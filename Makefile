@@ -1,4 +1,6 @@
 
+CFLAGS := -g
+
 .PHONY: all clean distclean unit
 
 all: $(MODULES)
