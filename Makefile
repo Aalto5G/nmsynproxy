@@ -1,6 +1,8 @@
 CC := cc
 #CC := clang
 
+.SUFFIXES:
+
 CFLAGS := -g -O2 -Wall -Werror
 
 .PHONY: all clean distclean unit
