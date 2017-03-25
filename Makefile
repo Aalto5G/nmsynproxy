@@ -1,5 +1,5 @@
 
-.PHONY: all
+.PHONY: all clean distclean unit
 
 all: $(MODULES)
 clean: $(patsubst %,clean_%,$(MODULES))
