@@ -1,3 +1,6 @@
+#ifndef _DYNARR_H_
+#define _DYNARR_H_
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -86,3 +89,5 @@ void *dynarr_realloc_impl(void *old, size_t size, size_t *capacity, size_t exten
   })
 
 #define DYNARR_SIZE(arptr) ((arptr)->size)
+
+#endif
