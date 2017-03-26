@@ -3,7 +3,6 @@ pcap
 pcapng
 tap, tapnet (=tapstar)
 atomic
-ipcksum
 random_mt
 netmapcommon
 databuf (=serbuf)
