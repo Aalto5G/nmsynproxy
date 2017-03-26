@@ -5,3 +5,4 @@ a.out
 *.swp
 *.log
 perf.data
+perf.data.old
