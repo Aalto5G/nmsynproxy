@@ -4,3 +4,4 @@ a.out
 *.d
 *.swp
 *.log
+perf.data
