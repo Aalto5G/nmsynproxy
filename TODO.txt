@@ -5,6 +5,5 @@ tap, tapnet (=tapstar)
 atomic
 ipcksum
 random_mt
-iphdr
 netmapcommon
 databuf (=serbuf)
