@@ -1,6 +1,6 @@
 pcap
 pcapng
-tap, tapnet (=tapstar)
+tappair (=tapfwd), tapnet (=tapstar)
 atomic
 netmapcommon
 databuf (=serbuf)
