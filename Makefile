@@ -3,6 +3,10 @@ CC := cc
 
 .SUFFIXES:
 
+DIRSYNPROXY := synproxy
+LCSYNPROXY := synproxy
+MODULES += SYNPROXY
+
 CFLAGS := -g -O2 -Wall -Werror
 
 .PHONY: all clean distclean unit
