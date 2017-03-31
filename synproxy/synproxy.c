@@ -1,5 +1,22 @@
 #include "synproxy.h"
 #include "ipcksum.h"
+#include <sys/time.h>
+
+static inline uint64_t gettime64(void)
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
+}
+
+void synproxy_expiry_fn(struct timer_link *timer, struct timer_linkheap *heap, void *ud)
+{
+  struct worker_local *local = ud;
+  struct synproxy_hash_entry *e;
+  e = CONTAINER_OF(timer, struct synproxy_hash_entry, timer);
+  hash_table_delete(&local->hash, &e->node);
+  free(e);
+}
 
 void synproxy_hash_put(
   struct worker_local *local,
@@ -24,6 +41,10 @@ void synproxy_hash_put(
   e->remote_ip = remote_ip;
   e->remote_port = remote_port;
   hash_table_add(&local->hash, &e->node, synproxy_hash(e));
+  e->timer.time64 = gettime64() + 86400ULL*1000ULL*1000ULL;
+  e->timer.fn = synproxy_expiry_fn;
+  e->timer.userdata = local;
+  timer_linkheap_add(&local->timers, &e->timer);
 }
 
 
@@ -42,7 +63,7 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
 // return: whether to free (1) or not (0)
 int uplink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
-  struct port *port)
+  struct port *port, uint64_t time64)
 {
   void *ether = packet_data(pkt);
   void *ip;
@@ -140,6 +161,8 @@ int uplink(
   {
     abort();
   }
+  entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+  timer_linkheap_modify(&local->timers, &entry->timer);
   tcp_set_seq_number_cksum_update(
     ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
   wscalediff = entry->wscalediff;

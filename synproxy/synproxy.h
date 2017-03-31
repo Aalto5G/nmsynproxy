@@ -9,6 +9,7 @@
 #include "linkedlist.h"
 #include "containerof.h"
 #include "murmur.h"
+#include "timerlink.h"
 #include <stdio.h>
 
 struct synproxy {
@@ -16,6 +17,7 @@ struct synproxy {
 
 struct synproxy_hash_entry {
   struct hash_list_node node;
+  struct timer_link timer;
   uint32_t local_ip;
   uint16_t local_port;
   uint32_t remote_ip;
@@ -55,6 +57,7 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata);
 
 struct worker_local {
   struct hash_table hash;
+  struct timer_linkheap timers;
 };
 
 static inline struct synproxy_hash_entry *synproxy_hash_get(
@@ -88,6 +91,6 @@ void synproxy_hash_put(
 
 int uplink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
-  struct port *port);
+  struct port *port, uint64_t time64);
 
 #endif

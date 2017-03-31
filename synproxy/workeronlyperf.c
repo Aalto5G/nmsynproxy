@@ -5,6 +5,12 @@
 #include "ipcksum.h"
 #include "packet.h"
 
+static inline uint64_t gettime64(void)
+{
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
+}
 
 #define POOL_SIZE 300
 #define CACHE_SIZE 100
@@ -106,12 +112,13 @@ void *rx_func(void *userdata)
   for (;;)
   {
     struct packet *pktstruct;
+    uint64_t time64 = gettime64();
 
     pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt);
     memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-    if (uplink(args->synproxy, args->local, pktstruct, &outport))
+    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
     {
       as_free_mt(&loc, pktstruct);
     }
@@ -123,7 +130,7 @@ void *rx_func(void *userdata)
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt);
     memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-    if (uplink(args->synproxy, args->local, pktstruct, &outport))
+    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
     {
       as_free_mt(&loc, pktstruct);
     }
@@ -134,7 +141,7 @@ void *rx_func(void *userdata)
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pktsmall);
     memcpy(packet_data(pktstruct), pktsmall, sizeof(pktsmall));
-    if (uplink(args->synproxy, args->local, pktstruct, &outport))
+    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
     {
       as_free_mt(&loc, pktstruct);
     }
@@ -166,6 +173,7 @@ int main(int argc, char **argv)
   }
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
+  timer_linkheap_init(&local.timers);
   synproxy_hash_put(&local, (10<<24)|2, 12345, (11<<24)|1, 54321);
 
   rx_args.workerq = &workerq;
