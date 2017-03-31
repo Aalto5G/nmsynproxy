@@ -18,6 +18,7 @@ void synproxy_hash_put(
   {
     abort();
   }
+  memset(e, 0, sizeof(*e));
   e->local_ip = local_ip;
   e->local_port = local_port;
   e->remote_ip = remote_ip;
@@ -54,7 +55,9 @@ int uplink(
   uint8_t protocol;
   uint32_t lan_ip;
   uint16_t lan_port;
+  uint16_t tcp_len;
   struct synproxy_hash_entry *entry;
+  int8_t wscalediff;
   if (ether_len < ETHER_HDR_LEN)
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full Ether hdr");
@@ -62,8 +65,8 @@ int uplink(
   }
   if (ether_type(ether) != ETHER_TYPE_IP)
   {
-    log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "not IPv4");
-    return 1;
+    port->portfunc(pkt, port->userdata);
+    return 0;
   }
   ip = ether_payload(ether);
   ip_len = ether_len - ETHER_HDR_LEN;
@@ -83,21 +86,15 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 2");
     return 1;
   }
-  if (ip_ttl(ip) <= 1)
+  if (ip_proto(ip) != 6)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt has TTL <= 1");
+    port->portfunc(pkt, port->userdata);
+    return 0;
   }
-#if 0
-  if (ip_hdr_cksum_calc(ip, ihl) != 0)
+  if (ip_frag_off(ip) != 0)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt has invalid IP hdr cksum");
-    return 1;
-  }
-#endif
-  if (ip_frag_off(ip) != 0 || ip_more_frags(ip))
-  {
-    log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "pkt is fragmented");
-    return 1;
+    port->portfunc(pkt, port->userdata);
+    return 0;
   }
   if (ip_len < ip_total_len(ip))
   {
@@ -111,48 +108,14 @@ int uplink(
   remote_ip = ip_dst(ip);
   if (protocol == 6)
   {
-    uint16_t tcp_len = ip_total_len(ip) - ihl;
+    tcp_len = ip_total_len(ip) - ihl;
     if (tcp_len < 20)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full TCP hdr");
       return 1;
     }
-#if 0
-    if (tcp_cksum_calc(ip, ihl, ippay, tcp_len) != 0)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt has invalid TCP cksum");
-      return 1;
-    }
-#endif
     lan_port = tcp_src_port(ippay);
     remote_port = tcp_dst_port(ippay);
-    if (tcp_syn(ippay))
-    {
-      abort();
-    }
-  }
-  else if (protocol == 17)
-  {
-    uint16_t udp_len = ip_total_len(ip) - ihl;
-    if (udp_len < 8)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full UDP hdr");
-      return 1;
-    }
-#if 0
-    if (udp_cksum_calc(ip, ihl, ippay, udp_len) != 0)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt has invalid UDP cksum");
-      return 1;
-    }
-#endif
-    lan_port = udp_src_port(ippay);
-    remote_port = udp_dst_port(ippay);
-  }
-  else
-  {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt not TCP or UDP");
-    return 1;
   }
   entry = synproxy_hash_get(
     local, lan_ip, lan_port, remote_ip, remote_port);
@@ -161,9 +124,35 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found");
     return 1;
   }
-#if 0
-  ip_set_hdr_cksum_calc(ip, ihl);
-#endif
+  if (tcp_syn(ippay))
+  {
+    abort();
+  }
+  if (!synproxy_is_connected(entry))
+  {
+    abort();
+  }
+  if (tcp_rst(ippay))
+  {
+    abort();
+  }
+  if (tcp_fin(ippay))
+  {
+    abort();
+  }
+  tcp_set_seq_number_cksum_update(
+    ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
+  wscalediff = entry->wscalediff;
+  if (wscalediff > 0)
+  {
+    tcp_set_window_cksum_update(
+      ippay, tcp_len, tcp_window(ippay) >> entry->wscalediff);
+  }
+  else
+  {
+    tcp_set_window_cksum_update(
+      ippay, tcp_len, tcp_window(ippay) << (-(entry->wscalediff)));
+  }
   port->portfunc(pkt, port->userdata);
   return 0;
 }

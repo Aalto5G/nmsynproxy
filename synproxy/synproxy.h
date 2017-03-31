@@ -20,7 +20,20 @@ struct synproxy_hash_entry {
   uint16_t local_port;
   uint32_t remote_ip;
   uint16_t remote_port;
+  uint32_t flag_state;
+  int8_t wscalediff;
+  uint16_t window_Size;
+  uint32_t isn;
+  uint32_t other_isn;
+  uint32_t seqoffset;
+  uint32_t timestamp;
 };
+
+static inline int synproxy_is_connected(struct synproxy_hash_entry *e)
+{
+  // FIXME implement properly
+  return (e->flag_state & 1) == 0;
+}
 
 static inline uint32_t synproxy_hash_separate(
   uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port)
