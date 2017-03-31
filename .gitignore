@@ -6,3 +6,4 @@ a.out
 *.log
 perf.data
 perf.data.old
+/opts.mk

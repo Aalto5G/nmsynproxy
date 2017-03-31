@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c
 
 SYNPROXY_SRC_LIB := $(patsubst %,$(DIRSYNPROXY)/%,$(SYNPROXY_SRC_LIB))
 SYNPROXY_SRC := $(patsubst %,$(DIRSYNPROXY)/%,$(SYNPROXY_SRC))
@@ -25,6 +25,11 @@ unit_$(LCSYNPROXY): unit_SYNPROXY
 
 SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf
 
+ifeq ($(WITH_NETMAP),yes)
+SYNPROXY: $(DIRSYNPROXY)/netmapsend
+CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR)
+endif
+
 unit_SYNPROXY: $(DIRSYNPROXY)/workeronlyperf
 	$(DIRSYNPROXY)/workeronlyperf
 
@@ -33,6 +38,9 @@ $(DIRSYNPROXY)/libsynproxy.a: $(SYNPROXY_OBJ_LIB) $(MAKEFILES_COMMON) $(MAKEFILE
 	ar rvs $@ $(filter %.o,$^)
 
 $(DIRSYNPROXY)/workeronlyperf: $(DIRSYNPROXY)/workeronlyperf.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
+
+$(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(SYNPROXY_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)

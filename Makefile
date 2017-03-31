@@ -18,5 +18,12 @@ unit: $(patsubst %,unit_%,$(MODULES))
 
 MAKEFILES_COMMON := Makefile
 
+WITH_NETMAP=no
+NETMAP_INCDIR=
+include opts.mk
+
 $(foreach module,$(MODULES),$(eval \
     include $(DIR$(module))/module.mk))
+
+opts.mk:
+	touch opts.mk
