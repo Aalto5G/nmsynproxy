@@ -4,3 +4,4 @@ tappair (=tapfwd), tapnet (=tapstar)
 atomic
 netmapcommon
 databuf (=serbuf)
+check if NETMAP_NO_TX_POLL is necessary
