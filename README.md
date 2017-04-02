@@ -11,8 +11,8 @@ To compile with netmap support, edit the file `opts.mk` (generated as empty
 file automatically after successful `make`), and add the lines:
 
 ```
-WITH\_NETMAP=yes
-NETMAP\_INCDIR=/home/YOURUSERNAME/netmap/sys
+WITH_NETMAP=yes
+NETMAP_INCDIR=/home/YOURUSERNAME/netmap/sys
 ```
 
 But before this, you need to clone netmap:
