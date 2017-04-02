@@ -138,6 +138,10 @@ int uplink(
     lan_port = tcp_src_port(ippay);
     remote_port = tcp_dst_port(ippay);
   }
+  else
+  {
+    abort();
+  }
   entry = synproxy_hash_get(
     local, lan_ip, lan_port, remote_ip, remote_port);
   if (entry == NULL)
