@@ -16,7 +16,7 @@ clean: $(patsubst %,clean_%,$(MODULES))
 distclean: $(patsubst %,distclean_%,$(MODULES))
 unit: $(patsubst %,unit_%,$(MODULES))
 
-MAKEFILES_COMMON := Makefile
+MAKEFILES_COMMON := Makefile opts.mk
 
 WITH_NETMAP=no
 NETMAP_INCDIR=
