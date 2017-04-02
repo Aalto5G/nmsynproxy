@@ -16,9 +16,9 @@
 static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
 {
   int i, j;
-  for (i = 0; i < 3; i++)
+  for (i = 0; i < 2; i++)
   {
-    for (j = 0; j < 3; j++)
+    for (j = 0; j < 2; j++)
     {
       if (nm_inject(nmd, data, sz) == 0)
       {
@@ -46,6 +46,7 @@ int main(int argc, char **argv)
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
   void *ip;
   void *tcp;
+  struct nmreq nmr;
 
   ether = pkt;
   memcpy(ether_dst(ether), lan_mac, 6);
@@ -94,7 +95,9 @@ int main(int argc, char **argv)
     printf("usage: netmapsend vale0:0\n");
     exit(1);
   }
-  nmd = nm_open(argv[1], NULL, 0, NULL);
+  memset(&nmr, 0, sizeof(nmr));
+  nmr.nr_tx_slots = 64;
+  nmd = nm_open(argv[1], &nmr, 0, NULL);
   if (nmd == NULL)
   {
     printf("cannot open %s\n", argv[1]);
