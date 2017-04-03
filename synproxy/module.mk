@@ -30,8 +30,9 @@ SYNPROXY: $(DIRSYNPROXY)/netmapsend
 CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR)
 endif
 
-unit_SYNPROXY: $(DIRSYNPROXY)/workeronlyperf
+unit_SYNPROXY: $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest
 	$(DIRSYNPROXY)/workeronlyperf
+	$(DIRSYNPROXY)/secrettest
 
 $(DIRSYNPROXY)/libsynproxy.a: $(SYNPROXY_OBJ_LIB) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	rm -f $@
