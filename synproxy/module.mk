@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c secrettest.c
 
 SYNPROXY_SRC_LIB := $(patsubst %,$(DIRSYNPROXY)/%,$(SYNPROXY_SRC_LIB))
 SYNPROXY_SRC := $(patsubst %,$(DIRSYNPROXY)/%,$(SYNPROXY_SRC))
@@ -23,7 +23,7 @@ clean_$(LCSYNPROXY): clean_SYNPROXY
 distclean_$(LCSYNPROXY): distclean_SYNPROXY
 unit_$(LCSYNPROXY): unit_SYNPROXY
 
-SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf
+SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest
 
 ifeq ($(WITH_NETMAP),yes)
 SYNPROXY: $(DIRSYNPROXY)/netmapsend
@@ -43,6 +43,9 @@ $(DIRSYNPROXY)/workeronlyperf: $(DIRSYNPROXY)/workeronlyperf.o $(DIRSYNPROXY)/li
 $(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
+$(DIRSYNPROXY)/secrettest: $(DIRSYNPROXY)/secrettest.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
+
 $(SYNPROXY_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SYNPROXY)
 
@@ -53,6 +56,6 @@ clean_SYNPROXY:
 	rm -f $(SYNPROXY_OBJ) $(SYNPROXY_DEP)
 
 distclean_SYNPROXY: clean_SYNPROXY
-	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf
+	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/netmapproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest
 
 -include $(DIRSYNPROXY)/*.d
