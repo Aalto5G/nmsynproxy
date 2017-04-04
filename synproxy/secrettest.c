@@ -5,7 +5,10 @@
 
 /*
  * We use only 64 bits of secret because most implementations don't have
- * 128-bit atomic variables
+ * 128-bit atomic variables.
+ *
+ * Or actually, we could use per-thread secrets. That would work and would
+ * allow 128-bit secrets.
  */
 atomic_uint_fast64_t secrets[2] = {ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
 atomic_int current_secret_index = ATOMIC_VAR_INIT(0);
