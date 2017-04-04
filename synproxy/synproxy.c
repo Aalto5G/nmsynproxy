@@ -9,7 +9,8 @@ static inline uint64_t gettime64(void)
   return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
 }
 
-void synproxy_expiry_fn(struct timer_link *timer, struct timer_linkheap *heap, void *ud)
+static void synproxy_expiry_fn(
+  struct timer_link *timer, struct timer_linkheap *heap, void *ud)
 {
   struct worker_local *local = ud;
   struct synproxy_hash_entry *e;

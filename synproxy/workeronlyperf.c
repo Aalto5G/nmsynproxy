@@ -17,7 +17,7 @@ static inline uint64_t gettime64(void)
 #define QUEUE_SIZE 512
 #define BLOCK_SIZE 1800
 
-void periodic(uint64_t count, struct timeval *tv1ptr)
+static void periodic(uint64_t count, struct timeval *tv1ptr)
 {
   struct timeval tv2;
   if ((count & (16*1024*1024-1)) == 0)
@@ -37,7 +37,7 @@ struct rx_args {
   struct worker_local *local;
 };
 
-void *rx_func(void *userdata)
+static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
   char pkt[1514] = {0};

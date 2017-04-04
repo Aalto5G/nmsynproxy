@@ -10,7 +10,7 @@
 atomic_uint_fast64_t secrets[2] = {ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
 atomic_int current_secret_index = ATOMIC_VAR_INIT(0);
 
-void revolve_secret_impl(void)
+static void revolve_secret_impl(void)
 {
   int new_secret_index = !atomic_load(&current_secret_index);
   // FIXME better implementation:
@@ -19,7 +19,8 @@ void revolve_secret_impl(void)
   atomic_store(&current_secret_index, new_secret_index);
 }
 
-void revolve_secret(struct timer_link *timer, struct timer_linkheap *heap, void *ud)
+static void __attribute__((unused)) revolve_secret(
+  struct timer_link *timer, struct timer_linkheap *heap, void *ud)
 {
   revolve_secret_impl();
   timer->time64 += 32*1000*1000;
