@@ -106,6 +106,6 @@ ifconfig veth3 up
 
 Then run these two commands in two terminal windows:
 ```
-./synproxy/netmapproxy netmap:veth1 netmap:veth2 (in one window)
-taskset -c 3 ./synproxy/netmapsend netmap:veth0 (in another window)
+./synproxy/netmapproxy netmap:veth1 netmap:veth2
+taskset -c 3 ./synproxy/netmapsend netmap:veth0
 ```
