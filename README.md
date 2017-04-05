@@ -65,7 +65,7 @@ taskset -c 3 ./synproxy/netmapsend vale0:1}0
 # Netmap with full kernel sources
 
 Some netmap drivers require full kernel sources. On Ubuntu 16.04 LTS, they
-can be installed in the following way: first, uncomment deb-src ines in
+can be installed in the following way: first, uncomment deb-src lines in
 `/etc/apt/sources.list`. Then, type these commands:
 
 ```
