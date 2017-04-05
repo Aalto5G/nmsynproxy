@@ -1,25 +1,27 @@
 #include <stdlib.h>
-#include <stdatomic.h>
 #include "timerlink.h"
 #include "siphash.h"
+#include "chacha.h"
 
-/*
- * We use only 64 bits of secret because most implementations don't have
- * 128-bit atomic variables.
- *
- * Or actually, we could use per-thread secrets. That would work and would
- * allow 128-bit secrets.
- */
-atomic_uint_fast64_t secrets[2] = {ATOMIC_VAR_INIT(0), ATOMIC_VAR_INIT(0)};
-atomic_int current_secret_index = ATOMIC_VAR_INIT(0);
+struct secret {
+  char data[16];
+};
+
+struct secret secrets[2] = {};
+
+int current_secret_index = 0;
+
+struct chacha20_ctx chachactx;
 
 static void revolve_secret_impl(void)
 {
-  int new_secret_index = !atomic_load(&current_secret_index);
-  // FIXME better implementation:
-  uint64_t new_secret = rand() + (((uint64_t)rand())<<32);
-  atomic_store(&secrets[new_secret_index], new_secret);
-  atomic_store(&current_secret_index, new_secret_index);
+  int new_secret_index = !current_secret_index;
+  struct secret new_secret;
+  char buf[64];
+  chacha20_next_block(&chachactx, buf);
+  memcpy(new_secret.data, buf, 16);
+  secrets[new_secret_index] = new_secret;
+  current_secret_index = new_secret_index;
 }
 
 static void __attribute__((unused)) revolve_secret(
@@ -30,29 +32,16 @@ static void __attribute__((unused)) revolve_secret(
   timer_linkheap_add(heap, timer);
 }
 
-static inline void fetch_secret(char key[16])
-{
-  int current_secret = atomic_load(&current_secret_index);
-  uint64_t secret = atomic_load(&secrets[current_secret]);
-  memcpy(key, &secret, 8);
-  memcpy(key+8, &secret, 8);
-}
-
 static inline int verify_cookie(
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn)
 {
-  int current_secret = atomic_load(&current_secret_index);
-  uint64_t secret1 = atomic_load(&secrets[current_secret]);
-  uint64_t secret2 = atomic_load(&secrets[!current_secret]);
+  int current_secret = current_secret_index;
+  struct secret secret1 = secrets[current_secret];
+  struct secret secret2 = secrets[!current_secret];
   uint16_t additional_bits = (isn>>28)&0xF;
-  char key1[16], key2[16];
   struct siphash_ctx ctx;
   uint32_t hash;
-  memcpy(key1, &secret1, 8);
-  memcpy(key1+8, &secret1, 8);
-  memcpy(key2, &secret2, 8);
-  memcpy(key2+8, &secret2, 8);
-  siphash_init(&ctx, key1);
+  siphash_init(&ctx, secret1.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & 0xfffffff;
@@ -60,7 +49,7 @@ static inline int verify_cookie(
   {
     return 1;
   }
-  siphash_init(&ctx, key2);
+  siphash_init(&ctx, secret2.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & 0xfffffff;
@@ -82,11 +71,10 @@ static uint32_t form_cookie(
   uint8_t mssbits;
   uint8_t additional_bits;
   int i;
-  int current_secret = atomic_load(&current_secret_index);
-  uint64_t secret1 = atomic_load(&secrets[current_secret]);
+  int current_secret = current_secret_index;
+  struct secret secret1 = secrets[current_secret];
   struct siphash_ctx ctx;
   uint32_t hash;
-  char key1[16];
   for (i = 0; i < 4; i++)
   {
     if (wstab[i] > wscale)
@@ -108,10 +96,8 @@ static uint32_t form_cookie(
     i--;
   }
   mssbits = i;
-  memcpy(key1, &secret1, 8);
-  memcpy(key1+8, &secret1, 8);
   additional_bits = (mssbits<<2) | wsbits;
-  siphash_init(&ctx, key1);
+  siphash_init(&ctx, secret1.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & 0xfffffff;
@@ -126,6 +112,7 @@ int main(int argc, char **argv)
   uint16_t mss = 1450;
   uint32_t cookie;
 
+  chacha20_init_deterministic(&chachactx);
   revolve_secret_impl();
   revolve_secret_impl();
   cookie = form_cookie(ip1, ip2, port1, port2, mss, wscale);
