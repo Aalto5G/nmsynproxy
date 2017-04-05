@@ -61,3 +61,51 @@ windows:
 ./synproxy/netmapproxy vale0:1{0 vale1:1
 taskset -c 3 ./synproxy/netmapsend vale0:1}0
 ```
+
+# Netmap with full kernel sources
+
+Some netmap drivers require full kernel sources. On Ubuntu 16.04 LTS, they
+can be installed in the following way: first, uncomment deb-src ines in
+`/etc/apt/sources.list`. Then, type these commands:
+
+```
+cd /home/YOURUSERNAME
+apt-get update
+apt-get source linux-image-$(uname -r)
+rm -rf netmap
+git clone https://github.com/luigirizzo/netmap
+cd netmap
+./configure --kernel-sources=/home/WHATEVER/linux-hwe-4.8.0
+rmmod netmap
+insmod ./netmap.ko
+```
+
+Then, you may load for example netmap specific veth driver:
+
+```
+cd /home/YOURUSERNAME/netmap
+rmmod veth
+insmod ./veth.ko
+```
+
+# Testing with veth
+
+Veth interfaces have poor performance. The netmap-specific veth driver is
+supposed to help this, but actually on the test laptop where it was tested, it
+made things even slower. Nevertheless, if you want to use veth, you can do it
+in this way:
+
+```
+ip link add veth0 type veth peer name veth1
+ip link add veth2 type veth peer name veth3
+ifconfig veth0 up
+ifconfig veth1 up
+ifconfig veth2 up
+ifconfig veth3 up
+```
+
+Then run these two commands in two terminal windows:
+```
+./synproxy/netmapproxy netmap:veth1 netmap:veth2 (in one window)
+taskset -c 3 ./synproxy/netmapsend netmap:veth0 (in another window)
+```
