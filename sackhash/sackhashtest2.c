@@ -24,7 +24,7 @@ static inline uint32_t sack_ip_hash_fn(struct hash_list_node *node, void *ud)
   return sack_ip_hash_value(e->ip);
 }
 
-#define READ_MTX_CNT 16
+#define READ_MTX_CNT 128
 
 struct sack_ip_hash {
   // Lock order, mtx first, then read_mtx.
