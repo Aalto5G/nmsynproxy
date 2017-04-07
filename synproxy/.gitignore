@@ -3,3 +3,11 @@
 /netmapsend
 /netmapproxy
 /secrettest
+/conftest
+/CONF.LEX.INTERMEDIATE
+/CONF.TAB.INTERMEDIATE
+/conf.lex.c
+/conf.lex.h
+/conf.tab.c
+/conf.tab.h
+/intermediatestore/
