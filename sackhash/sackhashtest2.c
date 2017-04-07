@@ -37,6 +37,10 @@ struct sack_ip_hash {
 static int sack_ip_hash_init(struct sack_ip_hash *hash, size_t capacity)
 {
   int i;
+  if (capacity < READ_MTX_CNT)
+  {
+    capacity = READ_MTX_CNT;
+  }
   if (pthread_mutex_init(&hash->mtx, NULL) != 0)
   {
     return -ENOMEM;
