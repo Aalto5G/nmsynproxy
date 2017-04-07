@@ -7,6 +7,10 @@ DIRSYNPROXY := synproxy
 LCSYNPROXY := synproxy
 MODULES += SYNPROXY
 
+DIRSACKHASH := sackhash
+LCSACKHASH := sackhash
+MODULES += SACKHASH
+
 CFLAGS := -g -O2 -Wall -Wextra -Wno-missing-field-initializers -Wno-unused-parameter -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith -Werror -std=gnu11
 
 .PHONY: all clean distclean unit
