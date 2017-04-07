@@ -1,5 +1,5 @@
 SACKHASH_SRC_LIB := 
-SACKHASH_SRC := $(SACKHASH_SRC_LIB) sackhashtest.c
+SACKHASH_SRC := $(SACKHASH_SRC_LIB) sackhashtest.c sackhashtest2.c
 
 SACKHASH_SRC_LIB := $(patsubst %,$(DIRSACKHASH)/%,$(SACKHASH_SRC_LIB))
 SACKHASH_SRC := $(patsubst %,$(DIRSACKHASH)/%,$(SACKHASH_SRC))
@@ -22,7 +22,7 @@ clean_$(LCSACKHASH): clean_SACKHASH
 distclean_$(LCSACKHASH): distclean_SACKHASH
 unit_$(LCSACKHASH): unit_SACKHASH
 
-SACKHASH: $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest
+SACKHASH: $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest $(DIRSACKHASH)/sackhashtest2
 
 unit_SACKHASH:
 	@true
@@ -32,6 +32,9 @@ $(DIRSACKHASH)/libsackhash.a: $(SACKHASH_OBJ_LIB) $(MAKEFILES_COMMON) $(MAKEFILE
 	ar rvs $@ $(filter %.o,$^)
 
 $(DIRSACKHASH)/sackhashtest: $(DIRSACKHASH)/sackhashtest.o $(DIRSACKHASH)/libsackhash.a $(LIBS_SACKHASH) $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SACKHASH)
+
+$(DIRSACKHASH)/sackhashtest2: $(DIRSACKHASH)/sackhashtest2.o $(DIRSACKHASH)/libsackhash.a $(LIBS_SACKHASH) $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SACKHASH)
 
 $(SACKHASH_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
@@ -44,6 +47,6 @@ clean_SACKHASH:
 	rm -f $(SACKHASH_OBJ) $(SACKHASH_DEP)
 
 distclean_SACKHASH: clean_SACKHASH
-	rm -f $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest
+	rm -f $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest $(DIRSACKHASH)/sackhashtest2
 
 -include $(DIRSACKHASH)/*.d
