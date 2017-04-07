@@ -8,7 +8,7 @@
 #include "hashtable.h"
 #include "linkedlist.h"
 #include "containerof.h"
-#include "murmur.h"
+#include "siphash.h"
 #include "timerlink.h"
 #include <stdio.h>
 
@@ -40,12 +40,12 @@ static inline int synproxy_is_connected(struct synproxy_hash_entry *e)
 static inline uint32_t synproxy_hash_separate(
   uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port)
 {
-  struct murmurctx ctx = MURMURCTX_INITER(0x12345678);
-  murmurctx_feed32(&ctx, local_ip);
-  murmurctx_feed32(&ctx, local_port);
-  murmurctx_feed32(&ctx, remote_ip);
-  murmurctx_feed32(&ctx, remote_port);
-  return murmurctx_get(&ctx);
+  struct siphash_ctx ctx;
+  char key[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+  siphash_init(&ctx, key);
+  siphash_feed_u64(&ctx, (((uint64_t)local_ip) << 32) | remote_ip);
+  siphash_feed_u64(&ctx, (((uint64_t)local_port) << 32) | remote_port);
+  return siphash_get(&ctx);
 }
 
 static inline uint32_t synproxy_hash(struct synproxy_hash_entry *e)
