@@ -234,8 +234,9 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < 10*1000*1000; i++)
   {
-    uint32_t ip = rand()&0xFFFF;
-    int oper = rand()%2;
+    uint32_t randval = rand();
+    uint32_t ip = randval&0xFFFF;
+    int oper = (randval>>16) % 2;
     if (oper)
     {
       if (sack_ip_hash_add(&hash, ip) != 0)
