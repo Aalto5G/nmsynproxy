@@ -82,7 +82,7 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
   return NULL;
 }
 
-void synproxy_hash_put(
+int synproxy_hash_put(
   struct worker_local *local,
   uint32_t local_ip,
   uint16_t local_port,
