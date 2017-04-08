@@ -19,7 +19,7 @@ static void synproxy_expiry_fn(
   free(e);
 }
 
-int synproxy_hash_put(
+struct synproxy_hash_entry *synproxy_hash_put(
   struct worker_local *local,
   uint32_t local_ip,
   uint16_t local_port,
@@ -34,7 +34,7 @@ int synproxy_hash_put(
   e = malloc(sizeof(*e));
   if (e == NULL)
   {
-    abort();
+    return NULL;
   }
   memset(e, 0, sizeof(*e));
   e->local_ip = local_ip;
@@ -46,7 +46,7 @@ int synproxy_hash_put(
   e->timer.userdata = local;
   timer_linkheap_add(&local->timers, &e->timer);
   hash_table_add_nogrow(&local->hash, &e->node, synproxy_hash(e));
-  return 0;
+  return e;
 }
 
 
@@ -81,6 +81,7 @@ int uplink(
   uint16_t tcp_len;
   struct synproxy_hash_entry *entry;
   int8_t wscalediff;
+  int todelete = 0;
   if (ether_len < ETHER_HDR_LEN)
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full Ether hdr");
@@ -144,6 +145,55 @@ int uplink(
   {
     abort();
   }
+  if (tcp_syn(ippay))
+  {
+    if (tcp_fin(ippay) || tcp_rst(ippay))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SYN packet contains FIN or RST");
+      return 1;
+    }
+    if (!tcp_ack(ippay))
+    {
+      entry = synproxy_hash_get(
+        local, lan_ip, lan_port, remote_ip, remote_port);
+      if (entry != NULL)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "S/SA but entry exists");
+        return 1;
+      }
+      entry = synproxy_hash_put(
+        local, lan_ip, lan_port, remote_ip, remote_port);
+      if (entry == NULL)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "out of memory");
+        return 1;
+      }
+      entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    else
+    {
+      entry = synproxy_hash_get(
+        local, lan_ip, lan_port, remote_ip, remote_port);
+      if (entry == NULL)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA but entry nonexistent");
+        return 1;
+      }
+      if (entry->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != DL_SYN_SENT");
+        return 1;
+      }
+      entry->flag_state = FLAG_STATE_CONNECTED;
+      entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+      timer_heap_modify(&local->timers, &entry->timer);
+      // FIXME send ACK and ACK window update
+      abort();
+      return 1;
+    }
+  }
   entry = synproxy_hash_get(
     local, lan_ip, lan_port, remote_ip, remote_port);
   if (entry == NULL)
@@ -151,21 +201,45 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found");
     return 1;
   }
-  if (tcp_syn(ippay))
+  if (entry->flag_state == FLAG_STATE_UPLINK_SYN_RECEIVED)
   {
-    abort();
+    if (tcp_rst(ippay))
+    {
+      synproxy_hash_del(local, entry);
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    if (tcp_ack(ippay))
+    {
+      entry->flag_state = FLAG_STATE_CONNECTED;
+      entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+      timer_heap_modify(&local->timers, &entry->timer);
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "UPLINK_SYN_RECEIVED w/o ACK");
+    return 1;
   }
   if (!synproxy_is_connected(entry))
   {
-    abort();
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
+    return 1;
   }
   if (tcp_rst(ippay))
   {
-    abort();
+    tcp_set_seq_number_cksum_update(
+      ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
+    synproxy_hash_del(local, entry);
+    port->portfunc(pkt, port->userdata);
+    return 0;
   }
   if (tcp_fin(ippay))
   {
-    abort();
+    entry->flag_state |= FLAG_STATE_UPLINK_FIN;
+    if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)
+    {
+      todelete = 1;
+    }
   }
   entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
@@ -183,5 +257,9 @@ int uplink(
       ippay, tcp_len, tcp_window(ippay) << (-(entry->wscalediff)));
   }
   port->portfunc(pkt, port->userdata);
+  if (todelete)
+  {
+    synproxy_hash_del(local, entry);
+  }
   return 0;
 }

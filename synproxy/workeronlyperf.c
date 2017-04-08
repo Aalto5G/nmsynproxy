@@ -174,7 +174,7 @@ int main(int argc, char **argv)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_linkheap_init(&local.timers);
-  synproxy_hash_put(&local, (10<<24)|2, 12345, (11<<24)|1, 54321);
+  synproxy_hash_put_connected(&local, (10<<24)|2, 12345, (11<<24)|1, 54321);
 
   rx_args.workerq = &workerq;
   rx_args.synproxy = &synproxy;
