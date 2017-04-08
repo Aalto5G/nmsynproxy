@@ -36,6 +36,8 @@ size         return SIZE;
 timer_period_usec return TIMER_PERIOD_USEC;
 timer_add    return TIMER_ADD;
 initial_tokens return INITIAL_TOKENS;
+conntablesize return CONNTABLESIZE;
+timerheapsize return TIMERHEAPSIZE;
 
 [0-9]+       yylval->i=atoi(yytext); return INT_LITERAL;
 

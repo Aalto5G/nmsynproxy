@@ -38,6 +38,7 @@ int confyywrap(yyscan_t scanner)
 
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token SACKHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
+%token CONNTABLESIZE TIMERHEAPSIZE
 
 %type<i> sackhashval
 %type<i> INT_LITERAL
@@ -88,6 +89,26 @@ SACKHASHMODE EQUALS sackhashval SEMICOLON
     YYABORT;
   }
   conf->sackhashsize = $3;
+}
+| CONNTABLESIZE EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid conn table size: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->conntablesize = $3;
+}
+| TIMERHEAPSIZE EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid timer heap size: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->timerheapsize = $3;
 }
 | RATEHASH EQUALS OPENBRACE ratehashlist CLOSEBRACE SEMICOLON
 ;
