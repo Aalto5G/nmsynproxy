@@ -41,7 +41,7 @@ void synproxy_hash_put(
   e->local_port = local_port;
   e->remote_ip = remote_ip;
   e->remote_port = remote_port;
-  hash_table_add(&local->hash, &e->node, synproxy_hash(e));
+  hash_table_add_nogrow(&local->hash, &e->node, synproxy_hash(e));
   e->timer.time64 = gettime64() + 86400ULL*1000ULL*1000ULL;
   e->timer.fn = synproxy_expiry_fn;
   e->timer.userdata = local;
