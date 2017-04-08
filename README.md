@@ -1,3 +1,10 @@
+# Prerequisites
+
+You need to have flex and bison installed in order to compile this project.
+Also, needless to say, compiler tools and GNU make must be available. To
+actually communicate with real network interfaces, you also need netmap, but
+more on that later.
+
 # Compilation
 
 To compile, type `make -j4` where the number after `-j` is the number of cores.
