@@ -1,5 +1,6 @@
 #include "synproxy.h"
 #include "ipcksum.h"
+#include "branchpredict.h"
 #include <sys/time.h>
 
 static inline uint64_t gettime64(void)
@@ -17,6 +18,18 @@ static void synproxy_expiry_fn(
   e = CONTAINER_OF(timer, struct synproxy_hash_entry, timer);
   hash_table_delete(&local->hash, &e->node);
   free(e);
+}
+
+static inline uint32_t between(uint32_t a, uint32_t x, uint32_t b)
+{
+  if (b >= a)
+  {
+    return x >= a && x < b;
+  }
+  else
+  {
+    return x >= a || x < b;
+  }
 }
 
 struct synproxy_hash_entry *synproxy_hash_put(
@@ -145,7 +158,7 @@ int uplink(
   {
     abort();
   }
-  if (tcp_syn(ippay))
+  if (unlikely(tcp_syn(ippay)))
   {
     if (tcp_fin(ippay) || tcp_rst(ippay))
     {
@@ -169,6 +182,7 @@ int uplink(
         return 1;
       }
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
+      entry->state_data.uplink_syn_sent.isn = tcp_seq_num(ippay);
       port->portfunc(pkt, port->userdata);
       return 0;
     }
@@ -186,7 +200,12 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != DL_SYN_SENT");
         return 1;
       }
-      entry->flag_state = FLAG_STATE_CONNECTED;
+      if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num");
+        return 1;
+      }
+      entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
       // FIXME send ACK and ACK window update
@@ -201,17 +220,28 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found");
     return 1;
   }
-  if (entry->flag_state == FLAG_STATE_UPLINK_SYN_RECEIVED)
+  if (unlikely(entry->flag_state == FLAG_STATE_UPLINK_SYN_RCVD))
   {
     if (tcp_rst(ippay))
     {
+      if (!between(
+        entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
+        return 1;
+      }
       synproxy_hash_del(local, entry);
       port->portfunc(pkt, port->userdata);
       return 0;
     }
     if (tcp_ack(ippay))
     {
-      entry->flag_state = FLAG_STATE_CONNECTED;
+      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_rcvd.isn + 1)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
+        return 1;
+      }
+      entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
       port->portfunc(pkt, port->userdata);
@@ -225,20 +255,53 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
     return 1;
   }
-  if (tcp_rst(ippay))
+  if (unlikely(tcp_rst(ippay)))
   {
+    if (!between(
+      entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+      return 1;
+    }
     tcp_set_seq_number_cksum_update(
       ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
     synproxy_hash_del(local, entry);
     port->portfunc(pkt, port->userdata);
     return 0;
   }
-  if (tcp_fin(ippay))
+  if (unlikely(tcp_fin(ippay)))
   {
+    uint32_t first_seq = tcp_seq_num(ippay);
+    uint32_t last_seq = tcp_seq_num(ippay); // FIXME
+    if (
+      !between(
+        entry->lan_next, first_seq, entry->lan_next+entry->lan_window)
+      &&
+      !between(
+        entry->lan_next, last_seq, entry->lan_next+entry->lan_window)
+      )
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+      return 1;
+    }
     entry->flag_state |= FLAG_STATE_UPLINK_FIN;
+#if 0 // only after ACK
     if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)
     {
       todelete = 1;
+    }
+#endif
+  }
+  if (unlikely(entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
+  {
+    uint32_t fin = entry->state_data.established.downfin;
+    if (tcp_ack_num(ippay) == fin + 1)
+    {
+      entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
+      if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
+      {
+        todelete = 1;
+      }
     }
   }
   entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
