@@ -81,6 +81,12 @@ SACKHASHMODE EQUALS sackhashval SEMICOLON
 }
 | SACKHASHSIZE EQUALS INT_LITERAL SEMICOLON
 {
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid sackhash size: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
   conf->sackhashsize = $3;
 }
 | RATEHASH EQUALS OPENBRACE ratehashlist CLOSEBRACE SEMICOLON
@@ -89,18 +95,42 @@ SACKHASHMODE EQUALS sackhashval SEMICOLON
 ratehash_entry:
 SIZE EQUALS INT_LITERAL SEMICOLON
 {
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid ratehash size: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
   conf->ratehash.size = $3;
 }
 | TIMER_PERIOD_USEC EQUALS INT_LITERAL SEMICOLON
 {
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid ratehash timer period: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
   conf->ratehash.timer_period_usec = $3;
 }
 | TIMER_ADD EQUALS INT_LITERAL SEMICOLON
 {
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid ratehash timer addition: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
   conf->ratehash.timer_add = $3;
 }
 | INITIAL_TOKENS EQUALS INT_LITERAL SEMICOLON
 {
+  if ($3 <= 0)
+  {
+    fprintf(stderr, "invalid ratehash initial tokens: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
   conf->ratehash.initial_tokens = $3;
 }
 ;
