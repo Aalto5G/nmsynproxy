@@ -4,6 +4,7 @@
 #include "iphdr.h"
 #include "ipcksum.h"
 #include "packet.h"
+#include "hashseed.h"
 
 static inline uint64_t gettime64(void)
 {
@@ -161,6 +162,7 @@ int main(int argc, char **argv)
   struct worker_local local;
   cpu_set_t cpuset;
 
+  hash_seed_init();
   setlinebuf(stdout);
 
   if (queue_init(&workerq, QUEUE_SIZE) != 0)
