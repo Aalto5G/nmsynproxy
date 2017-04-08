@@ -1,3 +1,10 @@
-synproxyconf {
+synproxyconf = {
   sackmode = hashipport;
-}
+  sackhashsize = 131072;
+  ratehash = {
+    size = 131072;
+    timer_period_usec = 1000000;
+    timer_add = 400;
+    initial_tokens = 2000;
+  };
+};
