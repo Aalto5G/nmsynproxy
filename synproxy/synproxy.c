@@ -267,6 +267,11 @@ int downlink(
     port->portfunc(pkt, port->userdata);
     return 0;
   }
+  if (!tcp_ack(ippay))
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "no TCP ACK, dropping pkt");
+    return 1;
+  }
   first_seq = tcp_seq_num(ippay);
   data_len =
     ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
@@ -593,6 +598,11 @@ int uplink(
   if (!synproxy_is_connected(entry))
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
+    return 1;
+  }
+  if (!tcp_ack(ippay))
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "no TCP ACK, dropping pkt");
     return 1;
   }
   first_seq = tcp_seq_num(ippay);
