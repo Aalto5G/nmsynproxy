@@ -32,10 +32,18 @@ struct synproxy_hash_entry {
   uint32_t other_isn;
   uint32_t seqoffset;
   uint32_t timestamp;
+  uint32_t lan_sent;
+  uint32_t wan_sent;
+  uint32_t lan_acked;
+  uint32_t wan_acked;
+  uint32_t lan_max;
+  uint32_t wan_max;
+#if 0
   uint32_t lan_next;
   uint32_t wan_next;
   uint32_t lan_window; // FIXME make unscaled to save space
   uint32_t wan_window; // FIXME make unscaled to save space
+#endif
   uint16_t lan_max_window_unscaled;
   uint16_t wan_max_window_unscaled;
   union {
@@ -133,8 +141,9 @@ static inline void synproxy_hash_put_connected(
   struct synproxy_hash_entry *e;
   e = synproxy_hash_put(local, local_ip, local_port, remote_ip, remote_port);
   e->flag_state = FLAG_STATE_ESTABLISHED;
-  e->lan_window = 32768;
-  e->lan_next = 0;
+  e->lan_max = 32768;
+  e->lan_sent = 0;
+  e->lan_acked = 0;
   e->lan_wscale = 0;
 }
 

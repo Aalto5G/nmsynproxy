@@ -204,9 +204,10 @@ int downlink(
         return 1;
       }
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
-      entry->wan_next = tcp_seq_num(ippay) + 1;
-      entry->lan_next = tcp_ack_num(ippay);
-      entry->lan_window = tcp_window(ippay) << entry->lan_wscale;
+      entry->wan_sent = tcp_seq_num(ippay) + 1;
+      entry->lan_acked = tcp_ack_num(ippay);
+      entry->lan_max =
+        entry->lan_acked + (tcp_window(ippay) << entry->lan_wscale);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
@@ -251,8 +252,8 @@ int downlink(
     else
     {
       if (!between(
-        entry->wan_next - (entry->wan_max_window_unscaled<<entry->wan_wscale),
-        tcp_seq_num(ippay), entry->wan_next+entry->wan_window))
+        entry->wan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale),
+        tcp_seq_num(ippay), entry->wan_max))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
         return 1;
@@ -288,15 +289,15 @@ int downlink(
     last_seq += 1;
   }
   wan_min =
-    entry->wan_next - (entry->wan_max_window_unscaled<<entry->wan_wscale);
+    entry->wan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale);
   if (
-    !(data_len == 0 && first_seq+1 == entry->wan_next) // keepalive
+    !(data_len == 0 && first_seq+1 == entry->wan_sent) // keepalive
     &&
     !between(
-      wan_min, first_seq, entry->wan_next+entry->wan_window)
+      wan_min, first_seq, entry->wan_max)
     &&
     !between(
-      wan_min, last_seq, entry->wan_next+entry->wan_window)
+      wan_min, last_seq, entry->wan_max)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number");
@@ -331,10 +332,13 @@ int downlink(
   {
     uint32_t ack = tcp_ack_num(ippay);
     uint16_t window = tcp_window(ippay);
-    if (seq_cmp(ack, entry->lan_next) >= 0)
+    if (seq_cmp(ack, entry->lan_acked) >= 0)
     {
-      entry->lan_next = ack;
-      entry->lan_window = window << entry->lan_wscale;
+      entry->lan_acked = ack;
+    }
+    if (seq_cmp(ack + (window << entry->lan_wscale), entry->lan_max) >= 0)
+    {
+      entry->lan_max = ack + (window << entry->lan_wscale);
     }
   }
   entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
@@ -526,8 +530,8 @@ int uplink(
     if (tcp_rst(ippay))
     {
       if (!between(
-        entry->lan_next - (entry->lan_max_window_unscaled<<entry->lan_wscale),
-        tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+        entry->lan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale),
+        tcp_seq_num(ippay), entry->lan_max))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
         return 1;
@@ -545,10 +549,13 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
         return 1;
       }
-      if (seq_cmp(ack, entry->wan_next) >= 0)
+      if (seq_cmp(ack, entry->wan_acked) >= 0)
       {
-        entry->wan_next = ack;
-        entry->wan_window = window << entry->wan_wscale;
+        entry->wan_acked = ack;
+      }
+      if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
+      {
+        entry->wan_max = ack + (window << entry->wan_wscale);
       }
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
@@ -582,8 +589,8 @@ int uplink(
     else
     {
       if (!between(
-        entry->lan_next - (entry->lan_max_window_unscaled<<entry->lan_wscale),
-        tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+        entry->lan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale),
+        tcp_seq_num(ippay), entry->lan_max))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
         return 1;
@@ -621,15 +628,15 @@ int uplink(
     last_seq += 1;
   }
   lan_min =
-    entry->lan_next - (entry->lan_max_window_unscaled<<entry->lan_wscale);
+    entry->lan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
   if (
-    !(data_len == 0 && first_seq+1 == entry->lan_next) // keepalive
+    !(data_len == 0 && first_seq+1 == entry->lan_sent) // keepalive
     &&
     !between(
-      lan_min, first_seq, entry->lan_next+entry->lan_window)
+      lan_min, first_seq, entry->lan_max)
     &&
     !between(
-      lan_min, last_seq, entry->lan_next+entry->lan_window)
+      lan_min, last_seq, entry->lan_max)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
@@ -664,10 +671,13 @@ int uplink(
   {
     uint32_t ack = tcp_ack_num(ippay);
     uint16_t window = tcp_window(ippay);
-    if (seq_cmp(ack, entry->wan_next) >= 0)
+    if (seq_cmp(ack, entry->wan_acked) >= 0)
     {
-      entry->wan_next = ack;
-      entry->wan_window = window << entry->wan_wscale;
+      entry->wan_acked = ack;
+    }
+    if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
+    {
+      entry->wan_max = ack + (window << entry->wan_wscale);
     }
   }
   entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
