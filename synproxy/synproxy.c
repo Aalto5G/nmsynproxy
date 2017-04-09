@@ -203,6 +203,9 @@ int downlink(
         return 1;
       }
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
+      entry->wan_next = tcp_seq_num(ippay) + 1;
+      entry->lan_next = tcp_ack_num(ippay);
+      entry->lan_window = tcp_window(ippay) << entry->lan_wscale;
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
@@ -217,6 +220,7 @@ int downlink(
     if (tcp_ack(ippay))
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found but ACK set");
+      return 1;
       // FIXME implement SYN proxy
       abort();
     }
@@ -246,7 +250,7 @@ int downlink(
     else
     {
       if (!between(
-        entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+        entry->wan_next, tcp_seq_num(ippay), entry->wan_next+entry->wan_window))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
         return 1;
@@ -277,6 +281,8 @@ int downlink(
     last_seq += 1;
   }
   if (
+    !(data_len == 0 && first_seq+1 == entry->wan_next) // keepalive
+    &&
     !between(
       entry->wan_next, first_seq, entry->wan_next+entry->wan_window)
     &&
@@ -442,6 +448,13 @@ int uplink(
     {
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port);
+      if (entry != NULL && entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT &&
+          entry->state_data.uplink_syn_sent.isn == tcp_seq_num(ippay))
+      {
+        // retransmit of SYN
+        port->portfunc(pkt, port->userdata);
+        return 0;
+      }
       if (entry != NULL)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "S/SA but entry exists");
@@ -509,10 +522,17 @@ int uplink(
     }
     if (tcp_ack(ippay))
     {
+      uint32_t ack = tcp_ack_num(ippay);
+      uint16_t window = tcp_window(ippay);
       if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_rcvd.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
         return 1;
+      }
+      if (seq_cmp(ack, entry->wan_next) >= 0)
+      {
+        entry->wan_next = ack;
+        entry->wan_window = window << entry->wan_wscale;
       }
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
@@ -579,6 +599,8 @@ int uplink(
     last_seq += 1;
   }
   if (
+    !(data_len == 0 && first_seq+1 == entry->lan_next) // keepalive
+    &&
     !between(
       entry->lan_next, first_seq, entry->lan_next+entry->lan_window)
     &&
