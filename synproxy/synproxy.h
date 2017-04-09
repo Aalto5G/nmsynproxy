@@ -34,8 +34,10 @@ struct synproxy_hash_entry {
   uint32_t timestamp;
   uint32_t lan_next;
   uint32_t wan_next;
-  uint32_t lan_window;
-  uint32_t wan_window;
+  uint32_t lan_window; // FIXME make unscaled to save space
+  uint32_t wan_window; // FIXME make unscaled to save space
+  uint16_t lan_max_window_unscaled;
+  uint16_t wan_max_window_unscaled;
   union {
     struct {
       uint32_t isn;

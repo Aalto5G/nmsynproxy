@@ -103,6 +103,7 @@ int downlink(
   uint32_t last_seq;
   int32_t data_len;
   int todelete = 0;
+  uint32_t wan_min;
 
   if (ether_len < ETHER_HDR_LEN)
   {
@@ -250,7 +251,8 @@ int downlink(
     else
     {
       if (!between(
-        entry->wan_next, tcp_seq_num(ippay), entry->wan_next+entry->wan_window))
+        entry->wan_next - (entry->wan_max_window_unscaled<<entry->wan_wscale),
+        tcp_seq_num(ippay), entry->wan_next+entry->wan_window))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
         return 1;
@@ -280,14 +282,16 @@ int downlink(
   {
     last_seq += 1;
   }
+  wan_min =
+    entry->wan_next - (entry->wan_max_window_unscaled<<entry->wan_wscale);
   if (
     !(data_len == 0 && first_seq+1 == entry->wan_next) // keepalive
     &&
     !between(
-      entry->wan_next, first_seq, entry->wan_next+entry->wan_window)
+      wan_min, first_seq, entry->wan_next+entry->wan_window)
     &&
     !between(
-      entry->wan_next, last_seq, entry->wan_next+entry->wan_window)
+      wan_min, last_seq, entry->wan_next+entry->wan_window)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number");
@@ -313,6 +317,10 @@ int downlink(
         todelete = 1;
       }
     }
+  }
+  if (tcp_window(ippay) > entry->lan_max_window_unscaled)
+  {
+    entry->lan_max_window_unscaled = tcp_window(ippay);
   }
   if (likely(tcp_ack(ippay)))
   {
@@ -369,6 +377,8 @@ int uplink(
   uint32_t last_seq;
   int32_t data_len;
   int todelete = 0;
+  uint32_t lan_min;
+
   if (ether_len < ETHER_HDR_LEN)
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full Ether hdr");
@@ -511,7 +521,8 @@ int uplink(
     if (tcp_rst(ippay))
     {
       if (!between(
-        entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+        entry->lan_next - (entry->lan_max_window_unscaled<<entry->lan_wscale),
+        tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
         return 1;
@@ -566,7 +577,8 @@ int uplink(
     else
     {
       if (!between(
-        entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+        entry->lan_next - (entry->lan_max_window_unscaled<<entry->lan_wscale),
+        tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
         return 1;
@@ -598,18 +610,24 @@ int uplink(
   {
     last_seq += 1;
   }
+  lan_min =
+    entry->lan_next - (entry->lan_max_window_unscaled<<entry->lan_wscale);
   if (
     !(data_len == 0 && first_seq+1 == entry->lan_next) // keepalive
     &&
     !between(
-      entry->lan_next, first_seq, entry->lan_next+entry->lan_window)
+      lan_min, first_seq, entry->lan_next+entry->lan_window)
     &&
     !between(
-      entry->lan_next, last_seq, entry->lan_next+entry->lan_window)
+      lan_min, last_seq, entry->lan_next+entry->lan_window)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
     return 1;
+  }
+  if (tcp_window(ippay) > entry->wan_max_window_unscaled)
+  {
+    entry->wan_max_window_unscaled = tcp_window(ippay);
   }
   if (unlikely(tcp_fin(ippay)))
   {
