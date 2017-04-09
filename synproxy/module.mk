@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c yyutils.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c secrettest.c conftest.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c
 
 SYNPROXY_LEX_LIB := conf.l
 SYNPROXY_LEX := $(SYNPROXY_LEX_LIB)
@@ -37,11 +37,11 @@ SYNPROXY_DEP := $(patsubst %.c,%.d,$(SYNPROXY_SRC))
 SYNPROXY_DEPGEN_LIB := $(patsubst %.c,%.d,$(SYNPROXY_GEN_LIB))
 SYNPROXY_DEPGEN := $(patsubst %.c,%.d,$(SYNPROXY_GEN))
 
-CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) -I$(DIRLOG) -I$(DIRHASHTABLE) -I$(DIRHASHLIST) -I$(DIRPORTS) -I$(DIRALLOC) -I$(DIRTIMERLINKHEAP)
+CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) -I$(DIRLOG) -I$(DIRHASHTABLE) -I$(DIRHASHLIST) -I$(DIRPORTS) -I$(DIRALLOC) -I$(DIRTIMERLINKHEAP) -I$(DIRMYPCAP) -I$(DIRDYNARR)
 
 MAKEFILES_SYNPROXY := $(DIRSYNPROXY)/module.mk
 
-LIBS_SYNPROXY := $(DIRALLOC)/liballoc.a $(DIRIPHDR)/libiphdr.a $(DIRLOG)/liblog.a $(DIRPORTS)/libports.a $(DIRHASHTABLE)/libhashtable.a $(DIRHASHLIST)/libhashlist.a $(DIRTIMERLINKHEAP)/libtimerheap.a $(DIRMISC)/libmisc.a
+LIBS_SYNPROXY := $(DIRMYPCAP)/libmypcap.a $(DIRDYNARR)/libdynarr.a $(DIRALLOC)/liballoc.a $(DIRIPHDR)/libiphdr.a $(DIRLOG)/liblog.a $(DIRPORTS)/libports.a $(DIRHASHTABLE)/libhashtable.a $(DIRHASHLIST)/libhashlist.a $(DIRTIMERLINKHEAP)/libtimerlinkheap.a $(DIRMISC)/libmisc.a
 
 .PHONY: SYNPROXY clean_SYNPROXY distclean_SYNPROXY unit_SYNPROXY $(LCSYNPROXY) clean_$(LCSYNPROXY) distclean_$(LCSYNPROXY) unit_$(LCSYNPROXY)
 
@@ -50,7 +50,7 @@ clean_$(LCSYNPROXY): clean_SYNPROXY
 distclean_$(LCSYNPROXY): distclean_SYNPROXY
 unit_$(LCSYNPROXY): unit_SYNPROXY
 
-SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest
+SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly
 
 ifeq ($(WITH_NETMAP),yes)
 SYNPROXY: $(DIRSYNPROXY)/netmapsend
@@ -75,6 +75,9 @@ $(DIRSYNPROXY)/secrettest: $(DIRSYNPROXY)/secrettest.o $(DIRSYNPROXY)/libsynprox
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(DIRSYNPROXY)/conftest: $(DIRSYNPROXY)/conftest.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
+
+$(DIRSYNPROXY)/pcapngworkeronly: $(DIRSYNPROXY)/pcapngworkeronly.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(SYNPROXY_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
@@ -116,6 +119,6 @@ clean_SYNPROXY:
 	rm -f $(DIRSYNPROXY)/conf.tab.h
 
 distclean_SYNPROXY: clean_SYNPROXY
-	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/netmapproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest
+	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/netmapproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly
 
 -include $(DIRSYNPROXY)/*.d

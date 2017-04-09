@@ -4,6 +4,7 @@
 /netmapproxy
 /secrettest
 /conftest
+/pcapngworkeronly
 /CONF.LEX.INTERMEDIATE
 /CONF.TAB.INTERMEDIATE
 /conf.lex.c
