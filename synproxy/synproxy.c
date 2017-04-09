@@ -272,24 +272,45 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "UPLINK_SYN_RECEIVED w/o ACK");
     return 1;
   }
-  if (!synproxy_is_connected(entry))
-  {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
-    return 1;
-  }
   if (unlikely(tcp_rst(ippay)))
   {
-    if (!between(
-      entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+    if (entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT)
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "dropping RST in UPLINK_SYN_SENT");
       return 1;
+    }
+    else if (entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+    {
+      if (!tcp_ack(ippay))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT");
+        return 1;
+      }
+      if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT");
+        return 1;
+      }
+    }
+    else
+    {
+      if (!between(
+        entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+        return 1;
+      }
     }
     tcp_set_seq_number_cksum_update(
       ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
     synproxy_hash_del(local, entry);
     port->portfunc(pkt, port->userdata);
     return 0;
+  }
+  if (!synproxy_is_connected(entry))
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
+    return 1;
   }
   first_seq = tcp_seq_num(ippay);
   data_len =
