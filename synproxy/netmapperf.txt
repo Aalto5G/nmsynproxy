@@ -1,0 +1,20 @@
+vale default 1.25 Mpps = 10.3 Gbps
+pipe default 2.10 Mpps = 17.3 Gbps
+- small packets default 4.6 Mpps
+- nmreq tx slots 128: 3.2 Mpps
+- nmreq tx slots 64: 3.3 Mpps
+- nmreq tx/rx slots 64/64: 3.2 Mpps
+- nmreq tx/rx slots 64/128: 3.2 Mpps
+- nmreq tx/rx slots 64/256: 3.3 Mpps = 27.2 Gbps <---- this was chosen
+- nmreq tx/rx slots 64/512: 3.3 Mpps
+- nmreq tx/rx slots 64/1024: 3.3 Mpps
+- nmreq tx slots 32: 3.3 Mpps
+- small packets chosen nmreq: 10 Mpps
+netmapfwd pipe default 3.50 Mpps = 28.9 Gbps
+- nmreq tx/rx slots 64/256: 7.6 Mpps = 62.7 Gbps <---- this was chosen
+
+veth wo/ drivers 0.73 Mpps = 6.0 Gbps
+veth w/ drivers 0.31 Mpps = 2.6 Gbps
+
+at work pipe: 4.3 Mpps large packets, 7.5 Mpps small packets
+at work i40e: 2.0 Mpps large packets

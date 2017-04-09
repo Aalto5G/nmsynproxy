@@ -1,0 +1,7 @@
+What if ACK response to SYN+ACK is dropped? The protected host may retry, and
+we must be prepared to re-send ACK.
+
+What client tries to re-send old data that server has ACKed and firewall
+has seen the ACK but the ack was dropped between firewall and client? Now
+the old data is dropped, and therefore, the server never gets a chance to
+ACK.
