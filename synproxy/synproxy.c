@@ -128,10 +128,15 @@ int uplink(
     port->portfunc(pkt, port->userdata);
     return 0;
   }
-  if (ip_frag_off(ip) != 0)
+  if (ip_frag_off(ip) >= 20)
   {
     port->portfunc(pkt, port->userdata);
     return 0;
+  }
+  else if (ip_frag_off(ip) != 0)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "fragment has partial header");
+    return 1;
   }
   if (ip_len < ip_total_len(ip))
   {
