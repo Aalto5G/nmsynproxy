@@ -12,3 +12,5 @@ RST attack
 - require exact or +1 match, need to maintain seqlo/seqhi values where
   seqlo is max sent and seqhi is max ACKed + window. Then we allow resending
   up to 1 window back, i.e. seqlo-max_window .. seqhi
+
+Enforce at least that window size must be 1. If it's 0, round up to 1.
