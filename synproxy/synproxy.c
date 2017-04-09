@@ -273,6 +273,14 @@ int downlink(
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "no TCP ACK, dropping pkt");
     return 1;
   }
+  if (!between(
+    entry->lan_acked - (entry->lan_max_window_unscaled<<entry->lan_wscale),
+    tcp_ack_num(ippay),
+    entry->lan_sent + 1))
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid ACK number");
+    return 1;
+  }
   first_seq = tcp_seq_num(ippay);
   data_len =
     ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
@@ -327,6 +335,10 @@ int downlink(
   if (tcp_window(ippay) > entry->lan_max_window_unscaled)
   {
     entry->lan_max_window_unscaled = tcp_window(ippay);
+  }
+  if (seq_cmp(last_seq, entry->wan_sent) >= 0)
+  {
+    entry->wan_sent = last_seq + 1;
   }
   if (likely(tcp_ack(ippay)))
   {
@@ -612,6 +624,14 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "no TCP ACK, dropping pkt");
     return 1;
   }
+  if (!between(
+    entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
+    tcp_ack_num(ippay),
+    entry->wan_sent + 1))
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid ACK number");
+    return 1;
+  }
   first_seq = tcp_seq_num(ippay);
   data_len =
     ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
@@ -666,6 +686,10 @@ int uplink(
         todelete = 1;
       }
     }
+  }
+  if (seq_cmp(last_seq, entry->lan_sent) >= 0)
+  {
+    entry->lan_sent = last_seq + 1;
   }
   if (likely(tcp_ack(ippay)))
   {

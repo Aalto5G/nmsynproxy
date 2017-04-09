@@ -19,3 +19,5 @@ FIN attack
 - Require FIN segments to have ACK, verify that ACK number is between
   max ACKed - max_window and seqlo. Require also data segments to have ACK.
   RST and initial SYN are the only ones for which ACK is not required.
+
+Populate wscale values
