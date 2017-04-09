@@ -106,7 +106,7 @@ int downlink(
 
   if (ether_len < ETHER_HDR_LEN)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full Ether hdr");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full Ether hdr");
     return 1;
   }
   if (ether_type(ether) != ETHER_TYPE_IP)
@@ -118,18 +118,18 @@ int downlink(
   ip_len = ether_len - ETHER_HDR_LEN;
   if (ip_len < IP_HDR_MINLEN)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 1");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP hdr 1");
     return 1;
   }
   if (ip_version(ip) != 4)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "IP version mismatch");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP version mismatch");
     return 1;
   }
   ihl = ip_hdr_len(ip);
   if (ip_len < ihl)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 2");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP hdr 2");
     return 1;
   }
   if (ip_proto(ip) != 6)
@@ -144,12 +144,12 @@ int downlink(
   }
   else if (ip_frag_off(ip) != 0)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "fragment has partial header");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "fragment has partial header");
     return 1;
   }
   if (ip_len < ip_total_len(ip))
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP data");
     return 1;
   }
   
@@ -162,7 +162,7 @@ int downlink(
     tcp_len = ip_total_len(ip) - ihl;
     if (tcp_len < 20)
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full TCP hdr");
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full TCP hdr");
       return 1;
     }
     lan_port = tcp_dst_port(ippay);
@@ -176,7 +176,7 @@ int downlink(
   {
     if (tcp_fin(ippay) || tcp_rst(ippay))
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SYN packet contains FIN or RST");
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SYN packet contains FIN or RST");
       return 1;
     }
     if (!tcp_ack(ippay))
@@ -189,17 +189,17 @@ int downlink(
         local, lan_ip, lan_port, remote_ip, remote_port);
       if (entry == NULL)
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA but entry nonexistent");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA but entry nonexistent");
         return 1;
       }
       if (entry->flag_state != FLAG_STATE_UPLINK_SYN_SENT)
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != UL_SYN_SENT");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, entry != UL_SYN_SENT");
         return 1;
       }
       if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, invalid ACK num");
         return 1;
       }
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
@@ -216,11 +216,11 @@ int downlink(
   {
     if (tcp_ack(ippay))
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found but ACK set");
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found but ACK set");
       // FIXME implement SYN proxy
       abort();
     }
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found");
     return 1;
   }
   if (unlikely(tcp_rst(ippay)))
@@ -229,18 +229,18 @@ int downlink(
     {
       if (!tcp_ack(ippay))
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in UPLINK_SYN_SENT");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "R/RA in UPLINK_SYN_SENT");
         return 1;
       }
       if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn)
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in UL_SYN_SENT, bad seq");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RA/RA in UL_SYN_SENT, bad seq");
         return 1;
       }
     }
     else if (entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "dropping RST in DOWNLINK_SYN_SENT");
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "dropping RST in DOWNLINK_SYN_SENT");
       return 1;
     }
     else
@@ -248,7 +248,7 @@ int downlink(
       if (!between(
         entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
         return 1;
       }
     }
@@ -284,14 +284,14 @@ int downlink(
       entry->wan_next, last_seq, entry->wan_next+entry->wan_window)
     )
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number");
     return 1;
   }
   if (unlikely(tcp_fin(ippay)))
   {
     if (ip_more_frags(ip))
     {
-      log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
+      log_log(LOG_LEVEL_WARNING, "WORKERDOWNLINK", "FIN with more frags");
     }
     entry->state_data.established.downfin = last_seq;
     entry->flag_state |= FLAG_STATE_DOWNLINK_FIN;
