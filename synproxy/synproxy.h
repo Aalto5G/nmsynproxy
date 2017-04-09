@@ -145,6 +145,10 @@ static inline void synproxy_hash_del(
   free(e);
 }
 
+int downlink(
+  struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
+  struct port *port, uint64_t time64);
+
 int uplink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
   struct port *port, uint64_t time64);

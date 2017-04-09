@@ -82,6 +82,257 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
   return synproxy_hash(CONTAINER_OF(node, struct synproxy_hash_entry, node));
 }
 
+int downlink(
+  struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
+  struct port *port, uint64_t time64)
+{
+  void *ether = packet_data(pkt);
+  void *ip;
+  void *ippay;
+  size_t ether_len = pkt->sz;
+  size_t ip_len;
+  uint16_t ihl;
+  uint32_t remote_ip;
+  uint16_t remote_port;
+  uint8_t protocol;
+  uint32_t lan_ip;
+  uint16_t lan_port;
+  uint16_t tcp_len;
+  struct synproxy_hash_entry *entry;
+  uint32_t first_seq;
+  uint32_t last_seq;
+  int32_t data_len;
+  int todelete = 0;
+
+  if (ether_len < ETHER_HDR_LEN)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full Ether hdr");
+    return 1;
+  }
+  if (ether_type(ether) != ETHER_TYPE_IP)
+  {
+    port->portfunc(pkt, port->userdata);
+    return 0;
+  }
+  ip = ether_payload(ether);
+  ip_len = ether_len - ETHER_HDR_LEN;
+  if (ip_len < IP_HDR_MINLEN)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 1");
+    return 1;
+  }
+  if (ip_version(ip) != 4)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "IP version mismatch");
+    return 1;
+  }
+  ihl = ip_hdr_len(ip);
+  if (ip_len < ihl)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 2");
+    return 1;
+  }
+  if (ip_proto(ip) != 6)
+  {
+    port->portfunc(pkt, port->userdata);
+    return 0;
+  }
+  if (ip_frag_off(ip) >= 20)
+  {
+    port->portfunc(pkt, port->userdata);
+    return 0;
+  }
+  else if (ip_frag_off(ip) != 0)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "fragment has partial header");
+    return 1;
+  }
+  if (ip_len < ip_total_len(ip))
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
+    return 1;
+  }
+  
+  protocol = ip_proto(ip);
+  ippay = ip_payload(ip);
+  lan_ip = ip_dst(ip);
+  remote_ip = ip_src(ip);
+  if (protocol == 6)
+  {
+    tcp_len = ip_total_len(ip) - ihl;
+    if (tcp_len < 20)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full TCP hdr");
+      return 1;
+    }
+    lan_port = tcp_dst_port(ippay);
+    remote_port = tcp_src_port(ippay);
+  }
+  else
+  {
+    abort();
+  }
+  if (unlikely(tcp_syn(ippay)))
+  {
+    if (tcp_fin(ippay) || tcp_rst(ippay))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SYN packet contains FIN or RST");
+      return 1;
+    }
+    if (!tcp_ack(ippay))
+    {
+      abort(); // FIXME implement SYN proxy
+    }
+    else
+    {
+      entry = synproxy_hash_get(
+        local, lan_ip, lan_port, remote_ip, remote_port);
+      if (entry == NULL)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA but entry nonexistent");
+        return 1;
+      }
+      if (entry->flag_state != FLAG_STATE_UPLINK_SYN_SENT)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != UL_SYN_SENT");
+        return 1;
+      }
+      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num");
+        return 1;
+      }
+      entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
+      entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
+      entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+      timer_heap_modify(&local->timers, &entry->timer);
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+  }
+  entry = synproxy_hash_get(
+    local, lan_ip, lan_port, remote_ip, remote_port);
+  if (entry == NULL)
+  {
+    if (tcp_ack(ippay))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found but ACK set");
+      // FIXME implement SYN proxy
+      abort();
+    }
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "entry not found");
+    return 1;
+  }
+  if (unlikely(tcp_rst(ippay)))
+  {
+    if (entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT)
+    {
+      if (!tcp_ack(ippay))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in UPLINK_SYN_SENT");
+        return 1;
+      }
+      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in UL_SYN_SENT, bad seq");
+        return 1;
+      }
+    }
+    else if (entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "dropping RST in DOWNLINK_SYN_SENT");
+      return 1;
+    }
+    else
+    {
+      if (!between(
+        entry->lan_next, tcp_seq_num(ippay), entry->lan_next+entry->lan_window))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+        return 1;
+      }
+    }
+    if (tcp_ack(ippay))
+    {
+      tcp_set_ack_number_cksum_update(
+        ippay, tcp_len, tcp_ack_number(ippay)+entry->seqoffset);
+    }
+    synproxy_hash_del(local, entry);
+    port->portfunc(pkt, port->userdata);
+    return 0;
+  }
+  first_seq = tcp_seq_num(ippay);
+  data_len =
+    ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
+  if (data_len < 0)
+  {
+    // This can occur in fragmented packets. We don't then know the true
+    // data length, and can therefore drop packets that would otherwise be
+    // valid.
+    data_len = 0;
+  }
+  last_seq = first_seq + data_len - 1;
+  if (unlikely(tcp_fin(ippay)))
+  {
+    last_seq += 1;
+  }
+  if (
+    !between(
+      entry->wan_next, first_seq, entry->wan_next+entry->wan_window)
+    &&
+    !between(
+      entry->wan_next, last_seq, entry->wan_next+entry->wan_window)
+    )
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
+    return 1;
+  }
+  if (unlikely(tcp_fin(ippay)))
+  {
+    if (ip_more_frags(ip))
+    {
+      log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
+    }
+    entry->state_data.established.downfin = last_seq;
+    entry->flag_state |= FLAG_STATE_DOWNLINK_FIN;
+  }
+  if (unlikely(entry->flag_state & FLAG_STATE_UPLINK_FIN))
+  {
+    uint32_t fin = entry->state_data.established.upfin;
+    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin)
+    {
+      entry->flag_state |= FLAG_STATE_UPLINK_FIN_ACK;
+      if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN_ACK)
+      {
+        todelete = 1;
+      }
+    }
+  }
+  if (likely(tcp_ack(ippay)))
+  {
+    uint32_t ack = tcp_ack_num(ippay);
+    uint16_t window = tcp_window(ippay);
+    if (seq_cmp(ack, entry->lan_next) >= 0)
+    {
+      entry->lan_next = ack;
+      entry->lan_window = window << entry->lan_wscale;
+    }
+  }
+  entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+  timer_heap_modify(&local->timers, &entry->timer);
+  if (tcp_ack(ippay))
+  {
+    tcp_set_ack_number_cksum_update(
+      ippay, tcp_len, tcp_ack_number(ippay)+entry->seqoffset);
+  }
+  port->portfunc(pkt, port->userdata);
+  if (todelete)
+  {
+    synproxy_hash_del(local, entry);
+  }
+  return 0;
+}
+
 /*
   Uplink packet arrives. It has lan_ip:lan_port remote_ip:remote_port
   - Lookup by lan_ip:lan_port, verify remote_ip:remote_port
@@ -288,7 +539,7 @@ int uplink(
       }
       if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn)
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT");
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in DL_SYN_SENT, bad seq");
         return 1;
       }
     }
@@ -350,7 +601,7 @@ int uplink(
   if (unlikely(entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
     uint32_t fin = entry->state_data.established.downfin;
-    if (tcp_ack_num(ippay) == fin)
+    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin)
     {
       entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
       if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
