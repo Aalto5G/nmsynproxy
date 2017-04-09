@@ -7,3 +7,8 @@ the old data is dropped, and therefore, the server never gets a chance to
 ACK.
 - Solution: allow retransmit not more than one max_window back
 - - Have to keep track of max_window
+
+RST attack
+- require exact or +1 match, need to maintain seqlo/seqhi values where
+  seqlo is max sent and seqhi is max ACKed + window. Then we allow resending
+  up to 1 window back, i.e. seqlo-max_window .. seqhi
