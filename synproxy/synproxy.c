@@ -20,6 +20,20 @@ static void synproxy_expiry_fn(
   free(e);
 }
 
+static inline int seq_cmp(uint32_t x, uint32_t y)
+{
+  int32_t result = x-y;
+  if (result > 0)
+  {
+    return 1;
+  }
+  if (result < 0)
+  {
+    return -1;
+  }
+  return result;
+}
+
 static inline uint32_t between(uint32_t a, uint32_t x, uint32_t b)
 {
   if (b >= a)
@@ -94,6 +108,9 @@ int uplink(
   uint16_t tcp_len;
   struct synproxy_hash_entry *entry;
   int8_t wscalediff;
+  uint32_t first_seq;
+  uint32_t last_seq;
+  int32_t data_len;
   int todelete = 0;
   if (ether_len < ETHER_HDR_LEN)
   {
@@ -274,39 +291,61 @@ int uplink(
     port->portfunc(pkt, port->userdata);
     return 0;
   }
+  first_seq = tcp_seq_num(ippay);
+  data_len =
+    ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
+  if (data_len < 0)
+  {
+    // This can occur in fragmented packets. We don't then know the true
+    // data length, and can therefore drop packets that would otherwise be
+    // valid.
+    data_len = 0;
+  }
+  last_seq = first_seq + data_len - 1;
   if (unlikely(tcp_fin(ippay)))
   {
-    uint32_t first_seq = tcp_seq_num(ippay);
-    uint32_t last_seq = tcp_seq_num(ippay); // FIXME
-    if (
-      !between(
-        entry->lan_next, first_seq, entry->lan_next+entry->lan_window)
-      &&
-      !between(
-        entry->lan_next, last_seq, entry->lan_next+entry->lan_window)
-      )
+    last_seq += 1;
+  }
+  if (
+    !between(
+      entry->lan_next, first_seq, entry->lan_next+entry->lan_window)
+    &&
+    !between(
+      entry->lan_next, last_seq, entry->lan_next+entry->lan_window)
+    )
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
+    return 1;
+  }
+  if (unlikely(tcp_fin(ippay)))
+  {
+    if (ip_more_frags(ip))
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "FIN has invalid SEQ number");
-      return 1;
+      log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
     }
+    entry->state_data.established.upfin = last_seq;
     entry->flag_state |= FLAG_STATE_UPLINK_FIN;
-#if 0 // only after ACK
-    if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)
-    {
-      todelete = 1;
-    }
-#endif
   }
   if (unlikely(entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
     uint32_t fin = entry->state_data.established.downfin;
-    if (tcp_ack_num(ippay) == fin + 1)
+    if (tcp_ack_num(ippay) == fin)
     {
       entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
       if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
       {
         todelete = 1;
       }
+    }
+  }
+  if (likely(tcp_ack(ippay)))
+  {
+    uint32_t ack = tcp_ack_num(ippay);
+    uint16_t window = tcp_window(ippay);
+    if (seq_cmp(ack, entry->wan_next) >= 0)
+    {
+      entry->wan_next = ack;
+      entry->wan_window = window << entry->wan_wscale;
     }
   }
   entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;

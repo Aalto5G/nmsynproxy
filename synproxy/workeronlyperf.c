@@ -88,6 +88,7 @@ static void *rx_func(void *userdata)
   tcp = ip_payload(ip);
   tcp_set_src_port(tcp, 12345);
   tcp_set_dst_port(tcp, 54321);
+  tcp_set_ack_on(tcp);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
 
   ether = pktsmall;
@@ -108,6 +109,7 @@ static void *rx_func(void *userdata)
   tcp = ip_payload(ip);
   tcp_set_src_port(tcp, 12345);
   tcp_set_dst_port(tcp, 54321);
+  tcp_set_ack_on(tcp);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(pktsmall) - 14 - 20);
 
   for (;;)

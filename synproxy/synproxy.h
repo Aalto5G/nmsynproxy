@@ -131,6 +131,9 @@ static inline void synproxy_hash_put_connected(
   struct synproxy_hash_entry *e;
   e = synproxy_hash_put(local, local_ip, local_port, remote_ip, remote_port);
   e->flag_state = FLAG_STATE_ESTABLISHED;
+  e->lan_window = 32768;
+  e->lan_next = 0;
+  e->lan_wscale = 0;
 }
 
 static inline void synproxy_hash_del(
