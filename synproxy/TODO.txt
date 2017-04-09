@@ -21,3 +21,5 @@ FIN attack
   RST and initial SYN are the only ones for which ACK is not required.
 
 Populate wscale values
+
+Use TIME_WAIT state
