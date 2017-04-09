@@ -281,7 +281,7 @@ int uplink(
         entry->lan_next, last_seq, entry->lan_next+entry->lan_window)
       )
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "FIN has invalid SEQ number");
       return 1;
     }
     entry->flag_state |= FLAG_STATE_UPLINK_FIN;
