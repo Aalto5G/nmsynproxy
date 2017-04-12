@@ -186,6 +186,7 @@ int downlink(
     }
     else
     {
+      struct tcp_information tcpinfo;
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port);
       if (entry == NULL)
@@ -203,6 +204,9 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, invalid ACK num");
         return 1;
       }
+      tcp_parse_options(ippay, &tcpinfo);
+      entry->lan_wscale = tcpinfo.wscale;
+      entry->lan_max_window_unscaled = tcp_window(ippay);
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
       entry->wan_sent = tcp_seq_num(ippay) + 1;
       entry->lan_acked = tcp_ack_num(ippay);
@@ -477,6 +481,7 @@ int uplink(
     }
     if (!tcp_ack(ippay))
     {
+      struct tcp_information tcpinfo;
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port);
       if (entry != NULL && entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT &&
@@ -498,8 +503,12 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "out of memory");
         return 1;
       }
+      tcp_parse_options(ippay, &tcpinfo);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
       entry->state_data.uplink_syn_sent.isn = tcp_seq_num(ippay);
+      entry->wan_wscale = tcpinfo.wscale;
+      entry->wan_max_window_unscaled = tcp_window(ippay);
+      entry->lan_sent = tcp_seq_num(ippay) + 1;
       port->portfunc(pkt, port->userdata);
       return 0;
     }
