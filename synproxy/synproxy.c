@@ -361,8 +361,17 @@ int downlink(
   timer_heap_modify(&local->timers, &entry->timer);
   if (tcp_ack(ippay))
   {
+    void *sackhdr;
+    size_t sacklen;
+    int sixteen_bit_align;
     tcp_set_ack_number_cksum_update(
       ippay, tcp_len, tcp_ack_number(ippay)+entry->seqoffset);
+    sackhdr = tcp_find_sack_header(ippay, &sacklen, &sixteen_bit_align);
+    if (sackhdr != NULL)
+    {
+      tcp_adjust_sack_cksum_update(
+        ippay, sackhdr, sacklen, sixteen_bit_align, entry->seqoffset);
+    }
   }
   port->portfunc(pkt, port->userdata);
   if (todelete)
