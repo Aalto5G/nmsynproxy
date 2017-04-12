@@ -138,7 +138,7 @@ int downlink(
     port->portfunc(pkt, port->userdata);
     return 0;
   }
-  if (ip_frag_off(ip) >= 20)
+  if (ip_frag_off(ip) >= 60)
   {
     port->portfunc(pkt, port->userdata);
     return 0;
@@ -164,6 +164,11 @@ int downlink(
     if (tcp_len < 20)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full TCP hdr");
+      return 1;
+    }
+    if (tcp_data_offset(ippay) > tcp_len)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full TCP opts");
       return 1;
     }
     lan_port = tcp_dst_port(ippay);
@@ -446,7 +451,7 @@ int uplink(
     port->portfunc(pkt, port->userdata);
     return 0;
   }
-  if (ip_frag_off(ip) >= 20)
+  if (ip_frag_off(ip) >= 60)
   {
     port->portfunc(pkt, port->userdata);
     return 0;
@@ -472,6 +477,11 @@ int uplink(
     if (tcp_len < 20)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full TCP hdr");
+      return 1;
+    }
+    if (tcp_data_offset(ippay) > tcp_len)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full TCP opts");
       return 1;
     }
     lan_port = tcp_src_port(ippay);
