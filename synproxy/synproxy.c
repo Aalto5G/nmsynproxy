@@ -337,6 +337,14 @@ int downlink(
     {
       log_log(LOG_LEVEL_WARNING, "WORKERDOWNLINK", "FIN with more frags");
     }
+    if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)
+    {
+      if (entry->state_data.established.downfin != last_seq)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "FIN seq changed");
+        return 1;
+      }
+    }
     entry->state_data.established.downfin = last_seq;
     entry->flag_state |= FLAG_STATE_DOWNLINK_FIN;
   }
@@ -728,6 +736,14 @@ int uplink(
     if (ip_more_frags(ip))
     {
       log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
+    }
+    if (entry->flag_state & FLAG_STATE_UPLINK_FIN)
+    {
+      if (entry->state_data.established.upfin != last_seq)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "FIN seq changed");
+        return 1;
+      }
     }
     entry->state_data.established.upfin = last_seq;
     entry->flag_state |= FLAG_STATE_UPLINK_FIN;
