@@ -343,7 +343,7 @@ int downlink(
   if (unlikely(entry->flag_state & FLAG_STATE_UPLINK_FIN))
   {
     uint32_t fin = entry->state_data.established.upfin;
-    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin)
+    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin + 1)
     {
       entry->flag_state |= FLAG_STATE_UPLINK_FIN_ACK;
       if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN_ACK)
@@ -735,7 +735,7 @@ int uplink(
   if (unlikely(entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
     uint32_t fin = entry->state_data.established.downfin;
-    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin)
+    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin + 1)
     {
       entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
       if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
