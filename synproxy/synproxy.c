@@ -254,7 +254,7 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "R/RA in UPLINK_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn)
+      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RA/RA in UL_SYN_SENT, bad seq");
         return 1;
@@ -648,7 +648,7 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn)
+      if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in DL_SYN_SENT, bad seq");
         return 1;
