@@ -260,9 +260,8 @@ int downlink(
     }
     else
     {
-      if (!between(
-        entry->wan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale),
-        tcp_seq_num(ippay), entry->wan_max))
+      uint32_t seq = tcp_seq_num(ippay);
+      if (seq != (uint32_t)(entry->wan_sent-1) && seq != entry->wan_sent && seq != (uint32_t)(entry->wan_sent+1))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
         return 1;
@@ -569,9 +568,10 @@ int uplink(
   {
     if (tcp_rst(ippay))
     {
-      if (!between(
-        entry->lan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale),
-        tcp_seq_num(ippay), entry->lan_max))
+      uint32_t seq = tcp_seq_num(ippay);
+      if (seq != (uint32_t)(entry->lan_sent-1) && 
+          seq != (uint32_t)(entry->lan_sent) && 
+          seq != (uint32_t)(entry->lan_sent+1))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
         return 1;
@@ -628,11 +628,12 @@ int uplink(
     }
     else
     {
-      if (!between(
-        entry->lan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale),
-        tcp_seq_num(ippay), entry->lan_max))
+      uint32_t seq = tcp_seq_num(ippay);
+      if (seq != (uint32_t)(entry->lan_sent-1) && 
+          seq != (uint32_t)(entry->lan_sent) && 
+          seq != (uint32_t)(entry->lan_sent+1))
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RST has invalid SEQ number");
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
         return 1;
       }
     }
