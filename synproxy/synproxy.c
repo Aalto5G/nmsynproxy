@@ -310,10 +310,10 @@ int downlink(
     !(data_len == 0 && first_seq+1 == entry->wan_sent) // keepalive
     &&
     !between(
-      wan_min, first_seq, entry->wan_max)
+      wan_min, first_seq, entry->wan_max+1)
     &&
     !between(
-      wan_min, last_seq, entry->wan_max)
+      wan_min, last_seq, entry->wan_max+1)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number");
@@ -682,10 +682,10 @@ int uplink(
     !(data_len == 0 && first_seq+1 == entry->lan_sent) // keepalive
     &&
     !between(
-      lan_min, first_seq, entry->lan_max)
+      lan_min, first_seq, entry->lan_max+1)
     &&
     !between(
-      lan_min, last_seq, entry->lan_max)
+      lan_min, last_seq, entry->lan_max+1)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
