@@ -145,6 +145,7 @@ static inline void synproxy_hash_put_connected(
   e->lan_sent = 0;
   e->lan_acked = 0;
   e->lan_wscale = 0;
+  e->lan_max_window_unscaled = 65535;
 }
 
 static inline void synproxy_hash_del(
