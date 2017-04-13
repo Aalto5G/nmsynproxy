@@ -5,6 +5,7 @@
 /secrettest
 /conftest
 /pcapngworkeronly
+/unittest
 /CONF.LEX.INTERMEDIATE
 /CONF.TAB.INTERMEDIATE
 /conf.lex.c
