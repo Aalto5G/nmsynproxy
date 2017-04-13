@@ -199,6 +199,13 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA but entry nonexistent");
         return 1;
       }
+      if (entry->flag_state == FLAG_STATE_UPLINK_SYN_RCVD &&
+          entry->state_data.uplink_syn_rcvd.isn == tcp_seq_num(ippay))
+      {
+        // retransmit of SYN+ACK
+        port->portfunc(pkt, port->userdata);
+        return 0;
+      }
       if (entry->flag_state != FLAG_STATE_UPLINK_SYN_SENT)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, entry != UL_SYN_SENT");
