@@ -1,25 +1,4 @@
 What if ACK response to SYN+ACK is dropped? The protected host may retry, and
 we must be prepared to re-send ACK.
 
-What client tries to re-send old data that server has ACKed and firewall
-has seen the ACK but the ack was dropped between firewall and client? Now
-the old data is dropped, and therefore, the server never gets a chance to
-ACK.
-- Solution: allow retransmit not more than one max_window back
-- - Have to keep track of max_window
-
-RST attack
-- require exact or +1 match, need to maintain seqlo/seqhi values where
-  seqlo is max sent and seqhi is max ACKed + window. Then we allow resending
-  up to 1 window back, i.e. seqlo-max_window .. seqhi
-
 Enforce at least that window size must be 1. If it's 0, round up to 1.
-
-FIN attack
-- Require FIN segments to have ACK, verify that ACK number is between
-  max ACKed - max_window and seqlo. Require also data segments to have ACK.
-  RST and initial SYN are the only ones for which ACK is not required.
-
-Populate wscale values
-
-Use TIME_WAIT state
