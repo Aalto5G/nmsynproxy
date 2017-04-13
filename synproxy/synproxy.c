@@ -366,9 +366,14 @@ int downlink(
       entry->lan_max = ack + (window << entry->lan_wscale);
     }
   }
-  if (entry->flag_state & (FLAG_STATE_UPLINK_FIN | FLAG_STATE_DOWNLINK_FIN))
+  if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+      (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
+    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+  }
+  else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
+  {
+    entry->timer.time64 = time64 + 900ULL*1000ULL*1000ULL;
   }
   else
   {
@@ -749,9 +754,14 @@ int uplink(
       entry->wan_max = ack + (window << entry->wan_wscale);
     }
   }
-  if (entry->flag_state & (FLAG_STATE_UPLINK_FIN | FLAG_STATE_DOWNLINK_FIN))
+  if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+      (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
+    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+  }
+  else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
+  {
+    entry->timer.time64 = time64 + 900ULL*1000ULL*1000ULL;
   }
   else
   {
