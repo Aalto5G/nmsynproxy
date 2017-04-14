@@ -82,6 +82,180 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
   return synproxy_hash(CONTAINER_OF(node, struct synproxy_hash_entry, node));
 }
 
+const uint8_t default_wscale = 7;
+const uint8_t default_sack_permitted = 1;
+const uint16_t default_mss = 1460;
+
+static void send_synack(
+  void *orig, struct worker_local *local,
+  struct port *port, struct ll_alloc_st *st)
+{
+  char synack[14+20+20+12] = {0};
+  void *ip, *origip;
+  void *tcp, *origtcp;
+  unsigned char *tcpopts;
+  struct packet *pktstruct;
+  uint32_t syn_cookie;
+  struct tcp_information tcpinfo;
+
+  origip = ether_payload(orig);
+  origtcp = ip_payload(origip);
+  tcp_parse_options(origtcp, &tcpinfo);
+  if (!tcpinfo.options_valid)
+  {
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "options in TCP SYN invalid");
+    return;
+  }
+  syn_cookie = form_cookie(
+    &local->info, ip_dst(origip), ip_src(origip),
+    tcp_dst_port(origtcp), tcp_src_port(origtcp),
+    tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted);
+
+  memcpy(ether_src(synack), ether_dst(orig), 6);
+  memcpy(ether_dst(synack), ether_src(orig), 6);
+  ether_set_type(synack, 0x0800);
+  ip = ether_payload(synack);
+  ip_set_version(ip, 4);
+  ip_set_hdr_len(ip, 20);
+  ip_set_total_len(ip, sizeof(synack) - 14);
+  ip_set_dont_frag(ip, 1);
+  ip_set_id(ip, 0); // XXX
+  ip_set_ttl(ip, 64);
+  ip_set_proto(ip, 6);
+  ip_set_src(ip, ip_dst(origip));
+  ip_set_dst(ip, ip_src(origip));
+  ip_set_hdr_cksum_calc(ip, 20);
+  tcp = ip_payload(ip);
+  tcp_set_src_port(tcp, tcp_dst_port(origtcp));
+  tcp_set_dst_port(tcp, tcp_src_port(origtcp));
+  tcp_set_syn_on(tcp);
+  tcp_set_ack_on(tcp);
+  tcp_set_data_offset(tcp, sizeof(synack) - 14 - 20);
+  tcp_set_seq_number(tcp, syn_cookie);
+  tcp_set_ack_number(tcp, tcp_seq_number(origtcp) + 1);
+  tcp_set_window(tcp, tcp_window(origtcp));
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(synack) - 14 - 20);
+  tcpopts = &((unsigned char*)tcp)[20];
+  // WS, kind 3 len 3
+  // NOP, kind 1 len 1
+  // MSS, kind 2 len 4
+  // SACK permitted, kind 4 len 2
+  // endlist, kind 0 len 1
+  // pad, kind 0 len 1
+  tcpopts[0] = 3;
+  tcpopts[1] = 3;
+  tcpopts[2] = default_wscale;
+  tcpopts[3] = 1;
+  tcpopts[4] = 2;
+  tcpopts[5] = 4;
+  hdr_set16n(&tcpopts[6], default_mss);
+  if (default_sack_permitted)
+  {
+    tcpopts[8] = 4;
+    tcpopts[9] = 2;
+    tcpopts[10] = 0;
+    tcpopts[11] = 0;
+  }
+  else
+  {
+    tcpopts[8] = 0;
+    tcpopts[9] = 0;
+    tcpopts[10] = 0;
+    tcpopts[11] = 0;
+  }
+  // FIXME timestamps
+  pktstruct = ll_alloc_st(st, packet_size(sizeof(synack)));
+  pktstruct->direction = PACKET_DIRECTION_UPLINK;
+  pktstruct->sz = sizeof(synack);
+  memcpy(packet_data(pktstruct), synack, sizeof(synack));
+  port->portfunc(pktstruct, port->userdata);
+}
+
+static void send_syn(
+  void *orig, struct worker_local *local, struct port *port,
+  struct ll_alloc_st *st,
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
+{
+  char syn[14+20+20+12] = {0};
+  void *ip, *origip;
+  void *tcp, *origtcp;
+  unsigned char *tcpopts;
+  struct packet *pktstruct;
+  struct synproxy_hash_entry *entry;
+
+  origip = ether_payload(orig);
+  origtcp = ip_payload(origip);
+
+  entry = synproxy_hash_put(
+    local, ip_dst(origip), tcp_dst_port(origtcp),
+    ip_src(origip), tcp_src_port(origtcp));
+
+  entry->window_size = tcp_window(origtcp);
+  entry->isn = tcp_ack_number(origtcp) - 1;
+  entry->other_isn = tcp_seq_number(origtcp) - 1;
+  entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
+  entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
+  timer_heap_modify(&local->timers, &entry->timer);
+
+  memcpy(ether_src(syn), ether_src(orig), 6);
+  memcpy(ether_dst(syn), ether_dst(orig), 6);
+  ether_set_type(syn, 0x0800);
+  ip = ether_payload(syn);
+  ip_set_version(ip, 4);
+  ip_set_hdr_len(ip, 20);
+  ip_set_total_len(ip, sizeof(syn) - 14);
+  ip_set_dont_frag(ip, 1);
+  ip_set_id(ip, 0); // XXX
+  ip_set_ttl(ip, 64);
+  ip_set_proto(ip, 6);
+  ip_set_src(ip, ip_src(origip));
+  ip_set_dst(ip, ip_dst(origip));
+  ip_set_hdr_cksum_calc(ip, 20);
+  tcp = ip_payload(ip);
+  tcp_set_src_port(tcp, tcp_src_port(origtcp));
+  tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
+  tcp_set_syn_on(tcp);
+  tcp_set_data_offset(tcp, sizeof(syn) - 14 - 20);
+  tcp_set_seq_number(tcp, tcp_seq_number(origtcp) - 1);
+  tcp_set_ack_number(tcp, 0);
+  tcp_set_window(tcp, tcp_window(origtcp));
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(syn) - 14 - 20);
+  tcpopts = &((unsigned char*)tcp)[20];
+  // WS, kind 3 len 3
+  // NOP, kind 1 len 1
+  // MSS, kind 2 len 4
+  // SACK permitted, kind 4 len 2
+  // endlist, kind 0 len 1
+  // pad, kind 0 len 1
+  tcpopts[0] = 3;
+  tcpopts[1] = 3;
+  tcpopts[2] = wscale;
+  tcpopts[3] = 1;
+  tcpopts[4] = 2;
+  tcpopts[5] = 4;
+  hdr_set16n(&tcpopts[6], mss);
+  if (sack_permitted)
+  {
+    tcpopts[8] = 4;
+    tcpopts[9] = 2;
+    tcpopts[10] = 0;
+    tcpopts[11] = 0;
+  }
+  else
+  {
+    tcpopts[8] = 0;
+    tcpopts[9] = 0;
+    tcpopts[10] = 0;
+    tcpopts[11] = 0;
+  }
+  // FIXME timestamps
+  pktstruct = ll_alloc_st(st, packet_size(sizeof(syn)));
+  pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
+  pktstruct->sz = sizeof(syn);
+  memcpy(packet_data(pktstruct), syn, sizeof(syn));
+  port->portfunc(pktstruct, port->userdata);
+}
+
 static void send_ack_and_window_update(
   void *orig, struct synproxy_hash_entry *entry, struct port *port,
   struct ll_alloc_st *st)
@@ -277,7 +451,8 @@ int downlink(
     }
     if (!tcp_ack(ippay))
     {
-      abort(); // FIXME implement SYN proxy
+      send_synack(ether, local, port, st);
+      return 1;
     }
     else
     {
@@ -325,12 +500,27 @@ int downlink(
     local, lan_ip, lan_port, remote_ip, remote_port);
   if (entry == NULL)
   {
-    if (tcp_ack(ippay))
+    if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
     {
-      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found but ACK set");
+      uint32_t tcp_ack_num = tcp_ack(ippay);
+      uint16_t mss;
+      uint8_t wscale, sack_permitted;
+      int ok;
+      ok = verify_cookie(
+        &local->info, ip_dst(ip), ip_src(ip),
+        tcp_dst_port(ippay), tcp_src_port(ippay), tcp_ack_num - 1,
+        &mss, &wscale, &sack_permitted);
+      if (!ok)
+      {
+        log_log(
+          LOG_LEVEL_ERR, "WORKERDOWNLINK",
+          "entry not found but A/SAFR set, SYN cookie invalid");
+        return 1;
+      }
+      log_log(
+        LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN");
+      send_syn(ether, local, port, st, mss, wscale, sack_permitted);
       return 1;
-      // FIXME implement SYN proxy
-      abort();
     }
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found");
     return 1;
