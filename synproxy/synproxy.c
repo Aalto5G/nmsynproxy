@@ -139,7 +139,6 @@ static void send_synack(
   tcp_set_seq_number(tcp, syn_cookie);
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp) + 1);
   tcp_set_window(tcp, tcp_window(origtcp));
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(synack) - 14 - 20);
   tcpopts = &((unsigned char*)tcp)[20];
   // WS, kind 3 len 3
   // NOP, kind 1 len 1
@@ -168,6 +167,7 @@ static void send_synack(
     tcpopts[10] = 0;
     tcpopts[11] = 0;
   }
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(synack) - 14 - 20);
   // FIXME timestamps
   pktstruct = ll_alloc_st(st, packet_size(sizeof(synack)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -230,7 +230,6 @@ static void send_syn(
   tcp_set_seq_number(tcp, tcp_seq_number(origtcp) - 1);
   tcp_set_ack_number(tcp, 0);
   tcp_set_window(tcp, tcp_window(origtcp));
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(syn) - 14 - 20);
   tcpopts = &((unsigned char*)tcp)[20];
   // WS, kind 3 len 3
   // NOP, kind 1 len 1
@@ -259,6 +258,7 @@ static void send_syn(
     tcpopts[10] = 0;
     tcpopts[11] = 0;
   }
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(syn) - 14 - 20);
   // FIXME timestamps
   pktstruct = ll_alloc_st(st, packet_size(sizeof(syn)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
