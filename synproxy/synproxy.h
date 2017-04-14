@@ -34,20 +34,20 @@ struct synproxy_hash_entry {
   uint32_t other_isn;
   uint32_t seqoffset;
   uint32_t timestamp;
-  uint32_t lan_sent;
-  uint32_t wan_sent;
-  uint32_t lan_acked;
-  uint32_t wan_acked;
-  uint32_t lan_max;
-  uint32_t wan_max;
+  uint32_t lan_sent; // what LAN has sent plus 1
+  uint32_t wan_sent; // what WAN has sent plus 1
+  uint32_t lan_acked; // what WAN has sent and LAN has acked plus 1
+  uint32_t wan_acked; // what LAN has sent and WAN has acked plus 1
+  uint32_t lan_max; // lan_acked + (tcp_window()<<lan_wscale)
+  uint32_t wan_max; // wan_acked + (tcp_window()<<wan_wscale)
 #if 0
   uint32_t lan_next;
   uint32_t wan_next;
   uint32_t lan_window; // FIXME make unscaled to save space
   uint32_t wan_window; // FIXME make unscaled to save space
 #endif
-  uint16_t lan_max_window_unscaled;
-  uint16_t wan_max_window_unscaled;
+  uint16_t lan_max_window_unscaled; // max window LAN has advertised
+  uint16_t wan_max_window_unscaled; // max window WAN has advertised
   union {
     struct {
       uint32_t isn;
