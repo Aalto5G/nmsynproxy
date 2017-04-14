@@ -116,3 +116,24 @@ Then run these two commands in two terminal windows:
 ./synproxy/netmapproxy netmap:veth1 netmap:veth2
 taskset -c 3 ./synproxy/netmapsend netmap:veth0
 ```
+
+# Testing with real network interfaces
+
+Let's assume you have eth0 and eth1 inserted as an inline pair to an Ethernet
+network. You want to bridge traffic between eth0 and eth1 and SYN proxy
+incoming connections from eth1 into eth0. You must first set both interfaces to
+promiscuous mode:
+
+```
+ip link set eth0 promisc on
+ip link set eth1 promisc on
+```
+
+Then you must start netmapproxy:
+```
+./synproxy/netmapproxy netmap:eth0 netmap:eth1
+```
+
+Note that the order interfaces are specified matters. The first is the LAN
+interface. The second is the WAN interface. Only connections from WAN to LAN
+are SYN proxied.
