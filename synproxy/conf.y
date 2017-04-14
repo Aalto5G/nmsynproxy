@@ -48,6 +48,7 @@ int confyywrap(yyscan_t scanner)
 
 synproxyconf: SYNPROXYCONF EQUALS OPENBRACE conflist CLOSEBRACE SEMICOLON
 {
+  uint8_t bits = 0;
   if (!conf->wscalelist_present)
   {
     if (!DYNARR_PUSH_BACK(&conf->wscalelist, 0))
@@ -101,6 +102,29 @@ synproxyconf: SYNPROXYCONF EQUALS OPENBRACE conflist CLOSEBRACE SEMICOLON
               @1.first_line, @1.first_column);
       YYABORT;
     }
+  }
+  conf->msslist_bits = 255;
+  for (bits = 0; bits <= 32; bits++)
+  {
+    if ((1<<bits) == DYNARR_SIZE(&conf->msslist))
+    {
+      conf->msslist_bits = bits;
+      break;
+    }
+  }
+  conf->wscalelist_bits = 255;
+  for (bits = 0; bits <= 32; bits++)
+  {
+    if ((1<<bits) == DYNARR_SIZE(&conf->wscalelist))
+    {
+      conf->wscalelist_bits = bits;
+      break;
+    }
+  }
+  if (conf->msslist_bits + conf->wscalelist_bits + 1 > 12)
+  {
+    fprintf(stderr, "too long lists, too little cryptographic security\n");
+    YYABORT;
   }
 }
 ;

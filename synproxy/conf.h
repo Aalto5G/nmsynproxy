@@ -29,6 +29,8 @@ struct conf {
   DYNARR(uint8_t) wscalelist;
   int msslist_present;
   int wscalelist_present;
+  uint8_t msslist_bits;
+  uint8_t wscalelist_bits;
 };
 
 #define CONF_INITIALIZER { \
