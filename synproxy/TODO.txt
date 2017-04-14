@@ -2,5 +2,3 @@ What if ACK response to SYN+ACK is dropped? The protected host may retry, and
 we must be prepared to re-send ACK.
 
 Enforce at least that window size must be 1. If it's 0, round up to 1.
-
-Check that packet checksum for "important" packets is valid.

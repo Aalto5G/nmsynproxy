@@ -455,6 +455,16 @@ int downlink(
   }
   if (unlikely(tcp_syn(ippay)))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     if (tcp_fin(ippay) || tcp_rst(ippay))
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SYN packet contains FIN or RST");
@@ -517,6 +527,16 @@ int downlink(
       uint16_t mss;
       uint8_t wscale, sack_permitted;
       int ok;
+      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+        return 1;
+      }
+      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+        return 1;
+      }
       ok = verify_cookie(
         &local->info, ip_dst(ip), ip_src(ip),
         tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
@@ -538,6 +558,16 @@ int downlink(
   }
   if (unlikely(tcp_rst(ippay)))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     if (entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT)
     {
       if (!tcp_ack(ippay))
@@ -605,6 +635,16 @@ int downlink(
   last_seq = first_seq + data_len - 1;
   if (unlikely(tcp_fin(ippay)))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     last_seq += 1;
   }
   wan_min =
@@ -644,6 +684,16 @@ int downlink(
     uint32_t fin = entry->state_data.established.upfin;
     if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin + 1)
     {
+      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+        return 1;
+      }
+      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+        return 1;
+      }
       entry->flag_state |= FLAG_STATE_UPLINK_FIN_ACK;
       if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN_ACK)
       {
@@ -817,6 +867,16 @@ int uplink(
   }
   if (unlikely(tcp_syn(ippay)))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     if (tcp_fin(ippay) || tcp_rst(ippay))
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SYN packet contains FIN or RST");
@@ -907,6 +967,16 @@ int uplink(
   }
   if (unlikely(entry->flag_state == FLAG_STATE_UPLINK_SYN_RCVD))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     if (tcp_rst(ippay))
     {
       uint32_t seq = tcp_seq_num(ippay);
@@ -943,6 +1013,16 @@ int uplink(
   }
   if (unlikely(tcp_rst(ippay)))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     if (entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "dropping RST in UPLINK_SYN_SENT");
@@ -1009,6 +1089,16 @@ int uplink(
   last_seq = first_seq + data_len - 1;
   if (unlikely(tcp_fin(ippay)))
   {
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+      return 1;
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+      return 1;
+    }
     last_seq += 1;
   }
   lan_min =
@@ -1054,6 +1144,16 @@ int uplink(
     uint32_t fin = entry->state_data.established.downfin;
     if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin + 1)
     {
+      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+        return 1;
+      }
+      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+        return 1;
+      }
       entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
       if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
       {
