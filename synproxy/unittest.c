@@ -507,7 +507,7 @@ static void synproxy_handshake_impl(
     tcp_set_dst_port(tcp, port1);
     tcp_set_syn_on(tcp);
     tcp_set_data_offset(tcp, 20);
-    tcp_set_seq_number(tcp, isn1);
+    tcp_set_seq_number(tcp, isn2);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
@@ -582,7 +582,7 @@ static void synproxy_handshake_impl(
     tcp_set_dst_port(tcp, port1);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
-    tcp_set_seq_number(tcp, isn1 + 1);
+    tcp_set_seq_number(tcp, isn2 + 1);
     tcp_set_ack_number(tcp, (*isn) + 1);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   
@@ -660,8 +660,8 @@ static void synproxy_handshake_impl(
   tcp_set_syn_on(tcp);
   tcp_set_ack_on(tcp);
   tcp_set_data_offset(tcp, 20);
-  tcp_set_seq_number(tcp, isn2 + 1);
-  tcp_set_ack_number(tcp, isn1 + 1);
+  tcp_set_seq_number(tcp, isn1 + 1);
+  tcp_set_ack_number(tcp, isn2 + 1);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
 
   pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
@@ -724,7 +724,7 @@ static void four_way_fin_seq_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
-  uint32_t isn1, uint32_t isn2,
+  uint32_t isn1, uint32_t isn2, uint32_t isn,
   unsigned transcli, unsigned transsrv)
 {
   struct port outport;
@@ -777,7 +777,7 @@ static void four_way_fin_seq_impl(
     tcp_set_ack_on(tcp);
     tcp_set_fin_on(tcp);
     tcp_set_data_offset(tcp, 20);
-    tcp_set_seq_number(tcp, isn1 + 1);
+    tcp_set_seq_number(tcp, isn + 1);
     tcp_set_ack_number(tcp, isn2 + 1);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   
@@ -806,7 +806,9 @@ static void four_way_fin_seq_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+    tcp_set_seq_number(tcp, isn1 + 1);
+    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    if (memcmp(packet_data(pktstruct), pkt, 14+20) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -875,6 +877,8 @@ static void four_way_fin_seq_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
+  tcp_set_ack_number(tcp, isn + 2);
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -946,6 +950,8 @@ static void four_way_fin_seq_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
+    tcp_set_ack_number(tcp, isn + 2);
+    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
     if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -986,7 +992,7 @@ static void four_way_fin_seq_impl(
   tcp_set_dst_port(tcp, port2);
   tcp_set_ack_on(tcp);
   tcp_set_data_offset(tcp, 20);
-  tcp_set_seq_number(tcp, isn1 + 2);
+  tcp_set_seq_number(tcp, isn + 2);
   tcp_set_ack_number(tcp, isn2 + 2);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
 
@@ -1015,6 +1021,8 @@ static void four_way_fin_seq_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
+  tcp_set_seq_number(tcp, isn1 + 2);
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -1044,7 +1052,7 @@ static void four_way_fin_impl(
   uint32_t isn2 = 0x87654321;
   four_way_fin_seq_impl(
     synproxy, local, loc,
-    ip1, ip2, port1, port2, isn1, isn2,
+    ip1, ip2, port1, port2, isn1, isn2, isn1,
     transcli, transsrv);
 }
 
@@ -1406,8 +1414,8 @@ static void syn_proxy_handshake(void)
   struct ll_alloc_st st;
   struct worker_local local;
   uint32_t isn;
-  //uint32_t isn1 = 0x12345678;
-  //uint32_t isn2 = 0x87654321;
+  uint32_t isn1 = 0x12345678;
+  uint32_t isn2 = 0x87654321;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -1421,11 +1429,10 @@ static void syn_proxy_handshake(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1);
-#if 0
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321, isn, isn2,
-    2, 1);
-#endif
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    isn1, isn2, isn,
+    1, 1);
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
