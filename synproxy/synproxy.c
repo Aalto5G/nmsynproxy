@@ -880,6 +880,7 @@ int uplink(
       entry->wscalediff = ((int)default_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
         - entry->state_data.downlink_syn_sent.this_isn + tcp_seq_num(ippay) - 1;
+      entry->wan_acked += entry->seqoffset;
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_sent = tcp_seq_num(ippay) + 1;
       entry->lan_acked = tcp_ack_num(ippay);
