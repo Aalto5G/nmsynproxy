@@ -116,6 +116,7 @@ static void closed_port(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(&st, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -191,6 +192,7 @@ static void closed_port(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(&st, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -203,6 +205,9 @@ static void closed_port(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
     exit(1);
   }
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void three_way_handshake_impl(
@@ -288,6 +293,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
     }
+    ll_free_st(loc, pktstruct);
     pktstruct = fetch_packet(&head);
     if (pktstruct != NULL)
     {
@@ -366,6 +372,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
     }
+    ll_free_st(loc, pktstruct);
     pktstruct = fetch_packet(&head);
     if (pktstruct != NULL)
     {
@@ -434,6 +441,7 @@ static void three_way_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(loc, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -539,6 +547,7 @@ static void four_way_fin_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
     }
+    ll_free_st(loc, pktstruct);
     pktstruct = fetch_packet(&head);
     if (pktstruct != NULL)
     {
@@ -607,6 +616,7 @@ static void four_way_fin_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(loc, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -677,6 +687,7 @@ static void four_way_fin_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
     }
+    ll_free_st(loc, pktstruct);
     pktstruct = fetch_packet(&head);
     if (pktstruct != NULL)
     {
@@ -745,6 +756,7 @@ static void four_way_fin_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(loc, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -773,9 +785,12 @@ static void three_way_handshake_four_way_fin(void)
   timer_heap_init_capacity(&local.timers, 131072);
 
   three_way_handshake_impl(
-    &synproxy, &local, &loc, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
   four_way_fin_impl(
-    &synproxy, &local, &loc, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void established_rst_uplink(void)
@@ -812,7 +827,7 @@ static void established_rst_uplink(void)
   time64 = gettime64();
 
   three_way_handshake_impl(
-    &synproxy, &local, &loc, (10<<24)|4, (11<<24)|3, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321, 1, 1);
 
   e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
   if (e == NULL)
@@ -875,6 +890,7 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(&st, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -887,6 +903,9 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
     exit(1);
   }
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void established_rst_downlink(void)
@@ -923,7 +942,7 @@ static void established_rst_downlink(void)
   time64 = gettime64();
 
   three_way_handshake_impl(
-    &synproxy, &local, &loc, (10<<24)|6, (11<<24)|5, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321, 1, 1);
 
   e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
   if (e == NULL)
@@ -986,6 +1005,7 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
+  ll_free_st(&st, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct != NULL)
   {
@@ -998,6 +1018,9 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
     exit(1);
   }
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void three_way_handshake_ulretransmit(void)
@@ -1018,6 +1041,9 @@ static void three_way_handshake_ulretransmit(void)
     &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 2, 1);
   four_way_fin_impl(
     &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 1, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void three_way_handshake_dlretransmit(void)
@@ -1038,6 +1064,9 @@ static void three_way_handshake_dlretransmit(void)
     &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 2);
   four_way_fin_impl(
     &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void three_way_handshake_findlretransmit(void)
@@ -1058,6 +1087,9 @@ static void three_way_handshake_findlretransmit(void)
     &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 1);
   four_way_fin_impl(
     &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 2);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 static void three_way_handshake_finulretransmit(void)
@@ -1078,6 +1110,9 @@ static void three_way_handshake_finulretransmit(void)
     &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 1, 1);
   four_way_fin_impl(
     &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 2, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
 }
 
 int main(int argc, char **argv)

@@ -103,6 +103,22 @@ struct worker_local {
   struct timer_linkheap timers;
 };
 
+static inline void worker_local_free(struct worker_local *local)
+{
+  struct hash_list_node *x, *n;
+  size_t bucket;
+  HASH_TABLE_FOR_EACH_SAFE(&local->hash, bucket, n, x)
+  {
+    struct synproxy_hash_entry *e;
+    e = CONTAINER_OF(n, struct synproxy_hash_entry, node);
+    hash_table_delete(&local->hash, &e->node);
+    timer_heap_remove(&local->timers, &e->timer);
+    free(e);
+  }
+  hash_table_free(&local->hash);
+  timer_linkheap_free(&local->timers);
+}
+
 static inline struct synproxy_hash_entry *synproxy_hash_get(
   struct worker_local *local,
   uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port)
