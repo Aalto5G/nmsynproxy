@@ -508,13 +508,13 @@ int downlink(
   {
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
     {
-      uint32_t tcp_ack_num = tcp_ack(ippay);
+      uint32_t ack_num = tcp_ack_num(ippay);
       uint16_t mss;
       uint8_t wscale, sack_permitted;
       int ok;
       ok = verify_cookie(
         &local->info, ip_dst(ip), ip_src(ip),
-        tcp_dst_port(ippay), tcp_src_port(ippay), tcp_ack_num - 1,
+        tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
         &mss, &wscale, &sack_permitted);
       if (!ok)
       {
