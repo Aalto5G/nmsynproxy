@@ -894,7 +894,7 @@ int uplink(
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
-      send_ack_and_window_update(ippay, entry, port, st);
+      send_ack_and_window_update(ether, entry, port, st);
       return 1;
     }
   }
