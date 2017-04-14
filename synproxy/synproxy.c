@@ -197,7 +197,7 @@ static void send_syn(
     tcp_ack_num(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
 
   entry->wan_max_window_unscaled = tcp_window(origtcp);
-  entry->isn = tcp_ack_number(origtcp) - 1;
+  entry->state_data.downlink_syn_sent.this_isn = tcp_ack_number(origtcp) - 1;
   entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
@@ -878,7 +878,8 @@ int uplink(
         log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "SACK conflict");
       }
       entry->wscalediff = ((int)default_wscale) - ((int)tcpinfo.wscale);
-      entry->seqoffset = entry->isn - tcp_seq_num(ippay);
+      entry->seqoffset =
+        entry->state_data.downlink_syn_sent.this_isn - tcp_seq_num(ippay);
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_sent = tcp_seq_num(ippay) + 1;
       entry->lan_acked = tcp_ack_num(ippay);
