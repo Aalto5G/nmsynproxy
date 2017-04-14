@@ -196,7 +196,6 @@ static void send_syn(
   entry->wan_max =
     tcp_ack_num(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
 
-  entry->window_size = tcp_window(origtcp); // FIXME rm as redundant?
   entry->wan_max_window_unscaled = tcp_window(origtcp);
   entry->isn = tcp_ack_number(origtcp) - 1;
   entry->other_isn = tcp_seq_number(origtcp) - 1;
@@ -298,7 +297,7 @@ static void send_ack_and_window_update(
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
-  tcp_set_window(tcp, entry->window_size);
+  tcp_set_window(tcp, entry->wan_max_window_unscaled);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(ack) - 14 - 20);
 
   // FIXME timestamps, etc

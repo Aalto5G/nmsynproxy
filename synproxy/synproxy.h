@@ -29,7 +29,6 @@ struct synproxy_hash_entry {
   int8_t wscalediff;
   uint8_t lan_wscale;
   uint8_t wan_wscale;
-  uint16_t window_size;
   uint32_t isn;
   uint32_t other_isn;
   uint32_t seqoffset;
