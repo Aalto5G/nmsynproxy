@@ -546,6 +546,16 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
+    if (ip_proto(ip) != 6)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
+      exit(1);
+    }
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
+      exit(1);
+    }
     tcp = ip_payload(ip);
     if (!tcp_syn(tcp) || !tcp_ack(tcp))
     {
@@ -560,6 +570,11 @@ static void synproxy_handshake_impl(
     if (tcp_dst_port(tcp) != port2)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+      exit(1);
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
     }
     *isn = tcp_seq_num(tcp);
@@ -642,6 +657,16 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
+    if (ip_proto(ip) != 6)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
+      exit(1);
+    }
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
+      exit(1);
+    }
     tcp = ip_payload(ip);
     if (!tcp_syn(tcp) || tcp_ack(tcp))
     {
@@ -656,6 +681,11 @@ static void synproxy_handshake_impl(
     if (tcp_dst_port(tcp) != port1)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+      exit(1);
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
     }
     ll_free_st(loc, pktstruct);
@@ -740,6 +770,16 @@ static void synproxy_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
     exit(1);
   }
+  if (ip_proto(ip) != 6)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
+    exit(1);
+  }
+  if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
+    exit(1);
+  }
   tcp = ip_payload(ip);
   if (tcp_syn(tcp) || !tcp_ack(tcp) || tcp_fin(tcp) || tcp_rst(tcp))
   {
@@ -754,6 +794,11 @@ static void synproxy_handshake_impl(
   if (tcp_dst_port(tcp) != port1)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+    exit(1);
+  }
+  if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
     exit(1);
   }
   ll_free_st(loc, pktstruct);
@@ -784,6 +829,16 @@ static void synproxy_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
     exit(1);
   }
+  if (ip_proto(ip) != 6)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
+    exit(1);
+  }
+  if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
+    exit(1);
+  }
   tcp = ip_payload(ip);
   if (tcp_syn(tcp) || !tcp_ack(tcp) || tcp_fin(tcp) || tcp_rst(tcp))
   {
@@ -798,6 +853,11 @@ static void synproxy_handshake_impl(
   if (tcp_dst_port(tcp) != port2)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+    exit(1);
+  }
+  if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
     exit(1);
   }
   ll_free_st(loc, pktstruct);
