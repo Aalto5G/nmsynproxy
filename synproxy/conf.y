@@ -129,6 +129,10 @@ synproxyconf: SYNPROXYCONF EQUALS OPENBRACE conflist CLOSEBRACE SEMICOLON
 }
 ;
 
+maybe_comma:
+| COMMA
+;
+
 sackhashval:
   ENABLE
 {
@@ -201,11 +205,11 @@ wscalelist_entry
 ;
 
 msslist_maybe:
-| msslist
+| msslist maybe_comma
 ;
 
 wscalelist_maybe:
-| wscalelist
+| wscalelist maybe_comma
 ;
 
 conflist_entry:
