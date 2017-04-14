@@ -536,10 +536,30 @@ static void synproxy_handshake_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
+    if (ip_src(ip) != ip1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
+      exit(1);
+    }
+    if (ip_dst(ip) != ip2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
+      exit(1);
+    }
     tcp = ip_payload(ip);
     if (!tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
+      exit(1);
+    }
+    if (tcp_src_port(tcp) != port1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src port doesn't agree");
+      exit(1);
+    }
+    if (tcp_dst_port(tcp) != port2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
     *isn = tcp_seq_num(tcp);
@@ -612,10 +632,30 @@ static void synproxy_handshake_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
+    if (ip_src(ip) != ip2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
+      exit(1);
+    }
+    if (ip_dst(ip) != ip1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
+      exit(1);
+    }
     tcp = ip_payload(ip);
     if (!tcp_syn(tcp) || tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
+      exit(1);
+    }
+    if (tcp_src_port(tcp) != port2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src port doesn't agree");
+      exit(1);
+    }
+    if (tcp_dst_port(tcp) != port1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
     ll_free_st(loc, pktstruct);
@@ -689,6 +729,33 @@ static void synproxy_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
+  ip = ether_payload(packet_data(pktstruct));
+  if (ip_src(ip) != ip2)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
+    exit(1);
+  }
+  if (ip_dst(ip) != ip1)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
+    exit(1);
+  }
+  tcp = ip_payload(ip);
+  if (tcp_syn(tcp) || !tcp_ack(tcp) || tcp_fin(tcp) || tcp_rst(tcp))
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
+    exit(1);
+  }
+  if (tcp_src_port(tcp) != port2)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet src port doesn't agree");
+    exit(1);
+  }
+  if (tcp_dst_port(tcp) != port1)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+    exit(1);
+  }
   ll_free_st(loc, pktstruct);
   pktstruct = fetch_packet(&head);
   if (pktstruct == NULL)
@@ -704,6 +771,33 @@ static void synproxy_handshake_impl(
   if (pktstruct->direction != PACKET_DIRECTION_UPLINK)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
+    exit(1);
+  }
+  ip = ether_payload(packet_data(pktstruct));
+  if (ip_src(ip) != ip1)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
+    exit(1);
+  }
+  if (ip_dst(ip) != ip2)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
+    exit(1);
+  }
+  tcp = ip_payload(ip);
+  if (tcp_syn(tcp) || !tcp_ack(tcp) || tcp_fin(tcp) || tcp_rst(tcp))
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
+    exit(1);
+  }
+  if (tcp_src_port(tcp) != port1)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet src port doesn't agree");
+    exit(1);
+  }
+  if (tcp_dst_port(tcp) != port2)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
     exit(1);
   }
   ll_free_st(loc, pktstruct);
