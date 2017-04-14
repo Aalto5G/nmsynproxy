@@ -129,6 +129,24 @@ ip link set eth0 promisc on
 ip link set eth1 promisc on
 ```
 
+It is also recommended to turn off offloads:
+
+```
+ethtool -K eth0 rx off tx off tso off gso off gro off lro off
+ethtool -K eth1 rx off tx off tso off gso off gro off lro off
+```
+
+If the `ethtool` reports an error about being unable to change certain offload,
+remove the offload setting from the command line and try with the other
+settings.
+
+It is also recommended to turn off flow control:
+
+```
+ethtool -A eth0 rx off tx off autoneg off
+ethtool -A eth1 rx off tx off autoneg off
+```
+
 Then you must start netmapproxy:
 ```
 ./synproxy/netmapproxy netmap:eth0 netmap:eth1
