@@ -1040,6 +1040,46 @@ static void three_way_handshake_dlretransmit(void)
     &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 1);
 }
 
+static void three_way_handshake_findlretransmit(void)
+{
+  struct synproxy synproxy;
+  struct ll_alloc_st st;
+  struct worker_local local;
+
+  if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
+  {
+    abort();
+  }
+
+  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
+  timer_heap_init_capacity(&local.timers, 131072);
+
+  three_way_handshake_impl(
+    &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 1);
+  four_way_fin_impl(
+    &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 2);
+}
+
+static void three_way_handshake_finulretransmit(void)
+{
+  struct synproxy synproxy;
+  struct ll_alloc_st st;
+  struct worker_local local;
+
+  if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
+  {
+    abort();
+  }
+
+  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
+  timer_heap_init_capacity(&local.timers, 131072);
+
+  three_way_handshake_impl(
+    &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 1, 1);
+  four_way_fin_impl(
+    &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 2, 1);
+}
+
 int main(int argc, char **argv)
 {
   hash_seed_init();
@@ -1056,6 +1096,10 @@ int main(int argc, char **argv)
   three_way_handshake_ulretransmit();
 
   three_way_handshake_dlretransmit();
+
+  three_way_handshake_finulretransmit();
+
+  three_way_handshake_findlretransmit();
 
   return 0;
 }
