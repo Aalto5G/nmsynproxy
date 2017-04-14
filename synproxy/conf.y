@@ -39,6 +39,7 @@ int confyywrap(yyscan_t scanner)
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token SACKHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE TIMERHEAPSIZE
+%token COMMA MSS WSCALE
 
 %type<i> sackhashval
 %type<i> INT_LITERAL
@@ -46,6 +47,62 @@ int confyywrap(yyscan_t scanner)
 %%
 
 synproxyconf: SYNPROXYCONF EQUALS OPENBRACE conflist CLOSEBRACE SEMICOLON
+{
+  if (!conf->wscalelist_present)
+  {
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 0))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 2))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 4))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 7))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+  }
+  if (!conf->msslist_present)
+  {
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 216))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 1200))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 1400))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 1460))
+    {
+      fprintf(stderr, "out of memory at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+  }
+}
 ;
 
 sackhashval:
@@ -75,8 +132,102 @@ conflist:
 | conflist conflist_entry
 ;
 
+msslist_entry: INT_LITERAL
+{
+  if ($1 > 65535)
+  {
+    fprintf(stderr, "invalid MSS list entry: %d at line %d col %d\n",
+            $1, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  if (!DYNARR_PUSH_BACK(&conf->msslist, $1))
+  {
+    fprintf(stderr, "out of memory at line %d col %d\n",
+            @1.first_line, @1.first_column);
+    YYABORT;
+  }
+}
+;
+
+wscalelist_entry: INT_LITERAL
+{
+  if ($1 > 255)
+  {
+    fprintf(stderr, "invalid wscale list entry: %d at line %d col %d\n",
+            $1, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  if (!DYNARR_PUSH_BACK(&conf->wscalelist, $1))
+  {
+    fprintf(stderr, "out of memory at line %d col %d\n",
+            @1.first_line, @1.first_column);
+    YYABORT;
+  }
+}
+;
+
+msslist:
+msslist_entry
+| msslist COMMA msslist_entry
+;
+
+wscalelist:
+wscalelist_entry
+| wscalelist COMMA wscalelist_entry
+;
+
+msslist_maybe:
+| msslist
+;
+
+wscalelist_maybe:
+| wscalelist
+;
+
 conflist_entry:
-SACKHASHMODE EQUALS sackhashval SEMICOLON
+MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
+{
+  size_t len = DYNARR_SIZE(&conf->msslist);
+  size_t i;
+  if ((len & (len-1)) != 0 || len == 0)
+  {
+    fprintf(stderr, "mss list not power of 2 in size: %zu at line %d col %d\n",
+            len, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  for (i = 1; i < len; i++)
+  {
+    if (DYNARR_GET(&conf->msslist, i) < DYNARR_GET(&conf->msslist, i-1))
+    {
+      fprintf(stderr, "mss list not increasing at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+  }
+  conf->msslist_present = 1;
+}
+| WSCALE EQUALS OPENBRACE wscalelist_maybe CLOSEBRACE SEMICOLON
+{
+  size_t len = DYNARR_SIZE(&conf->wscalelist);
+  size_t i;
+  if ((len & (len-1)) != 0 || len == 0)
+  {
+    fprintf(stderr, "mss list not power of 2 in size: %zu at line %d col %d\n",
+            len, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  for (i = 1; i < len; i++)
+  {
+    if (DYNARR_GET(&conf->wscalelist, i) < DYNARR_GET(&conf->wscalelist, i-1))
+    {
+      fprintf(stderr, "wscale list not increasing at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+  }
+  conf->wscalelist_present = 1;
+}
+| SACKHASHMODE EQUALS sackhashval SEMICOLON
 {
   conf->sackmode = $3;
 }

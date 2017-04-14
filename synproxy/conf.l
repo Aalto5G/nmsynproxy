@@ -24,6 +24,7 @@ synproxyconf return SYNPROXYCONF;
 \{           return OPENBRACE;
 \}           return CLOSEBRACE;
 ;            return SEMICOLON;
+,            return COMMA;
 sackmode     return SACKHASHMODE;
 =            return EQUALS;
 disable      return DISABLE;
@@ -38,6 +39,8 @@ timer_add    return TIMER_ADD;
 initial_tokens return INITIAL_TOKENS;
 conntablesize return CONNTABLESIZE;
 timerheapsize return TIMERHEAPSIZE;
+mss          return MSS;
+wscale       return WSCALE;
 
 [0-9]+       yylval->i=atoi(yytext); return INT_LITERAL;
 

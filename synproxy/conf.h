@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "dynarr.h"
 
 enum sackmode {
   SACKMODE_ENABLE,
@@ -24,6 +25,10 @@ struct conf {
   size_t conntablesize;
   size_t timerheapsize;
   struct ratehashconf ratehash;
+  DYNARR(uint16_t) msslist;
+  DYNARR(uint8_t) wscalelist;
+  int msslist_present;
+  int wscalelist_present;
 };
 
 #define CONF_INITIALIZER { \
@@ -37,6 +42,10 @@ struct conf {
     .timer_add = 400, \
     .initial_tokens = 2000, \
   }, \
+  .msslist = DYNARR_INITER, \
+  .wscalelist = DYNARR_INITER, \
+  .msslist_present = 0, \
+  .wscalelist_present = 0, \
 }
 
 #endif
