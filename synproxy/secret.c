@@ -14,6 +14,7 @@ struct chacha20_ctx chachactx;
 
 void secret_init_deterministic(struct secretinfo *info)
 {
+  info->current_secret_index = 0;
   chacha20_init_deterministic(&info->chachactx);
   revolve_secret_impl(info);
   revolve_secret_impl(info);
@@ -21,6 +22,7 @@ void secret_init_deterministic(struct secretinfo *info)
 
 void secret_init_random(struct secretinfo *info)
 {
+  info->current_secret_index = 0;
   chacha20_init_devrandom(&info->chachactx);
   revolve_secret_impl(info);
   revolve_secret_impl(info);
