@@ -190,9 +190,17 @@ static void send_syn(
     local, ip_dst(origip), tcp_dst_port(origtcp),
     ip_src(origip), tcp_src_port(origtcp));
 
-  entry->window_size = tcp_window(origtcp);
+  entry->wan_wscale = wscale;
+  entry->wan_sent = tcp_seq_num(origtcp);
+  entry->wan_acked = tcp_ack_num(origtcp);
+  entry->wan_max =
+    tcp_ack_num(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
+
+  entry->window_size = tcp_window(origtcp); // FIXME rm as redundant?
+  entry->wan_max_window_unscaled = tcp_window(origtcp);
   entry->isn = tcp_ack_number(origtcp) - 1;
   entry->other_isn = tcp_seq_number(origtcp) - 1;
+  entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
   timer_heap_modify(&local->timers, &entry->timer);
@@ -482,13 +490,13 @@ int downlink(
         return 1;
       }
       tcp_parse_options(ippay, &tcpinfo);
-      entry->lan_wscale = tcpinfo.wscale;
-      entry->lan_max_window_unscaled = tcp_window(ippay);
+      entry->wan_wscale = tcpinfo.wscale;
+      entry->wan_max_window_unscaled = tcp_window(ippay);
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
       entry->wan_sent = tcp_seq_num(ippay) + 1;
-      entry->lan_acked = tcp_ack_num(ippay);
-      entry->lan_max =
-        entry->lan_acked + (tcp_window(ippay) << entry->lan_wscale);
+      entry->wan_acked = tcp_ack_num(ippay);
+      entry->wan_max =
+        entry->wan_acked + (tcp_window(ippay) << entry->wan_wscale);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       entry->timer.time64 = time64 + 60ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
@@ -574,7 +582,7 @@ int downlink(
     return 1;
   }
   if (!between(
-    entry->lan_acked - (entry->lan_max_window_unscaled<<entry->lan_wscale),
+    entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
     tcp_ack_num(ippay),
     entry->lan_sent + 1))
   {
@@ -597,7 +605,7 @@ int downlink(
     last_seq += 1;
   }
   wan_min =
-    entry->wan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale);
+    entry->wan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
   if (
     !(data_len == 0 && first_seq+1 == entry->wan_sent) // keepalive
     &&
@@ -640,9 +648,9 @@ int downlink(
       }
     }
   }
-  if (tcp_window(ippay) > entry->lan_max_window_unscaled)
+  if (tcp_window(ippay) > entry->wan_max_window_unscaled)
   {
-    entry->lan_max_window_unscaled = tcp_window(ippay);
+    entry->wan_max_window_unscaled = tcp_window(ippay);
   }
   if (seq_cmp(last_seq, entry->wan_sent) >= 0)
   {
@@ -652,9 +660,9 @@ int downlink(
   {
     uint32_t ack = tcp_ack_num(ippay);
     uint16_t window = tcp_window(ippay);
-    if (seq_cmp(ack, entry->lan_acked) >= 0)
+    if (seq_cmp(ack, entry->wan_acked) >= 0)
     {
-      entry->lan_acked = ack;
+      entry->wan_acked = ack;
     }
     if (seq_cmp(ack + (window << entry->lan_wscale), entry->lan_max) >= 0)
     {
@@ -838,8 +846,8 @@ int uplink(
       tcp_parse_options(ippay, &tcpinfo);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
       entry->state_data.uplink_syn_sent.isn = tcp_seq_num(ippay);
-      entry->wan_wscale = tcpinfo.wscale;
-      entry->wan_max_window_unscaled = tcp_window(ippay);
+      entry->lan_wscale = tcpinfo.wscale;
+      entry->lan_max_window_unscaled = tcp_window(ippay);
       entry->lan_sent = tcp_seq_num(ippay) + 1;
       port->portfunc(pkt, port->userdata);
       entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
@@ -848,6 +856,7 @@ int uplink(
     }
     else
     {
+      struct tcp_information tcpinfo;
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port);
       if (entry == NULL)
@@ -865,6 +874,18 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num");
         return 1;
       }
+      tcp_parse_options(ippay, &tcpinfo);
+      if (!tcpinfo.sack_permitted && default_sack_permitted)
+      {
+        log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "SACK conflict");
+      }
+      entry->wscalediff = ((int)default_wscale) - ((int)tcpinfo.wscale);
+      entry->seqoffset = entry->isn - tcp_seq_num(ippay);
+      entry->lan_wscale = tcpinfo.wscale;
+      entry->lan_sent = tcp_seq_num(ippay) + 1;
+      entry->lan_acked = tcp_ack_num(ippay);
+      entry->lan_max = tcp_ack_num(ippay) + (tcp_window(ippay) << entry->lan_wscale);
+      entry->lan_max_window_unscaled = tcp_window(ippay);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
@@ -904,9 +925,9 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
         return 1;
       }
-      if (seq_cmp(ack, entry->wan_acked) >= 0)
+      if (seq_cmp(ack, entry->lan_acked) >= 0)
       {
-        entry->wan_acked = ack;
+        entry->lan_acked = ack;
       }
       if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
       {
@@ -969,7 +990,7 @@ int uplink(
     return 1;
   }
   if (!between(
-    entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
+    entry->lan_acked - (entry->lan_max_window_unscaled<<entry->lan_wscale),
     tcp_ack_num(ippay),
     entry->wan_sent + 1))
   {
@@ -992,7 +1013,7 @@ int uplink(
     last_seq += 1;
   }
   lan_min =
-    entry->lan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
+    entry->lan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale);
   if (
     !(data_len == 0 && first_seq+1 == entry->lan_sent) // keepalive
     &&
@@ -1006,9 +1027,9 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
     return 1;
   }
-  if (tcp_window(ippay) > entry->wan_max_window_unscaled)
+  if (tcp_window(ippay) > entry->lan_max_window_unscaled)
   {
-    entry->wan_max_window_unscaled = tcp_window(ippay);
+    entry->lan_max_window_unscaled = tcp_window(ippay);
   }
   if (unlikely(tcp_fin(ippay)))
   {
@@ -1047,9 +1068,9 @@ int uplink(
   {
     uint32_t ack = tcp_ack_num(ippay);
     uint16_t window = tcp_window(ippay);
-    if (seq_cmp(ack, entry->wan_acked) >= 0)
+    if (seq_cmp(ack, entry->lan_acked) >= 0)
     {
-      entry->wan_acked = ack;
+      entry->lan_acked = ack;
     }
     if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
     {
