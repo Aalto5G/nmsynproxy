@@ -52,19 +52,19 @@ const uint8_t wstab[] = {0, 2, 4, 7};
 int verify_cookie(
   struct secretinfo *info,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
-  uint16_t *mss, uint8_t *wscale)
+  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted)
 {
   int current_secret = info->current_secret_index;
   struct secret secret1 = info->secrets[current_secret];
   struct secret secret2 = info->secrets[!current_secret];
-  uint16_t additional_bits = (isn>>28)&0xF;
+  uint16_t additional_bits = (isn>>27)&0x1F;
   struct siphash_ctx ctx;
   uint32_t hash;
   siphash_init(&ctx, secret1.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
-  hash = siphash_get(&ctx) & 0xfffffff;
-  if (hash == (isn & 0xfffffff))
+  hash = siphash_get(&ctx) & 0x7ffffff;
+  if (hash == (isn & 0x7ffffff))
   {
     if (wscale)
     {
@@ -73,14 +73,18 @@ int verify_cookie(
     if (mss)
     {
       *mss = msstab[(additional_bits>>2)&3];
+    }
+    if (sack_permitted)
+    {
+      *sack_permitted = (additional_bits>>4)&1;
     }
     return 1;
   }
   siphash_init(&ctx, secret2.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
-  hash = siphash_get(&ctx) & 0xfffffff;
-  if (hash == (isn & 0xfffffff))
+  hash = siphash_get(&ctx) & 0x7ffffff;
+  if (hash == (isn & 0x7ffffff))
   {
     if (wscale)
     {
@@ -89,6 +93,10 @@ int verify_cookie(
     if (mss)
     {
       *mss = msstab[(additional_bits>>2)&3];
+    }
+    if (sack_permitted)
+    {
+      *sack_permitted = (additional_bits>>4)&1;
     }
     return 1;
   }
@@ -98,7 +106,7 @@ int verify_cookie(
 uint32_t form_cookie(
   struct secretinfo *info,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
-  uint16_t mss, uint8_t wscale)
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
 {
   uint8_t wsbits;
   uint8_t mssbits;
@@ -129,10 +137,11 @@ uint32_t form_cookie(
     i--;
   }
   mssbits = i;
-  additional_bits = (mssbits<<2) | wsbits;
+  sack_permitted = !!sack_permitted;
+  additional_bits = (sack_permitted<<4) | (mssbits<<2) | wsbits;
   siphash_init(&ctx, secret1.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
-  hash = siphash_get(&ctx) & 0xfffffff;
-  return (additional_bits<<28) | hash;
+  hash = siphash_get(&ctx) & 0x7ffffff;
+  return (additional_bits<<27) | hash;
 }

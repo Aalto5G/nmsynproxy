@@ -12,18 +12,18 @@ int main(int argc, char **argv)
   struct secretinfo info;
 
   secret_init_deterministic(&info);
-  cookie = form_cookie(&info, ip1, ip2, port1, port2, mss, wscale);
-  if (!verify_cookie(&info, ip1, ip2, port1, port2, cookie, NULL, NULL))
+  cookie = form_cookie(&info, ip1, ip2, port1, port2, mss, wscale, 1);
+  if (!verify_cookie(&info, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL))
   {
     abort();
   }
   revolve_secret_impl(&info);
-  if (!verify_cookie(&info, ip1, ip2, port1, port2, cookie, NULL, NULL))
+  if (!verify_cookie(&info, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL))
   {
     abort();
   }
   revolve_secret_impl(&info);
-  if (verify_cookie(&info, ip1, ip2, port1, port2, cookie, NULL, NULL))
+  if (verify_cookie(&info, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL))
   {
     abort();
   }
