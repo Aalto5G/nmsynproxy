@@ -563,7 +563,7 @@ int downlink(
     if (tcp_ack(ippay))
     {
       tcp_set_ack_number_cksum_update(
-        ippay, tcp_len, tcp_ack_number(ippay)+entry->seqoffset);
+        ippay, tcp_len, tcp_ack_number(ippay)-entry->seqoffset);
     }
     synproxy_hash_del(local, entry);
     port->portfunc(pkt, port->userdata);
@@ -687,12 +687,12 @@ int downlink(
     size_t sacklen;
     int sixteen_bit_align;
     tcp_set_ack_number_cksum_update(
-      ippay, tcp_len, tcp_ack_number(ippay)+entry->seqoffset);
+      ippay, tcp_len, tcp_ack_number(ippay)-entry->seqoffset);
     sackhdr = tcp_find_sack_header(ippay, &sacklen, &sixteen_bit_align);
     if (sackhdr != NULL)
     {
       tcp_adjust_sack_cksum_update(
-        ippay, sackhdr, sacklen, sixteen_bit_align, entry->seqoffset);
+        ippay, sackhdr, sacklen, sixteen_bit_align, -entry->seqoffset);
     }
   }
   port->portfunc(pkt, port->userdata);
@@ -879,7 +879,7 @@ int uplink(
       }
       entry->wscalediff = ((int)default_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
-        entry->state_data.downlink_syn_sent.this_isn - tcp_seq_num(ippay);
+        - entry->state_data.downlink_syn_sent.this_isn + tcp_seq_num(ippay) - 1;
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_sent = tcp_seq_num(ippay) + 1;
       entry->lan_acked = tcp_ack_num(ippay);
@@ -1007,6 +1007,8 @@ int uplink(
   }
   lan_min =
     entry->lan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale);
+  first_seq += entry->seqoffset;
+  last_seq += entry->seqoffset;
   if (
     !(data_len == 0 && first_seq+1 == entry->lan_sent) // keepalive
     &&
