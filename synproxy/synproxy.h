@@ -30,7 +30,6 @@ struct synproxy_hash_entry {
   uint8_t lan_wscale;
   uint8_t wan_wscale;
   uint32_t isn;
-  uint32_t other_isn;
   uint32_t seqoffset;
   uint32_t timestamp;
   uint32_t lan_sent; // what LAN has sent plus 1

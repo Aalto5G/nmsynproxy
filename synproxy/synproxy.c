@@ -198,7 +198,6 @@ static void send_syn(
 
   entry->wan_max_window_unscaled = tcp_window(origtcp);
   entry->isn = tcp_ack_number(origtcp) - 1;
-  entry->other_isn = tcp_seq_number(origtcp) - 1;
   entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
