@@ -1,4 +1,4 @@
-SYNPROXY_SRC_LIB := synproxy.c yyutils.c
+SYNPROXY_SRC_LIB := synproxy.c yyutils.c secret.c
 SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c
 
 SYNPROXY_LEX_LIB := conf.l
