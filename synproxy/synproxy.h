@@ -13,6 +13,7 @@
 #include "timerlink.h"
 #include <stdio.h>
 #include "hashseed.h"
+#include "secret.h"
 
 struct synproxy {
 };
@@ -101,6 +102,7 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata);
 struct worker_local {
   struct hash_table hash;
   struct timer_linkheap timers;
+  struct secretinfo info;
 };
 
 static inline void worker_local_free(struct worker_local *local)

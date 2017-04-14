@@ -54,6 +54,7 @@ static void closed_port(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -783,6 +784,7 @@ static void three_way_handshake_four_way_fin(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
@@ -818,6 +820,7 @@ static void established_rst_uplink(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -933,6 +936,7 @@ static void established_rst_downlink(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -1036,6 +1040,7 @@ static void three_way_handshake_ulretransmit(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 2, 1);
@@ -1059,6 +1064,7 @@ static void three_way_handshake_dlretransmit(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 2);
@@ -1082,6 +1088,7 @@ static void three_way_handshake_findlretransmit(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 1);
@@ -1105,6 +1112,7 @@ static void three_way_handshake_finulretransmit(void)
 
   hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
   timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 1, 1);
