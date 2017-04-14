@@ -610,10 +610,10 @@ int downlink(
     !(data_len == 0 && first_seq+1 == entry->wan_sent) // keepalive
     &&
     !between(
-      wan_min, first_seq, entry->wan_max+1)
+      wan_min, first_seq, entry->lan_max+1)
     &&
     !between(
-      wan_min, last_seq, entry->wan_max+1)
+      wan_min, last_seq, entry->lan_max+1)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number");
@@ -664,9 +664,9 @@ int downlink(
     {
       entry->wan_acked = ack;
     }
-    if (seq_cmp(ack + (window << entry->lan_wscale), entry->lan_max) >= 0)
+    if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
     {
-      entry->lan_max = ack + (window << entry->lan_wscale);
+      entry->wan_max = ack + (window << entry->wan_wscale);
     }
   }
   if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
@@ -925,14 +925,8 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
         return 1;
       }
-      if (seq_cmp(ack, entry->lan_acked) >= 0)
-      {
-        entry->lan_acked = ack;
-      }
-      if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
-      {
-        entry->wan_max = ack + (window << entry->wan_wscale);
-      }
+      entry->lan_acked = ack;
+      entry->lan_max = ack + (window << entry->lan_wscale);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
@@ -1018,10 +1012,10 @@ int uplink(
     !(data_len == 0 && first_seq+1 == entry->lan_sent) // keepalive
     &&
     !between(
-      lan_min, first_seq, entry->lan_max+1)
+      lan_min, first_seq, entry->wan_max+1)
     &&
     !between(
-      lan_min, last_seq, entry->lan_max+1)
+      lan_min, last_seq, entry->wan_max+1)
     )
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number");
@@ -1072,9 +1066,9 @@ int uplink(
     {
       entry->lan_acked = ack;
     }
-    if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
+    if (seq_cmp(ack + (window << entry->lan_wscale), entry->lan_max) >= 0)
     {
-      entry->wan_max = ack + (window << entry->wan_wscale);
+      entry->lan_max = ack + (window << entry->lan_wscale);
     }
   }
   if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
