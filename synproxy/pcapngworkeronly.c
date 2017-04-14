@@ -111,14 +111,14 @@ static void *rx_func(void *userdata)
     memcpy(packet_data(pktstruct), buf, snap);
     if (direction == PACKET_DIRECTION_UPLINK)
     {
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
+      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
         ll_free_st(&st, pktstruct);
       }
     }
     else
     {
-      if (downlink(args->synproxy, args->local, pktstruct, &outport, time64))
+      if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
         ll_free_st(&st, pktstruct);
       }

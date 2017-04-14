@@ -121,7 +121,7 @@ static void *rx_func(void *userdata)
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt);
     memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
+    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
     {
       as_free_mt(&loc, pktstruct);
     }
@@ -133,7 +133,7 @@ static void *rx_func(void *userdata)
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt);
     memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
+    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
     {
       as_free_mt(&loc, pktstruct);
     }
@@ -144,7 +144,7 @@ static void *rx_func(void *userdata)
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pktsmall);
     memcpy(packet_data(pktstruct), pktsmall, sizeof(pktsmall));
-    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64))
+    if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
     {
       as_free_mt(&loc, pktstruct);
     }

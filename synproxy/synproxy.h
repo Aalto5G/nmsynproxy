@@ -2,6 +2,7 @@
 #define _SYNPROXY_H_
 
 #include "ports.h"
+#include "llalloc.h"
 #include "packet.h"
 #include "iphdr.h"
 #include "log.h"
@@ -159,10 +160,10 @@ static inline void synproxy_hash_del(
 
 int downlink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
-  struct port *port, uint64_t time64);
+  struct port *port, uint64_t time64, struct ll_alloc_st *st);
 
 int uplink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
-  struct port *port, uint64_t time64);
+  struct port *port, uint64_t time64, struct ll_alloc_st *st);
 
 #endif

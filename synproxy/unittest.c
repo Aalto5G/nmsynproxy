@@ -90,7 +90,7 @@ static void closed_port(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -165,7 +165,7 @@ static void closed_port(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -266,7 +266,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -341,7 +341,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -408,7 +408,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -476,7 +476,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -543,7 +543,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -611,7 +611,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -678,7 +678,7 @@ static void three_way_handshake_four_way_fin(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -778,7 +778,7 @@ static void established_rst_uplink(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -853,7 +853,7 @@ static void established_rst_uplink(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -920,7 +920,7 @@ static void established_rst_uplink(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -986,7 +986,7 @@ static void established_rst_uplink(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1087,7 +1087,7 @@ static void established_rst_downlink(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1162,7 +1162,7 @@ static void established_rst_downlink(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1229,7 +1229,7 @@ static void established_rst_downlink(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1295,7 +1295,7 @@ static void established_rst_downlink(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1396,7 +1396,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1469,7 +1469,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1537,7 +1537,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1604,7 +1604,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1672,7 +1672,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1739,7 +1739,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1807,7 +1807,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1874,7 +1874,7 @@ static void three_way_handshake_ulretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -1974,7 +1974,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2049,7 +2049,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2117,7 +2117,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2184,7 +2184,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2252,7 +2252,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2319,7 +2319,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2387,7 +2387,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (downlink(&synproxy, &local, pktstruct, &outport, time64))
+  if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }
@@ -2454,7 +2454,7 @@ static void three_way_handshake_dlretransmit(void)
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
   memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
-  if (uplink(&synproxy, &local, pktstruct, &outport, time64))
+  if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
   }

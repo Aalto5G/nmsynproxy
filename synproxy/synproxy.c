@@ -82,9 +82,99 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
   return synproxy_hash(CONTAINER_OF(node, struct synproxy_hash_entry, node));
 }
 
+static void send_ack_and_window_update(
+  void *orig, struct synproxy_hash_entry *entry, struct port *port,
+  struct ll_alloc_st *st)
+{
+  char ack[14+20+20] = {0};
+  char windowupdate[14+20+20] = {0};
+  void *ip, *origip;
+  void *tcp, *origtcp;
+  struct packet *pktstruct;
+
+  origip = ether_payload(orig);
+  origtcp = ip_payload(origip);
+
+  memcpy(ether_src(ack), ether_dst(orig), 6);
+  memcpy(ether_dst(ack), ether_src(orig), 6);
+  ether_set_type(ack, 0x0800);
+  ip = ether_payload(ack);
+  ip_set_version(ip, 4);
+  ip_set_hdr_len(ip, 20);
+  ip_set_total_len(ip, sizeof(ack) - 14);
+  ip_set_dont_frag(ip, 1);
+  ip_set_id(ip, 0); // XXX
+  ip_set_ttl(ip, 64);
+  ip_set_proto(ip, 6);
+  ip_set_src(ip, ip_dst(origip));
+  ip_set_dst(ip, ip_src(origip));
+  ip_set_hdr_cksum_calc(ip, 20);
+  tcp = ip_payload(ip);
+  tcp_set_src_port(tcp, tcp_dst_port(origtcp));
+  tcp_set_dst_port(tcp, tcp_src_port(origtcp));
+  tcp_set_ack_on(tcp);
+  tcp_set_data_offset(tcp, 20);
+  tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
+  tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
+  tcp_set_window(tcp, entry->window_size);
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(ack) - 14 - 20);
+
+  // FIXME timestamps, etc
+
+  pktstruct = ll_alloc_st(st, packet_size(sizeof(ack)));
+  pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
+  pktstruct->sz = sizeof(ack);
+  memcpy(packet_data(pktstruct), ack, sizeof(ack));
+  port->portfunc(pktstruct, port->userdata);
+
+  memcpy(ether_src(windowupdate), ether_src(orig), 6);
+  memcpy(ether_dst(windowupdate), ether_dst(orig), 6);
+  ether_set_type(windowupdate, 0x0800);
+  ip = ether_payload(windowupdate);
+  ip_set_version(ip, 4);
+  ip_set_hdr_len(ip, 20);
+  ip_set_total_len(ip, sizeof(windowupdate) - 14);
+  ip_set_dont_frag(ip, 1);
+  ip_set_id(ip, 0); // XXX
+  ip_set_ttl(ip, 64);
+  ip_set_proto(ip, 6);
+  ip_set_src(ip, ip_src(origip));
+  ip_set_dst(ip, ip_dst(origip));
+  ip_set_hdr_cksum_calc(ip, 20);
+  tcp = ip_payload(ip);
+  tcp_set_src_port(tcp, tcp_src_port(origtcp));
+  tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
+  tcp_set_ack_on(tcp);
+  tcp_set_data_offset(tcp, 20);
+  tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
+  tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
+  if (entry->wscalediff >= 0)
+  {
+    tcp_set_window(tcp, tcp_window(origtcp)>>entry->wscalediff);
+  }
+  else
+  {
+    uint64_t win64 = tcp_window(origtcp)<<entry->wscalediff;
+    if (win64 > 0xFFFF)
+    {
+      win64 = 0xFFFF;
+    }
+    tcp_set_window(tcp, win64);
+  }
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(windowupdate) - 14 - 20);
+
+  // FIXME timestamps, etc
+
+  pktstruct = ll_alloc_st(st, packet_size(sizeof(windowupdate)));
+  pktstruct->direction = PACKET_DIRECTION_UPLINK;
+  pktstruct->sz = sizeof(windowupdate);
+  memcpy(packet_data(pktstruct), windowupdate, sizeof(windowupdate));
+  port->portfunc(pktstruct, port->userdata);
+}
+
 int downlink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
-  struct port *port, uint64_t time64)
+  struct port *port, uint64_t time64, struct ll_alloc_st *st)
 {
   void *ether = packet_data(pkt);
   void *ip;
@@ -429,7 +519,7 @@ int downlink(
 // return: whether to free (1) or not (0)
 int uplink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
-  struct port *port, uint64_t time64)
+  struct port *port, uint64_t time64, struct ll_alloc_st *st)
 {
   void *ether = packet_data(pkt);
   void *ip;
@@ -588,8 +678,7 @@ int uplink(
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
-      // FIXME send ACK and ACK window update
-      abort();
+      send_ack_and_window_update(ippay, entry, port, st);
       return 1;
     }
   }
