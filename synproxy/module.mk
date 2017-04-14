@@ -94,7 +94,10 @@ $(SYNPROXY_DEP): %.d: %.c $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 $(SYNPROXY_DEPGEN): %.d: %.c %.h $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -MM -MP -MT "$*.d $*.o" -o $*.d $*.c $(CFLAGS_SYNPROXY)
 
-$(DIRSYNPROXY)/conf.lex.d: $(DIRSYNPROXY)/conf.tab.h
+$(DIRSYNPROXY)/conf.lex.d: $(DIRSYNPROXY)/conf.tab.h $(DIRSYNPROXY)/conf.lex.h
+$(DIRSYNPROXY)/conf.lex.o: $(DIRSYNPROXY)/conf.tab.h $(DIRSYNPROXY)/conf.lex.h
+$(DIRSYNPROXY)/conf.tab.d: $(DIRSYNPROXY)/conf.lex.h $(DIRSYNPROXY)/conf.tab.h
+$(DIRSYNPROXY)/conf.tab.o: $(DIRSYNPROXY)/conf.lex.h $(DIRSYNPROXY)/conf.tab.h
 
 $(DIRSYNPROXY)/CONF.LEX.INTERMEDIATE: $(DIRSYNPROXY)/conf.l
 	mkdir -p $(DIRSYNPROXY)/intermediatestore
