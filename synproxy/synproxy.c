@@ -267,12 +267,11 @@ static void send_syn(
   port->portfunc(pktstruct, port->userdata);
 }
 
-static void send_ack_and_window_update(
+static void send_ack_only(
   void *orig, struct synproxy_hash_entry *entry, struct port *port,
   struct ll_alloc_st *st)
 {
   char ack[14+20+20] = {0};
-  char windowupdate[14+20+20] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   struct packet *pktstruct;
@@ -311,6 +310,21 @@ static void send_ack_and_window_update(
   pktstruct->sz = sizeof(ack);
   memcpy(packet_data(pktstruct), ack, sizeof(ack));
   port->portfunc(pktstruct, port->userdata);
+}
+
+static void send_ack_and_window_update(
+  void *orig, struct synproxy_hash_entry *entry, struct port *port,
+  struct ll_alloc_st *st)
+{
+  char windowupdate[14+20+20] = {0};
+  void *ip, *origip;
+  void *tcp, *origtcp;
+  struct packet *pktstruct;
+
+  origip = ether_payload(orig);
+  origtcp = ip_payload(origip);
+
+  send_ack_only(orig, entry, port, st);
 
   memcpy(ether_src(windowupdate), ether_src(orig), 6);
   memcpy(ether_dst(windowupdate), ether_dst(orig), 6);
@@ -926,6 +940,17 @@ int uplink(
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA but entry nonexistent");
         return 1;
+      }
+      if (entry->flag_state == FLAG_STATE_ESTABLISHED)
+      {
+        // FIXME we should store the ISN permanently...
+        if (tcp_ack_num(ippay) == entry->lan_acked &&
+            tcp_seq_num(ippay) + 1 == entry->lan_sent)
+        {
+          log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "resending ACK");
+          send_ack_only(ether, entry, port, st);
+          return 1;
+        }
       }
       if (entry->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
       {
