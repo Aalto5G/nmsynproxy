@@ -36,6 +36,11 @@ static inline int seq_cmp(uint32_t x, uint32_t y)
 
 static inline uint32_t between(uint32_t a, uint32_t x, uint32_t b)
 {
+  if (b - a > 128*1024*1024)
+  {
+    log_log(LOG_LEVEL_EMERG, "WORKER",
+      "TOO GREAT SEQUENCE NUMBER DIFFERENCE\n");
+  }
   if (b >= a)
   {
     return x >= a && x < b;
