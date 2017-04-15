@@ -902,9 +902,7 @@ static void closed_port(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2082,9 +2080,7 @@ static void three_way_handshake_four_way_fin(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
@@ -2118,9 +2114,7 @@ static void established_rst_uplink(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2234,9 +2228,7 @@ static void established_rst_downlink(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2338,9 +2330,7 @@ static void three_way_handshake_ulretransmit(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 2, 1);
@@ -2362,9 +2352,7 @@ static void three_way_handshake_dlretransmit(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 2);
@@ -2386,9 +2374,7 @@ static void three_way_handshake_findlretransmit(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 1);
@@ -2410,9 +2396,7 @@ static void three_way_handshake_finulretransmit(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 1, 1);
@@ -2437,9 +2421,7 @@ static void syn_proxy_handshake(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2468,9 +2450,7 @@ static void syn_proxy_uplink(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2507,9 +2487,7 @@ static void syn_proxy_downlink(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2547,9 +2525,7 @@ static void syn_proxy_uplink_downlink(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2587,9 +2563,7 @@ static void syn_proxy_closed_port(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_closed_port_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2613,9 +2587,7 @@ static void syn_proxy_handshake_2_1_1(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2643,9 +2615,7 @@ static void syn_proxy_handshake_1_2_1(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2673,9 +2643,7 @@ static void syn_proxy_handshake_1_1_2(void)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_heap_init_capacity(&local.timers, 131072);
-  secret_init_deterministic(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,

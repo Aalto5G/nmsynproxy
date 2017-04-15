@@ -103,6 +103,15 @@ struct worker_local {
   struct secretinfo info;
 };
 
+static inline void worker_local_init(
+  struct worker_local *local,
+  size_t hash_size, size_t heap_size, size_t ratelimit_size)
+{
+  hash_table_init(&local->hash, hash_size, synproxy_hash_fn, NULL);
+  timer_linkheap_init(&local->timers);
+  secret_init_deterministic(&local->info);
+}
+
 static inline void worker_local_free(struct worker_local *local)
 {
   struct hash_list_node *x, *n;
