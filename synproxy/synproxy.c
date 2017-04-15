@@ -491,6 +491,11 @@ int downlink(
     }
     if (!tcp_ack(ippay))
     {
+      if (!ip_permitted(ip_src(ip), &local->ratelimit))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP ratelimited");
+        return 1;
+      }
       send_synack(ether, local, port, st);
       return 1;
     }
