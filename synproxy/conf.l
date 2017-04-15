@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <limits.h>
 #include "conf.tab.h"
 #include "yyutils.h"
 
@@ -44,7 +45,26 @@ mss          return MSS;
 wscale       return WSCALE;
 \"([^\\\"]|\\.)*\"  yylval->s=yy_escape_string(yytext); return STRING_LITERAL;
 
-[0-9]+       yylval->i=atoi(yytext); return INT_LITERAL;
+[0-9]+       {
+  char *endptr;
+  long l;
+  errno = 0;
+  l=strtol(yytext, &endptr, 10);
+  if (errno == ERANGE)
+  {
+    return ERROR_TOK;
+  }
+  if (l > INT_MAX || l < INT_MIN)
+  {
+    return ERROR_TOK;
+  }
+  if (*endptr != '\0')
+  {
+    return ERROR_TOK;
+  }
+  yylval->i = l;
+  return INT_LITERAL;
+}
 
 \n                                { ++yylineno; yycolumn=1; }
 [ \t]+                            /* ignore whitespaces */;
