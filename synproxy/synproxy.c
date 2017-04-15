@@ -23,6 +23,11 @@ static void synproxy_expiry_fn(
 static inline int seq_cmp(uint32_t x, uint32_t y)
 {
   int32_t result = x-y;
+  if (result > 128*1024*1024 || result < -128*1024*1024)
+  {
+    log_log(LOG_LEVEL_EMERG, "WORKER",
+      "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u\n", x, y);
+  }
   if (result > 0)
   {
     return 1;
@@ -39,7 +44,7 @@ static inline uint32_t between(uint32_t a, uint32_t x, uint32_t b)
   if (b - a > 128*1024*1024)
   {
     log_log(LOG_LEVEL_EMERG, "WORKER",
-      "TOO GREAT SEQUENCE NUMBER DIFFERENCE\n");
+      "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u %u\n", a, x, b);
   }
   if (b >= a)
   {
