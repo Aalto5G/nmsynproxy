@@ -10,6 +10,15 @@ static inline uint64_t gettime64(void)
   return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
 }
 
+static inline int rst_is_valid(uint32_t rst_seq, uint32_t ref_seq)
+{
+  if (rst_seq >= ref_seq)
+  {
+    return rst_seq - ref_seq <= 3;
+  }
+  return ref_seq - rst_seq <= 3;
+}
+
 static void synproxy_expiry_fn(
   struct timer_link *timer, struct timer_linkheap *heap, void *ud)
 {
@@ -613,7 +622,7 @@ int downlink(
     else
     {
       uint32_t seq = tcp_seq_num(ippay);
-      if (seq != (uint32_t)(entry->wan_sent-1) && seq != entry->wan_sent && seq != (uint32_t)(entry->wan_sent+1))
+      if (!rst_is_valid(seq, entry->wan_sent))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
         return 1;
@@ -1014,9 +1023,7 @@ int uplink(
     if (tcp_rst(ippay))
     {
       uint32_t seq = tcp_seq_num(ippay);
-      if (seq != (uint32_t)(entry->lan_sent-1) && 
-          seq != (uint32_t)(entry->lan_sent) && 
-          seq != (uint32_t)(entry->lan_sent+1))
+      if (!rst_is_valid(seq, entry->lan_sent))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
         return 1;
@@ -1101,9 +1108,7 @@ int uplink(
     else
     {
       uint32_t seq = tcp_seq_num(ippay);
-      if (seq != (uint32_t)(entry->lan_sent-1) && 
-          seq != (uint32_t)(entry->lan_sent) && 
-          seq != (uint32_t)(entry->lan_sent+1))
+      if (!rst_is_valid(seq, entry->lan_sent))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
         return 1;
