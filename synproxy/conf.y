@@ -267,6 +267,12 @@ MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
+  if (($3 & ($3-1)) != 0)
+  {
+    fprintf(stderr, "sackhash size not power of 2: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
   conf->sackhashsize = $3;
 }
 | CONNTABLESIZE EQUALS INT_LITERAL SEMICOLON
@@ -274,6 +280,12 @@ MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
   if ($3 <= 0)
   {
     fprintf(stderr, "invalid conn table size: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  if (($3 & ($3-1)) != 0)
+  {
+    fprintf(stderr, "conn table size not power of 2: %d at line %d col %d\n",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -298,6 +310,12 @@ SIZE EQUALS INT_LITERAL SEMICOLON
   if ($3 <= 0)
   {
     fprintf(stderr, "invalid ratehash size: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  if (($3 & ($3-1)) != 0)
+  {
+    fprintf(stderr, "ratehash size not power of 2: %d at line %d col %d\n",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
