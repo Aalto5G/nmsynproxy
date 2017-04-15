@@ -176,9 +176,7 @@ int main(int argc, char **argv)
     abort();
   }
 
-  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
-  timer_linkheap_init(&local.timers);
-  secret_init_random(&local.info);
+  worker_local_init(&local, 131072, 131072, 131072);
   synproxy_hash_put_connected(&local, (10<<24)|2, 12345, (11<<24)|1, 54321);
 
   rx_args.workerq = &workerq;
