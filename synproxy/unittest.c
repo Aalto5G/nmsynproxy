@@ -270,6 +270,236 @@ static void uplink_impl(
   }
 }
 
+static void downlink_impl(
+  struct synproxy *synproxy,
+  struct worker_local *local, struct ll_alloc_st *loc,
+  struct tcp_ctx *ctx,
+  unsigned pkts)
+{
+  struct port outport;
+  uint64_t time64;
+  struct packet *pktstruct;
+  struct linked_list_head head;
+  struct linkedlistfunc_userdata ud;
+  char pkt[1514] = {0};
+  char pktsmall[14+20+20] = {0};
+  void *ether, *ip, *tcp;
+  char cli_mac[6] = {0x02,0,0,0,0,0x04};
+  char lan_mac[6] = {0x02,0,0,0,0,0x01};
+  unsigned i;
+  
+  linked_list_head_init(&head);
+  ud.head = &head;
+  outport.userdata = &ud;
+  outport.portfunc = linkedlistfunc;
+
+  time64 = gettime64();
+
+  for (i = 0; i < pkts; i++)
+  {
+    ether = pkt;
+    memset(pkt, 0, sizeof(pkt));
+    memcpy(ether_dst(ether), cli_mac, 6);
+    memcpy(ether_src(ether), lan_mac, 6);
+    ether_set_type(ether, ETHER_TYPE_IP);
+    ip = ether_payload(ether);
+    ip_set_version(ip, 4);
+    ip_set_hdr_len(ip, 20);
+    ip_set_total_len(ip, sizeof(pkt) - 14);
+    ip_set_dont_frag(ip, 1);
+    ip_set_id(ip, 123);
+    ip_set_ttl(ip, 64);
+    ip_set_proto(ip, 6);
+    ip_set_src(ip, ctx->ip2);
+    ip_set_dst(ip, ctx->ip1);
+    ip_set_hdr_cksum_calc(ip, 20);
+    tcp = ip_payload(ip);
+    tcp_set_src_port(tcp, ctx->port2);
+    tcp_set_dst_port(tcp, ctx->port1);
+    tcp_set_ack_on(tcp);
+    tcp_set_data_offset(tcp, 20);
+    tcp_set_seq_number(tcp, ctx->seq2);
+    tcp_set_ack_number(tcp, ctx->seq);
+    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    ctx->seq2 += sizeof(pkt) - 14 - 20 - 20;
+
+    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
+    pktstruct->sz = sizeof(pkt);
+    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
+    {
+      ll_free_st(loc, pktstruct);
+    }
+
+    pktstruct = fetch_packet(&head);
+    if (pktstruct == NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
+      exit(1);
+    }
+    if (pktstruct->sz != 1514)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
+      exit(1);
+    }
+    if (pktstruct->direction != PACKET_DIRECTION_DOWNLINK)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
+      exit(1);
+    }
+    ip = ether_payload(packet_data(pktstruct));
+    if (ip_src(ip) != ctx->ip2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
+      exit(1);
+    }
+    if (ip_dst(ip) != ctx->ip1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
+      exit(1);
+    }
+    if (ip_proto(ip) != 6)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
+      exit(1);
+    }
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
+      exit(1);
+    }
+    tcp = ip_payload(ip);
+    if (tcp_syn(tcp) || !tcp_ack(tcp))
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
+      exit(1);
+    }
+    if (tcp_src_port(tcp) != ctx->port2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src port doesn't agree");
+      exit(1);
+    }
+    if (tcp_dst_port(tcp) != ctx->port1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+      exit(1);
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
+      exit(1);
+    }
+    ll_free_st(loc, pktstruct);
+    pktstruct = fetch_packet(&head);
+    if (pktstruct != NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
+      exit(1);
+    }
+
+    ether = pktsmall;
+    memset(pktsmall, 0, sizeof(pktsmall));
+    memcpy(ether_dst(ether), lan_mac, 6);
+    memcpy(ether_src(ether), cli_mac, 6);
+    ether_set_type(ether, ETHER_TYPE_IP);
+    ip = ether_payload(ether);
+    ip_set_version(ip, 4);
+    ip_set_hdr_len(ip, 20);
+    ip_set_total_len(ip, sizeof(pktsmall) - 14);
+    ip_set_dont_frag(ip, 1);
+    ip_set_id(ip, 123);
+    ip_set_ttl(ip, 64);
+    ip_set_proto(ip, 6);
+    ip_set_src(ip, ctx->ip1);
+    ip_set_dst(ip, ctx->ip2);
+    ip_set_hdr_cksum_calc(ip, 20);
+    tcp = ip_payload(ip);
+    tcp_set_src_port(tcp, ctx->port1);
+    tcp_set_dst_port(tcp, ctx->port2);
+    tcp_set_ack_on(tcp);
+    tcp_set_data_offset(tcp, 20);
+    tcp_set_seq_number(tcp, ctx->seq1);
+    tcp_set_ack_number(tcp, ctx->seq2);
+    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pktsmall) - 14 - 20);
+
+    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pktsmall)));
+    pktstruct->direction = PACKET_DIRECTION_UPLINK;
+    pktstruct->sz = sizeof(pktsmall);
+    memcpy(packet_data(pktstruct), pktsmall, sizeof(pktsmall));
+    if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
+    {
+      ll_free_st(loc, pktstruct);
+    }
+
+    pktstruct = fetch_packet(&head);
+    if (pktstruct == NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
+      exit(1);
+    }
+    if (pktstruct->sz != sizeof(pktsmall))
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
+      exit(1);
+    }
+    if (pktstruct->direction != PACKET_DIRECTION_UPLINK)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
+      exit(1);
+    }
+    ip = ether_payload(packet_data(pktstruct));
+    if (ip_src(ip) != ctx->ip1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
+      exit(1);
+    }
+    if (ip_dst(ip) != ctx->ip2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
+      exit(1);
+    }
+    if (ip_proto(ip) != 6)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
+      exit(1);
+    }
+    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
+      exit(1);
+    }
+    tcp = ip_payload(ip);
+    if (tcp_syn(tcp) || !tcp_ack(tcp))
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
+      exit(1);
+    }
+    if (tcp_src_port(tcp) != ctx->port1)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet src port doesn't agree");
+      exit(1);
+    }
+    if (tcp_dst_port(tcp) != ctx->port2)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
+      exit(1);
+    }
+    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
+      exit(1);
+    }
+    ll_free_st(loc, pktstruct);
+    pktstruct = fetch_packet(&head);
+    if (pktstruct != NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
+      exit(1);
+    }
+  }
+}
+
 static void synproxy_closed_port_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
@@ -2262,6 +2492,89 @@ static void syn_proxy_uplink(void)
   worker_local_free(&local);
 }
 
+static void syn_proxy_downlink(void)
+{
+  struct synproxy synproxy;
+  struct ll_alloc_st st;
+  struct worker_local local;
+  uint32_t isn;
+  uint32_t isn1 = 0x12345678;
+  uint32_t isn2 = 0x87654321;
+  struct tcp_ctx ctx;
+
+  if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
+  {
+    abort();
+  }
+
+  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
+  timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
+
+  synproxy_handshake_impl(
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &isn, 1, 1, 1);
+  ctx.ip1 = (10<<24)|18;
+  ctx.ip2 = (11<<24)|17;
+  ctx.port1 = 12345;
+  ctx.port2 = 54321;
+  ctx.seq1 = isn1 + 1;
+  ctx.seq2 = isn2 + 1;
+  ctx.seq = isn + 1;
+  downlink_impl(&synproxy, &local, &st, &ctx, 10000);
+  four_way_fin_seq_impl(
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
+    1, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
+}
+
+static void syn_proxy_uplink_downlink(void)
+{
+  struct synproxy synproxy;
+  struct ll_alloc_st st;
+  struct worker_local local;
+  uint32_t isn;
+  uint32_t isn1 = 0x12345678;
+  uint32_t isn2 = 0x87654321;
+  struct tcp_ctx ctx;
+  int i;
+
+  if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
+  {
+    abort();
+  }
+
+  hash_table_init(&local.hash, 8, synproxy_hash_fn, NULL);
+  timer_heap_init_capacity(&local.timers, 131072);
+  secret_init_deterministic(&local.info);
+
+  synproxy_handshake_impl(
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &isn, 1, 1, 1);
+  ctx.ip1 = (10<<24)|18;
+  ctx.ip2 = (11<<24)|17;
+  ctx.port1 = 12345;
+  ctx.port2 = 54321;
+  ctx.seq1 = isn1 + 1;
+  ctx.seq2 = isn2 + 1;
+  ctx.seq = isn + 1;
+  for (i = 0; i < 100; i++)
+  {
+    uplink_impl(&synproxy, &local, &st, &ctx, 100);
+    downlink_impl(&synproxy, &local, &st, &ctx, 100);
+  }
+  four_way_fin_seq_impl(
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
+    1, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
+}
+
 static void syn_proxy_closed_port(void)
 {
   struct synproxy synproxy;
@@ -2408,6 +2721,10 @@ int main(int argc, char **argv)
   syn_proxy_closed_port();
 
   syn_proxy_uplink();
+
+  syn_proxy_downlink();
+
+  syn_proxy_uplink_downlink();
 
   return 0;
 }
