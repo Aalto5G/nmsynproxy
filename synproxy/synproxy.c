@@ -950,7 +950,7 @@ int uplink(
       {
         // FIXME we should store the ISN permanently...
         if (tcp_ack_num(ippay) == entry->lan_acked &&
-            tcp_seq_num(ippay) + 1 == entry->lan_sent)
+            tcp_seq_num(ippay) + 1 + entry->seqoffset == entry->lan_sent)
         {
           log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "resending ACK");
           send_ack_only(ether, entry, port, st);
@@ -973,16 +973,10 @@ int uplink(
         log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "SACK conflict");
       }
       entry->wscalediff = ((int)default_wscale) - ((int)tcpinfo.wscale);
-#if 0
       entry->seqoffset =
-        - entry->state_data.downlink_syn_sent.this_isn + tcp_seq_num(ippay) - 1;
-#endif
-      entry->seqoffset =
-        - entry->state_data.downlink_syn_sent.this_isn + tcp_seq_num(ippay);
-      entry->wan_acked += entry->seqoffset;
-      entry->wan_max += entry->seqoffset;
+        entry->state_data.downlink_syn_sent.this_isn - tcp_seq_num(ippay);
       entry->lan_wscale = tcpinfo.wscale;
-      entry->lan_sent = tcp_seq_num(ippay) + 1;
+      entry->lan_sent = tcp_seq_num(ippay) + 1 + entry->seqoffset;
       entry->lan_acked = tcp_ack_num(ippay);
       entry->lan_max = tcp_ack_num(ippay) + (tcp_window(ippay) << entry->lan_wscale);
       entry->lan_max_window_unscaled = tcp_window(ippay);
