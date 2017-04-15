@@ -1034,6 +1034,21 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
         return 1;
       }
+      first_seq = tcp_seq_num(ippay);
+      data_len =
+        ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
+      if (data_len < 0)
+      {
+        // This can occur in fragmented packets. We don't then know the true
+        // data length, and can therefore drop packets that would otherwise be
+        // valid.
+        data_len = 0;
+      }
+      last_seq = first_seq + data_len - 1;
+      if (seq_cmp(last_seq, entry->lan_sent) >= 0)
+      {
+        entry->lan_sent = last_seq + 1;
+      }
       entry->lan_acked = ack;
       entry->lan_max = ack + (window << entry->lan_wscale);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
