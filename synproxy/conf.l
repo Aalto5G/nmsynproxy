@@ -51,4 +51,11 @@ wscale       return WSCALE;
 \/\/.*                            /* ignore single-line comments */;
 .            return ERROR_TOK;
 
+"/*"                  BEGIN(COMMENTS);
+<COMMENTS>"/*"         return ERROR_TOK;
+<COMMENTS>"*/"         BEGIN(INITIAL);
+<COMMENTS><<EOF>>      return ERROR_TOK;
+<COMMENTS>.          ;
+<COMMENTS>"\n"       { ++yylineno; yycolumn=1; }
+
 %%
