@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c yyutils.c secret.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c
 
 SYNPROXY_LEX_LIB := conf.l
 SYNPROXY_LEX := $(SYNPROXY_LEX_LIB)
@@ -50,7 +50,7 @@ clean_$(LCSYNPROXY): clean_SYNPROXY
 distclean_$(LCSYNPROXY): distclean_SYNPROXY
 unit_$(LCSYNPROXY): unit_SYNPROXY
 
-SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest
+SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof
 
 ifeq ($(WITH_NETMAP),yes)
 SYNPROXY: $(DIRSYNPROXY)/netmapsend
@@ -82,6 +82,9 @@ $(DIRSYNPROXY)/pcapngworkeronly: $(DIRSYNPROXY)/pcapngworkeronly.o $(DIRSYNPROXY
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(DIRSYNPROXY)/unittest: $(DIRSYNPROXY)/unittest.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
+
+$(DIRSYNPROXY)/sizeof: $(DIRSYNPROXY)/sizeof.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(SYNPROXY_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
@@ -127,6 +130,6 @@ clean_SYNPROXY:
 	rm -f $(DIRSYNPROXY)/conf.tab.h
 
 distclean_SYNPROXY: clean_SYNPROXY
-	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/netmapproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest
+	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/netmapproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof
 
 -include $(DIRSYNPROXY)/*.d
