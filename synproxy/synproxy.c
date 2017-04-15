@@ -1065,6 +1065,14 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in DL_SYN_SENT, bad seq");
         return 1;
       }
+      tcp_set_seq_number_cksum_update(
+        ippay, tcp_len, entry->state_data.downlink_syn_sent.this_isn + 1);
+      tcp_set_ack_off_cksum_update(ippay);
+      tcp_set_ack_number_cksum_update(
+        ippay, tcp_len, 0);
+      synproxy_hash_del(local, entry);
+      port->portfunc(pkt, port->userdata);
+      return 0;
     }
     else
     {
