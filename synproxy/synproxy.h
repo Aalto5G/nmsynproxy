@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include "hashseed.h"
 #include "secret.h"
+#include "iphash.h"
 
 struct synproxy {
 };
@@ -101,6 +102,7 @@ struct worker_local {
   struct hash_table hash;
   struct timer_linkheap timers;
   struct secretinfo info;
+  struct ip_hash ratelimit;
 };
 
 static inline void worker_local_init(
@@ -110,12 +112,23 @@ static inline void worker_local_init(
   hash_table_init(&local->hash, hash_size, synproxy_hash_fn, NULL);
   timer_linkheap_init(&local->timers);
   secret_init_deterministic(&local->info);
+  local->ratelimit.hash_size = ratelimit_size;
+  local->ratelimit.batch_size = 16384;
+  if (local->ratelimit.batch_size > ratelimit_size)
+  {
+    local->ratelimit.batch_size = ratelimit_size;
+  }
+  local->ratelimit.initial_tokens = 2000;
+  local->ratelimit.timer_add = 400;
+  local->ratelimit.timer_period = 1000*1000;
+  ip_hash_init(&local->ratelimit, &local->timers);
 }
 
 static inline void worker_local_free(struct worker_local *local)
 {
   struct hash_list_node *x, *n;
   size_t bucket;
+  ip_hash_free(&local->ratelimit, &local->timers);
   HASH_TABLE_FOR_EACH_SAFE(&local->hash, bucket, n, x)
   {
     struct synproxy_hash_entry *e;
