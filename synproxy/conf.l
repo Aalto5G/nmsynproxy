@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "conf.tab.h"
+#include "yyutils.h"
 
 #define YYSTYPE CONFYYSTYPE
 #define YYLTYPE CONFYYLTYPE
@@ -41,6 +42,7 @@ conntablesize return CONNTABLESIZE;
 timerheapsize return TIMERHEAPSIZE;
 mss          return MSS;
 wscale       return WSCALE;
+\"([^\\\"]|\\.)*\"  yylval->s=yy_escape_string(yytext); return STRING_LITERAL;
 
 [0-9]+       yylval->i=atoi(yytext); return INT_LITERAL;
 

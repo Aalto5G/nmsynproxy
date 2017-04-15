@@ -43,3 +43,52 @@ void confyydomemparse(char *filedata, size_t filesize, struct conf *conf)
     exit(1);
   }
 }
+
+char *yy_escape_string(char *orig)
+{
+  char *buf = NULL;
+  char *result = NULL;
+  size_t j = 0;
+  size_t capacity = 0;
+  size_t i = 1;
+  while (orig[i] != '"')
+  {
+    if (j >= capacity)
+    {
+      char *buf2;
+      capacity = 2*capacity+10;
+      buf2 = realloc(buf, capacity);
+      if (buf2 == NULL)
+      {
+        free(buf);
+        return NULL;
+      }
+      buf = buf2;
+    }
+    if (orig[i] != '\\')
+    {
+      buf[j++] = orig[i++];
+    }
+    else
+    {
+      buf[j++] = orig[i+1];
+      i += 2;
+    }
+  }
+  if (j >= capacity)
+  {
+    char *buf2;
+    capacity = 2*capacity+10;
+    buf2 = realloc(buf, capacity);
+    if (buf2 == NULL)
+    {
+      free(buf);
+      return NULL;
+    }
+    buf = buf2;
+  }
+  buf[j++] = '\0';
+  result = strdup(buf);
+  free(buf);
+  return result;
+}

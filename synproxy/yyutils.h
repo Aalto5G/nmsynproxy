@@ -8,5 +8,7 @@ void confyydoparse(FILE *filein, struct conf *conf);
 
 void confyydomemparse(char *filedata, size_t filesize, struct conf *conf);
 
+char *yy_escape_string(char *orig);
+
 #endif
 

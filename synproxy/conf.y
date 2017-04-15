@@ -11,6 +11,7 @@ typedef void *yyscan_t;
 %{
 
 #include "conf.h"
+#include "yyutils.h"
 #include "conf.tab.h"
 #include "conf.lex.h"
 
@@ -34,15 +35,20 @@ int confyywrap(yyscan_t scanner)
 
 %union {
   int i;
+  char *s;
 }
+
+%destructor { free ($$); } STRING_LITERAL
 
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token SACKHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE TIMERHEAPSIZE
 %token COMMA MSS WSCALE
+%token STRING_LITERAL
 
 %type<i> sackhashval
 %type<i> INT_LITERAL
+%type<s> STRING_LITERAL
 
 %%
 
