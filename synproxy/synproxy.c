@@ -104,6 +104,8 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
 const uint8_t default_wscale = 7;
 const uint8_t default_sack_permitted = 1;
 const uint16_t default_mss = 1460;
+const uint8_t mss_clamp_enabled = 0;
+const uint16_t mss_clamp = 1460;
 
 static void send_synack(
   void *orig, struct worker_local *local,
@@ -522,6 +524,17 @@ int downlink(
           entry->state_data.uplink_syn_rcvd.isn == tcp_seq_num(ippay))
       {
         // retransmit of SYN+ACK
+        if (mss_clamp_enabled)
+        {
+          uint16_t mss;
+          tcp_parse_options(ippay, &tcpinfo);
+          mss = tcpinfo.mss;
+          if (mss > mss_clamp)
+          {
+            mss = mss_clamp;
+          }
+          tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+        }
         port->portfunc(pkt, port->userdata);
         return 0;
       }
@@ -530,6 +543,17 @@ int downlink(
       {
         // retransmit of SYN+ACK
         // FIXME should store the ISN for a longer duration of time...
+        if (mss_clamp_enabled)
+        {
+          uint16_t mss;
+          tcp_parse_options(ippay, &tcpinfo);
+          mss = tcpinfo.mss;
+          if (mss > mss_clamp)
+          {
+            mss = mss_clamp;
+          }
+          tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+        }
         port->portfunc(pkt, port->userdata);
         return 0;
       }
@@ -554,6 +578,16 @@ int downlink(
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       entry->timer.time64 = time64 + 60ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
+      if (mss_clamp_enabled)
+      {
+        uint16_t mss;
+        mss = tcpinfo.mss;
+        if (mss > mss_clamp)
+        {
+          mss = mss_clamp;
+        }
+        tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+      }
       port->portfunc(pkt, port->userdata);
       return 0;
     }
@@ -953,6 +987,16 @@ int uplink(
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_max_window_unscaled = tcp_window(ippay);
       entry->lan_sent = tcp_seq_num(ippay) + 1;
+      if (mss_clamp_enabled)
+      {
+        uint16_t mss;
+        mss = tcpinfo.mss;
+        if (mss > mss_clamp)
+        {
+          mss = mss_clamp;
+        }
+        tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+      }
       port->portfunc(pkt, port->userdata);
       entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
