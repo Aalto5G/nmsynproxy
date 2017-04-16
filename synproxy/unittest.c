@@ -624,7 +624,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
     }
-    *isn = tcp_seq_num(tcp);
+    *isn = tcp_seq_number(tcp);
     ll_free_st(loc, pktstruct);
     pktstruct = fetch_packet(&head);
     if (pktstruct != NULL)
@@ -1432,7 +1432,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
     }
-    *isn = tcp_seq_num(tcp);
+    *isn = tcp_seq_number(tcp);
     ll_free_st(loc, pktstruct);
     pktstruct = fetch_packet(&head);
     if (pktstruct != NULL)

@@ -207,10 +207,10 @@ static void send_syn(
     ip_src(origip), tcp_src_port(origtcp));
 
   entry->wan_wscale = wscale;
-  entry->wan_sent = tcp_seq_num(origtcp);
-  entry->wan_acked = tcp_ack_num(origtcp);
+  entry->wan_sent = tcp_seq_number(origtcp);
+  entry->wan_acked = tcp_ack_number(origtcp);
   entry->wan_max =
-    tcp_ack_num(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
+    tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
 
   entry->wan_max_window_unscaled = tcp_window(origtcp);
   entry->state_data.downlink_syn_sent.this_isn = tcp_ack_number(origtcp) - 1;
@@ -516,7 +516,7 @@ int downlink(
         return 1;
       }
       if (entry->flag_state == FLAG_STATE_UPLINK_SYN_RCVD &&
-          entry->state_data.uplink_syn_rcvd.isn == tcp_seq_num(ippay))
+          entry->state_data.uplink_syn_rcvd.isn == tcp_seq_number(ippay))
       {
         // retransmit of SYN+ACK
         if (synproxy->conf->mss_clamp_enabled)
@@ -537,7 +537,7 @@ int downlink(
         return 0;
       }
       if (entry->flag_state == FLAG_STATE_ESTABLISHED &&
-          entry->wan_sent-1 == tcp_seq_num(ippay))
+          entry->wan_sent-1 == tcp_seq_number(ippay))
       {
         // retransmit of SYN+ACK
         // FIXME should store the ISN for a longer duration of time...
@@ -563,7 +563,7 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, entry != UL_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, invalid ACK num");
         return 1;
@@ -571,9 +571,9 @@ int downlink(
       tcp_parse_options(ippay, &tcpinfo);
       entry->wan_wscale = tcpinfo.wscale;
       entry->wan_max_window_unscaled = tcp_window(ippay);
-      entry->state_data.uplink_syn_rcvd.isn = tcp_seq_num(ippay);
-      entry->wan_sent = tcp_seq_num(ippay) + 1;
-      entry->wan_acked = tcp_ack_num(ippay);
+      entry->state_data.uplink_syn_rcvd.isn = tcp_seq_number(ippay);
+      entry->wan_sent = tcp_seq_number(ippay) + 1;
+      entry->wan_acked = tcp_ack_number(ippay);
       entry->wan_max =
         entry->wan_acked + (tcp_window(ippay) << entry->wan_wscale);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
@@ -602,7 +602,7 @@ int downlink(
   {
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
     {
-      uint32_t ack_num = tcp_ack_num(ippay);
+      uint32_t ack_num = tcp_ack_number(ippay);
       uint16_t mss;
       uint8_t wscale, sack_permitted;
       int ok;
@@ -654,7 +654,7 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "R/RA in UPLINK_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.uplink_syn_sent.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RA/RA in UL_SYN_SENT, bad seq");
         return 1;
@@ -667,7 +667,7 @@ int downlink(
     }
     else
     {
-      uint32_t seq = tcp_seq_num(ippay);
+      uint32_t seq = tcp_seq_number(ippay);
       if (!rst_is_valid(seq, entry->wan_sent))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
@@ -695,13 +695,13 @@ int downlink(
   }
   if (!between(
     entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
-    tcp_ack_num(ippay),
+    tcp_ack_number(ippay),
     entry->lan_sent + 1)) // XXX increment lan_sent by 1460 in case of frags?
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid ACK number");
     return 1;
   }
-  first_seq = tcp_seq_num(ippay);
+  first_seq = tcp_seq_number(ippay);
   data_len =
     ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
   if (data_len < 0)
@@ -761,7 +761,7 @@ int downlink(
   if (unlikely(entry->flag_state & FLAG_STATE_UPLINK_FIN))
   {
     uint32_t fin = entry->state_data.established.upfin;
-    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin + 1)
+    if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
     {
       if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
       {
@@ -790,7 +790,7 @@ int downlink(
   }
   if (likely(tcp_ack(ippay)))
   {
-    uint32_t ack = tcp_ack_num(ippay);
+    uint32_t ack = tcp_ack_number(ippay);
     uint16_t window = tcp_window(ippay);
     if (seq_cmp(ack, entry->wan_acked) >= 0)
     {
@@ -967,7 +967,7 @@ int uplink(
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port);
       if (entry != NULL && entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT &&
-          entry->state_data.uplink_syn_sent.isn == tcp_seq_num(ippay))
+          entry->state_data.uplink_syn_sent.isn == tcp_seq_number(ippay))
       {
         // retransmit of SYN
         port->portfunc(pkt, port->userdata);
@@ -987,10 +987,10 @@ int uplink(
       }
       tcp_parse_options(ippay, &tcpinfo);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
-      entry->state_data.uplink_syn_sent.isn = tcp_seq_num(ippay);
+      entry->state_data.uplink_syn_sent.isn = tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_max_window_unscaled = tcp_window(ippay);
-      entry->lan_sent = tcp_seq_num(ippay) + 1;
+      entry->lan_sent = tcp_seq_number(ippay) + 1;
       if (synproxy->conf->mss_clamp_enabled)
       {
         uint16_t mss;
@@ -1022,8 +1022,8 @@ int uplink(
       if (entry->flag_state == FLAG_STATE_ESTABLISHED)
       {
         // FIXME we should store the ISN permanently...
-        if (tcp_ack_num(ippay) == entry->lan_acked &&
-            tcp_seq_num(ippay) + 1 + entry->seqoffset == entry->lan_sent)
+        if (tcp_ack_number(ippay) == entry->lan_acked &&
+            tcp_seq_number(ippay) + 1 + entry->seqoffset == entry->lan_sent)
         {
           log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "resending ACK");
           send_ack_only(ether, entry, port, st);
@@ -1035,7 +1035,7 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != DL_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num");
         return 1;
@@ -1049,11 +1049,11 @@ int uplink(
       entry->wscalediff =
         ((int)synproxy->conf->own_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
-        entry->state_data.downlink_syn_sent.this_isn - tcp_seq_num(ippay);
+        entry->state_data.downlink_syn_sent.this_isn - tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
-      entry->lan_sent = tcp_seq_num(ippay) + 1 + entry->seqoffset;
-      entry->lan_acked = tcp_ack_num(ippay);
-      entry->lan_max = tcp_ack_num(ippay) + (tcp_window(ippay) << entry->lan_wscale);
+      entry->lan_sent = tcp_seq_number(ippay) + 1 + entry->seqoffset;
+      entry->lan_acked = tcp_ack_number(ippay);
+      entry->lan_max = tcp_ack_number(ippay) + (tcp_window(ippay) << entry->lan_wscale);
       entry->lan_max_window_unscaled = tcp_window(ippay);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
@@ -1083,7 +1083,7 @@ int uplink(
     }
     if (tcp_rst(ippay))
     {
-      uint32_t seq = tcp_seq_num(ippay);
+      uint32_t seq = tcp_seq_number(ippay);
       if (!rst_is_valid(seq, entry->lan_sent))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
@@ -1095,14 +1095,14 @@ int uplink(
     }
     if (tcp_ack(ippay))
     {
-      uint32_t ack = tcp_ack_num(ippay);
+      uint32_t ack = tcp_ack_number(ippay);
       uint16_t window = tcp_window(ippay);
-      if (tcp_ack_num(ippay) != entry->state_data.uplink_syn_rcvd.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.uplink_syn_rcvd.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number");
         return 1;
       }
-      first_seq = tcp_seq_num(ippay);
+      first_seq = tcp_seq_number(ippay);
       data_len =
         ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
       if (data_len < 0)
@@ -1152,7 +1152,7 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_num(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in DL_SYN_SENT, bad seq");
         return 1;
@@ -1168,7 +1168,7 @@ int uplink(
     }
     else
     {
-      uint32_t seq = tcp_seq_num(ippay);
+      uint32_t seq = tcp_seq_number(ippay);
       if (!rst_is_valid(seq, entry->lan_sent))
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
@@ -1193,13 +1193,13 @@ int uplink(
   }
   if (!between(
     entry->lan_acked - (entry->lan_max_window_unscaled<<entry->lan_wscale),
-    tcp_ack_num(ippay),
+    tcp_ack_number(ippay),
     entry->wan_sent + 1)) // XXX increment wan_sent by 1460 in case of frags?
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid ACK number");
     return 1;
   }
-  first_seq = tcp_seq_num(ippay);
+  first_seq = tcp_seq_number(ippay);
   data_len =
     ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
   if (data_len < 0)
@@ -1265,7 +1265,7 @@ int uplink(
   if (unlikely(entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
     uint32_t fin = entry->state_data.established.downfin;
-    if (tcp_ack(ippay) && tcp_ack_num(ippay) == fin + 1)
+    if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
     {
       if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
       {
@@ -1290,7 +1290,7 @@ int uplink(
   }
   if (likely(tcp_ack(ippay)))
   {
-    uint32_t ack = tcp_ack_num(ippay);
+    uint32_t ack = tcp_ack_number(ippay);
     uint16_t window = tcp_window(ippay);
     if (seq_cmp(ack, entry->lan_acked) >= 0)
     {
