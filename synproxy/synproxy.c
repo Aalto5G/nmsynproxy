@@ -101,14 +101,8 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
   return synproxy_hash(CONTAINER_OF(node, struct synproxy_hash_entry, node));
 }
 
-const uint8_t default_wscale = 7;
-const uint8_t default_sack_permitted = 1;
-const uint16_t default_mss = 1460;
-const uint8_t mss_clamp_enabled = 0;
-const uint16_t mss_clamp = 1460;
-
 static void send_synack(
-  void *orig, struct worker_local *local,
+  void *orig, struct worker_local *local, struct synproxy *synproxy,
   struct port *port, struct ll_alloc_st *st)
 {
   char synack[14+20+20+12] = {0};
@@ -164,12 +158,13 @@ static void send_synack(
   // pad, kind 0 len 1
   tcpopts[0] = 3;
   tcpopts[1] = 3;
-  tcpopts[2] = default_wscale;
+  tcpopts[2] = synproxy->conf->own_wscale;
   tcpopts[3] = 1;
   tcpopts[4] = 2;
   tcpopts[5] = 4;
-  hdr_set16n(&tcpopts[6], default_mss);
-  if (default_sack_permitted)
+  hdr_set16n(&tcpopts[6], synproxy->conf->own_mss);
+  // FIXME implement learning
+  if (synproxy->conf->sackmode == SACKMODE_ENABLE)
   {
     tcpopts[8] = 4;
     tcpopts[9] = 2;
@@ -507,7 +502,7 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP ratelimited");
         return 1;
       }
-      send_synack(ether, local, port, st);
+      send_synack(ether, local, synproxy, port, st);
       return 1;
     }
     else
@@ -524,16 +519,19 @@ int downlink(
           entry->state_data.uplink_syn_rcvd.isn == tcp_seq_num(ippay))
       {
         // retransmit of SYN+ACK
-        if (mss_clamp_enabled)
+        if (synproxy->conf->mss_clamp_enabled)
         {
           uint16_t mss;
           tcp_parse_options(ippay, &tcpinfo);
           mss = tcpinfo.mss;
-          if (mss > mss_clamp)
+          if (mss > synproxy->conf->mss_clamp)
           {
-            mss = mss_clamp;
+            mss = synproxy->conf->mss_clamp;
           }
-          tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+          if (tcpinfo.mssoff)
+          {
+            tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+          }
         }
         port->portfunc(pkt, port->userdata);
         return 0;
@@ -543,16 +541,19 @@ int downlink(
       {
         // retransmit of SYN+ACK
         // FIXME should store the ISN for a longer duration of time...
-        if (mss_clamp_enabled)
+        if (synproxy->conf->mss_clamp_enabled)
         {
           uint16_t mss;
           tcp_parse_options(ippay, &tcpinfo);
           mss = tcpinfo.mss;
-          if (mss > mss_clamp)
+          if (mss > synproxy->conf->mss_clamp)
           {
-            mss = mss_clamp;
+            mss = synproxy->conf->mss_clamp;
           }
-          tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+          if (tcpinfo.mssoff)
+          {
+            tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+          }
         }
         port->portfunc(pkt, port->userdata);
         return 0;
@@ -578,15 +579,18 @@ int downlink(
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       entry->timer.time64 = time64 + 60ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
-      if (mss_clamp_enabled)
+      if (synproxy->conf->mss_clamp_enabled)
       {
         uint16_t mss;
         mss = tcpinfo.mss;
-        if (mss > mss_clamp)
+        if (mss > synproxy->conf->mss_clamp)
         {
-          mss = mss_clamp;
+          mss = synproxy->conf->mss_clamp;
         }
-        tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+        if (tcpinfo.mssoff)
+        {
+          tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+        }
       }
       port->portfunc(pkt, port->userdata);
       return 0;
@@ -987,15 +991,18 @@ int uplink(
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_max_window_unscaled = tcp_window(ippay);
       entry->lan_sent = tcp_seq_num(ippay) + 1;
-      if (mss_clamp_enabled)
+      if (synproxy->conf->mss_clamp_enabled)
       {
         uint16_t mss;
         mss = tcpinfo.mss;
-        if (mss > mss_clamp)
+        if (mss > synproxy->conf->mss_clamp)
         {
-          mss = mss_clamp;
+          mss = synproxy->conf->mss_clamp;
         }
-        tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+        if (tcpinfo.mssoff)
+        {
+          tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+        }
       }
       port->portfunc(pkt, port->userdata);
       entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
@@ -1034,11 +1041,13 @@ int uplink(
         return 1;
       }
       tcp_parse_options(ippay, &tcpinfo);
-      if (!tcpinfo.sack_permitted && default_sack_permitted)
+      if (!tcpinfo.sack_permitted &&
+          synproxy->conf->sackmode == SACKMODE_ENABLE)
       {
         log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "SACK conflict");
       }
-      entry->wscalediff = ((int)default_wscale) - ((int)tcpinfo.wscale);
+      entry->wscalediff =
+        ((int)synproxy->conf->own_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
         entry->state_data.downlink_syn_sent.this_isn - tcp_seq_num(ippay);
       entry->lan_wscale = tcpinfo.wscale;
