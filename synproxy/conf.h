@@ -11,6 +11,10 @@ enum sackmode {
   SACKMODE_HASHIP,
   SACKMODE_HASHIPPORT,
 };
+enum sackconflict {
+  SACKCONFLICT_REMOVE,
+  SACKCONFLICT_RETAIN,
+};
 
 struct ratehashconf {
   size_t size;
@@ -21,6 +25,7 @@ struct ratehashconf {
 
 struct conf {
   enum sackmode sackmode;
+  enum sackconflict sackconflict;
   size_t sackhashsize;
   size_t conntablesize;
   size_t timerheapsize;

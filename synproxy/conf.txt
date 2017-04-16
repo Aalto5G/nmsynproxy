@@ -1,5 +1,6 @@
 synproxyconf = {
   sackmode = hashipport;
+  sackconflict = remove;
   sackhashsize = 131072;
   conntablesize = 131072;
   timerheapsize = 131072;

@@ -45,8 +45,10 @@ int confyywrap(yyscan_t scanner)
 %token CONNTABLESIZE TIMERHEAPSIZE
 %token COMMA MSS WSCALE OWN_MSS OWN_WSCALE
 %token STRING_LITERAL
+%token SACKCONFLICT REMOVE RETAIN
 
 %type<i> sackhashval
+%type<i> sackconflictval
 %type<i> INT_LITERAL
 %type<s> STRING_LITERAL
 
@@ -138,6 +140,16 @@ synproxyconf: SYNPROXYCONF EQUALS OPENBRACE conflist CLOSEBRACE SEMICOLON
 maybe_comma:
 | COMMA
 ;
+
+sackconflictval:
+  REMOVE
+{
+  $$ = SACKCONFLICT_REMOVE;
+}
+| RETAIN
+{
+  $$ = SACKCONFLICT_RETAIN;
+}
 
 sackhashval:
   ENABLE
@@ -284,6 +296,10 @@ MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
 | SACKHASHMODE EQUALS sackhashval SEMICOLON
 {
   conf->sackmode = $3;
+}
+| SACKCONFLICT EQUALS sackconflictval SEMICOLON
+{
+  conf->sackconflict = $3;
 }
 | SACKHASHSIZE EQUALS INT_LITERAL SEMICOLON
 {
