@@ -1272,8 +1272,12 @@ int uplink(
   }
   else
   {
-    tcp_set_window_cksum_update(
-      ippay, tcp_len, tcp_window(ippay) << (-(entry->wscalediff)));
+    uint64_t win64 = ((uint64_t)tcp_window(ippay)) << (-(entry->wscalediff));
+    if (win64 > 65535 || win64 < tcp_window(ippay))
+    {
+      win64 = 65535;
+    }
+    tcp_set_window_cksum_update(ippay, tcp_len, win64);
   }
   port->portfunc(pkt, port->userdata);
   if (todelete)
