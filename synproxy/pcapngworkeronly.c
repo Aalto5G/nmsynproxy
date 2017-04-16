@@ -35,8 +35,8 @@ static void *rx_func(void *userdata)
   struct port outport;
   //struct allocifdiscardfunc_userdata ud;
   struct timeval tv1;
-  void *buf;
-  size_t bufcapacity;
+  void *buf = NULL;
+  size_t bufcapacity = 0;
   size_t len, snap;
   const char *ifname;
   struct pcapng_in_ctx ctx;
@@ -212,6 +212,9 @@ int main(int argc, char **argv)
   CPU_SET(0, &cpuset);
   pthread_setaffinity_np(rx, sizeof(cpuset), &cpuset);
   pthread_join(rx, NULL);
+
+  worker_local_free(&local);
+  conf_free(&conf);
 
   return 0;
 }
