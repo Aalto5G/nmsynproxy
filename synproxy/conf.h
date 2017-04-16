@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <errno.h>
 #include "dynarr.h"
 
 enum sackmode {
@@ -62,6 +63,83 @@ struct conf {
   .own_wscale = 7, \
   .mss_clamp_enabled = 0, \
   .mss_clamp = 1460, \
+}
+
+static inline int conf_postprocess(struct conf *conf)
+{
+  uint8_t bits = 0;
+  if (!conf->wscalelist_present)
+  {
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 0))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 2))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 4))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->wscalelist, 7))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    conf->wscalelist_present = 1;
+  }
+  if (!conf->msslist_present)
+  {
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 216))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 1200))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 1400))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->msslist, 1460))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    conf->msslist_present = 1;
+  }
+  conf->msslist_bits = 255;
+  for (bits = 0; bits <= 32; bits++)
+  {
+    if ((1U<<bits) == DYNARR_SIZE(&conf->msslist))
+    {
+      conf->msslist_bits = bits;
+      break;
+    }
+  }
+  conf->wscalelist_bits = 255;
+  for (bits = 0; bits <= 32; bits++)
+  {
+    if ((1U<<bits) == DYNARR_SIZE(&conf->wscalelist))
+    {
+      conf->wscalelist_bits = bits;
+      break;
+    }
+  }
+  if (conf->msslist_bits + conf->wscalelist_bits + 1 > 12)
+  {
+    fprintf(stderr, "too long lists, too little cryptographic security\n");
+    return -EINVAL;
+  }
+  return 0;
 }
 
 #endif
