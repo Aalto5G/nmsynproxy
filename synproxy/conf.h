@@ -65,6 +65,12 @@ struct conf {
   .mss_clamp = 1460, \
 }
 
+static inline void conf_free(struct conf *conf)
+{
+  DYNARR_FREE(&conf->msslist);
+  DYNARR_FREE(&conf->wscalelist);
+}
+
 static inline int conf_postprocess(struct conf *conf)
 {
   uint8_t bits = 0;

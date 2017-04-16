@@ -1064,6 +1064,7 @@ static void closed_port(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void three_way_handshake_impl(
@@ -2100,6 +2101,7 @@ static void three_way_handshake_four_way_fin(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void established_rst_uplink(void)
@@ -2218,6 +2220,7 @@ static void established_rst_uplink(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void established_rst_downlink(void)
@@ -2336,6 +2339,7 @@ static void established_rst_downlink(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void three_way_handshake_ulretransmit(void)
@@ -2362,6 +2366,7 @@ static void three_way_handshake_ulretransmit(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void three_way_handshake_dlretransmit(void)
@@ -2388,6 +2393,7 @@ static void three_way_handshake_dlretransmit(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void three_way_handshake_findlretransmit(void)
@@ -2414,6 +2420,7 @@ static void three_way_handshake_findlretransmit(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void three_way_handshake_finulretransmit(void)
@@ -2440,6 +2447,7 @@ static void three_way_handshake_finulretransmit(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_handshake(void)
@@ -2472,6 +2480,7 @@ static void syn_proxy_handshake(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_uplink(void)
@@ -2513,6 +2522,7 @@ static void syn_proxy_uplink(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_downlink(void)
@@ -2554,6 +2564,7 @@ static void syn_proxy_downlink(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_uplink_downlink(void)
@@ -2600,6 +2611,7 @@ static void syn_proxy_uplink_downlink(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_closed_port(void)
@@ -2626,6 +2638,7 @@ static void syn_proxy_closed_port(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_handshake_2_1_1(void)
@@ -2658,6 +2671,7 @@ static void syn_proxy_handshake_2_1_1(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_handshake_1_2_1(void)
@@ -2690,6 +2704,7 @@ static void syn_proxy_handshake_1_2_1(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 static void syn_proxy_handshake_1_1_2(void)
@@ -2722,6 +2737,7 @@ static void syn_proxy_handshake_1_1_2(void)
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
+  conf_free(&conf);
 }
 
 int main(int argc, char **argv)
