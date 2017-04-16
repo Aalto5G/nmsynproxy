@@ -3,6 +3,8 @@
 #include "branchpredict.h"
 #include <sys/time.h>
 
+#define MAX_FRAG 65535
+
 static inline uint64_t gettime64(void)
 {
   struct timeval tv;
@@ -696,7 +698,7 @@ int downlink(
   if (!between(
     entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
     tcp_ack_number(ippay),
-    entry->lan_sent + 1)) // XXX increment lan_sent by 1460 in case of frags?
+    entry->lan_sent + 1 + MAX_FRAG))
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid ACK number");
     return 1;
@@ -1192,7 +1194,7 @@ int uplink(
   if (!between(
     entry->lan_acked - (entry->lan_max_window_unscaled<<entry->lan_wscale),
     tcp_ack_number(ippay),
-    entry->wan_sent + 1)) // XXX increment wan_sent by 1460 in case of frags?
+    entry->wan_sent + 1 + MAX_FRAG))
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid ACK number");
     return 1;
