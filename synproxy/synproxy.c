@@ -122,7 +122,7 @@ static void send_synack(
     return;
   }
   syn_cookie = form_cookie(
-    &local->info, ip_dst(origip), ip_src(origip),
+    &local->info, synproxy, ip_dst(origip), ip_src(origip),
     tcp_dst_port(origtcp), tcp_src_port(origtcp),
     tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted);
 
@@ -617,7 +617,7 @@ int downlink(
         return 1;
       }
       ok = verify_cookie(
-        &local->info, ip_dst(ip), ip_src(ip),
+        &local->info, synproxy, ip_dst(ip), ip_src(ip),
         tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
         &mss, &wscale, &sack_permitted);
       if (!ok)
