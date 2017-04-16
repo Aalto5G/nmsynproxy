@@ -117,6 +117,7 @@ void confyynameparse(const char *fname, struct conf *conf, int require)
   {
     exit(1);
   }
+  fclose(conffile);
 }
 
 void confyydirparse(
