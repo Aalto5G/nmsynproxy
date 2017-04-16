@@ -729,8 +729,6 @@ int downlink(
   wan_min =
     entry->wan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
   if (
-    !(data_len == 0 && first_seq+1 == entry->wan_sent) // keepalive
-    &&
     !between(
       wan_min, first_seq, entry->lan_max+1)
     &&
@@ -1229,8 +1227,6 @@ int uplink(
   first_seq += entry->seqoffset;
   last_seq += entry->seqoffset;
   if (
-    !(data_len == 0 && first_seq+1 == entry->lan_sent) // keepalive
-    &&
     !between(
       lan_min, first_seq, entry->wan_max+1)
     &&
