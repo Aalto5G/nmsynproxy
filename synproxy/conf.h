@@ -38,10 +38,13 @@ struct conf {
   uint8_t wscalelist_bits;
   uint16_t own_mss;
   uint8_t own_wscale;
+  uint8_t mss_clamp_enabled;
+  uint16_t mss_clamp;
 };
 
 #define CONF_INITIALIZER { \
   .sackmode = SACKMODE_HASHIP, \
+  .sackconflict = SACKCONFLICT_RETAIN, \
   .sackhashsize = 131072, \
   .conntablesize = 131072, \
   .timerheapsize = 131072, \
@@ -55,6 +58,10 @@ struct conf {
   .wscalelist = DYNARR_INITER, \
   .msslist_present = 0, \
   .wscalelist_present = 0, \
+  .own_mss = 1460, \
+  .own_wscale = 7, \
+  .mss_clamp_enabled = 0, \
+  .mss_clamp = 1460, \
 }
 
 #endif

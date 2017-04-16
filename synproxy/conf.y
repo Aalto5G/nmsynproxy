@@ -46,6 +46,7 @@ int confyywrap(yyscan_t scanner)
 %token COMMA MSS WSCALE OWN_MSS OWN_WSCALE
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
+%token MSS_CLAMP
 
 %type<i> sackhashval
 %type<i> sackconflictval
@@ -231,7 +232,18 @@ wscalelist_maybe:
 ;
 
 conflist_entry:
-MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
+MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 <= 0 || $3 > 65535)
+  {
+    fprintf(stderr, "invalid mss_clamp: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->mss_clamp_enabled = 1;
+  conf->mss_clamp = $3;
+}
+| MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
 {
   size_t len = DYNARR_SIZE(&conf->msslist);
   size_t i;

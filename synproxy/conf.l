@@ -48,6 +48,7 @@ own_wscale   return OWN_WSCALE;
 sackconflict return SACKCONFLICT;
 remove       return REMOVE;
 retain       return RETAIN;
+mss_clamp    return MSS_CLAMP;
 \"([^\\\"]|\\.)*\"  yylval->s=yy_escape_string(yytext); return STRING_LITERAL;
 
 [0-9]+       {
