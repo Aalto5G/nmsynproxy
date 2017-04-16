@@ -2045,7 +2045,6 @@ static void four_way_fin_seq_impl(
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
   {
-    printf("%u %u\n", isn1 + 2, tcp_seq_number(ip_payload(ether_payload(packet_data(pktstruct)))));
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
   }
