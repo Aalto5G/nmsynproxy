@@ -525,6 +525,14 @@ int downlink(
         port->portfunc(pkt, port->userdata);
         return 0;
       }
+      if (entry->flag_state == FLAG_STATE_ESTABLISHED &&
+          entry->wan_sent-1 == tcp_seq_num(ippay))
+      {
+        // retransmit of SYN+ACK
+        // FIXME should store the ISN for a longer duration of time...
+        port->portfunc(pkt, port->userdata);
+        return 0;
+      }
       if (entry->flag_state != FLAG_STATE_UPLINK_SYN_SENT)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA, entry != UL_SYN_SENT");
