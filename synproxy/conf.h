@@ -31,6 +31,8 @@ struct conf {
   int wscalelist_present;
   uint8_t msslist_bits;
   uint8_t wscalelist_bits;
+  uint16_t own_mss;
+  uint8_t own_wscale;
 };
 
 #define CONF_INITIALIZER { \

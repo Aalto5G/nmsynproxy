@@ -43,7 +43,7 @@ int confyywrap(yyscan_t scanner)
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token SACKHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE TIMERHEAPSIZE
-%token COMMA MSS WSCALE
+%token COMMA MSS WSCALE OWN_MSS OWN_WSCALE
 %token STRING_LITERAL
 
 %type<i> sackhashval
@@ -260,6 +260,26 @@ MSS EQUALS OPENBRACE msslist_maybe CLOSEBRACE SEMICOLON
     }
   }
   conf->wscalelist_present = 1;
+}
+| OWN_MSS EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 <= 0 || $3 > 65535)
+  {
+    fprintf(stderr, "invalid own_mss: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->own_mss = $3;
+}
+| OWN_WSCALE EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 < 0 || $3 > 14)
+  {
+    fprintf(stderr, "invalid own_wscale: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->own_wscale = $3;
 }
 | SACKHASHMODE EQUALS sackhashval SEMICOLON
 {

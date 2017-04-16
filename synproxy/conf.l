@@ -43,6 +43,8 @@ conntablesize return CONNTABLESIZE;
 timerheapsize return TIMERHEAPSIZE;
 mss          return MSS;
 wscale       return WSCALE;
+own_mss      return OWN_MSS;
+own_wscale   return OWN_WSCALE;
 \"([^\\\"]|\\.)*\"  yylval->s=yy_escape_string(yytext); return STRING_LITERAL;
 
 [0-9]+       {
