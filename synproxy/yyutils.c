@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <libgen.h>
 #include "conf.h"
 #include "yyutils.h"
 
@@ -91,4 +93,40 @@ char *yy_escape_string(char *orig)
   result = strdup(buf);
   free(buf);
   return result;
+}
+
+void confyynameparse(const char *fname, struct conf *conf, int require)
+{
+  FILE *conffile;
+  conffile = fopen(fname, "r");
+  if (conffile == NULL)
+  {
+    if (require)
+    {
+      fprintf(stderr, "File %s cannot be opened\n", fname);
+      exit(1);
+    }
+    if (conf_postprocess(conf) != 0)
+    {
+      exit(1);
+    }
+    return;
+  }
+  confyydoparse(conffile, conf);
+  if (conf_postprocess(conf) != 0)
+  {
+    exit(1);
+  }
+}
+
+void confyydirparse(
+  const char *argv0, const char *fname, struct conf *conf, int require)
+{
+  const char *dir;
+  char *copy = strdup(argv0);
+  char pathbuf[PATH_MAX];
+  dir = dirname(copy); // NB: not for multi-threaded operation!
+  snprintf(pathbuf, sizeof(pathbuf), "%s/%s", dir, fname);
+  free(copy);
+  confyynameparse(pathbuf, conf, require);
 }

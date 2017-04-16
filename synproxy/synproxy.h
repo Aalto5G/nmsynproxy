@@ -15,8 +15,10 @@
 #include "hashseed.h"
 #include "secret.h"
 #include "iphash.h"
+#include "conf.h"
 
 struct synproxy {
+  struct conf *conf;
 };
 
 struct synproxy_hash_entry {

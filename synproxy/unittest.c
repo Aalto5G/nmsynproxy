@@ -6,6 +6,9 @@
 #include "packet.h"
 #include "hashseed.h"
 #include "log.h"
+#include "yyutils.h"
+
+const char *argv0;
 
 struct tcp_ctx {
   uint32_t seq;
@@ -896,6 +899,10 @@ static void closed_port(void)
   struct ll_alloc_st st;
   struct worker_local local;
   struct synproxy_hash_entry *e;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2074,6 +2081,10 @@ static void three_way_handshake_four_way_fin(void)
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2108,6 +2119,10 @@ static void established_rst_uplink(void)
   struct ll_alloc_st st;
   struct worker_local local;
   struct synproxy_hash_entry *e;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2222,6 +2237,10 @@ static void established_rst_downlink(void)
   struct ll_alloc_st st;
   struct worker_local local;
   struct synproxy_hash_entry *e;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2324,6 +2343,10 @@ static void three_way_handshake_ulretransmit(void)
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2346,6 +2369,10 @@ static void three_way_handshake_dlretransmit(void)
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2368,6 +2395,10 @@ static void three_way_handshake_findlretransmit(void)
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2390,6 +2421,10 @@ static void three_way_handshake_finulretransmit(void)
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2415,6 +2450,10 @@ static void syn_proxy_handshake(void)
   uint32_t isn;
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2444,6 +2483,10 @@ static void syn_proxy_uplink(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct tcp_ctx ctx;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2481,6 +2524,10 @@ static void syn_proxy_downlink(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct tcp_ctx ctx;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2519,6 +2566,10 @@ static void syn_proxy_uplink_downlink(void)
   uint32_t isn2 = 0x87654321;
   struct tcp_ctx ctx;
   int i;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2557,6 +2608,10 @@ static void syn_proxy_closed_port(void)
   struct ll_alloc_st st;
   struct worker_local local;
   uint32_t isn;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2581,6 +2636,10 @@ static void syn_proxy_handshake_2_1_1(void)
   uint32_t isn;
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2609,6 +2668,10 @@ static void syn_proxy_handshake_1_2_1(void)
   uint32_t isn;
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2637,6 +2700,10 @@ static void syn_proxy_handshake_1_1_2(void)
   uint32_t isn;
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2659,6 +2726,8 @@ static void syn_proxy_handshake_1_1_2(void)
 
 int main(int argc, char **argv)
 {
+  argv0 = argv[0];
+
   hash_seed_init();
   setlinebuf(stdout);
 

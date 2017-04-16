@@ -7,6 +7,7 @@
 #include "packet.h"
 #include "hashseed.h"
 #include "mypcapng.h"
+#include "yyutils.h"
 
 static inline uint64_t gettime64(void)
 {
@@ -177,7 +178,11 @@ int main(int argc, char **argv)
   struct synproxy synproxy;
   struct worker_local local;
   cpu_set_t cpuset;
+  struct conf conf = CONF_INITIALIZER;
 
+  synproxy.conf = &conf;
+
+  confyydirparse(argv[0], "conf.txt", &conf, 0);
   hash_seed_init();
   setlinebuf(stdout);
 

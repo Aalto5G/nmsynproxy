@@ -5,6 +5,7 @@
 #include "ipcksum.h"
 #include "packet.h"
 #include "hashseed.h"
+#include "yyutils.h"
 
 static inline uint64_t gettime64(void)
 {
@@ -163,6 +164,10 @@ int main(int argc, char **argv)
   struct queue txq;
   struct worker_local local;
   cpu_set_t cpuset;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv[0], "conf.txt", &conf, 0);
+  synproxy.conf = &conf;
 
   hash_seed_init();
   setlinebuf(stdout);
