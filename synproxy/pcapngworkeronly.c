@@ -192,7 +192,7 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  worker_local_init(&local, 131072, 131072, 131072);
+  worker_local_init(&local, &synproxy, 1);
   synproxy_hash_put_connected(&local, (10<<24)|2, 12345, (11<<24)|1, 54321);
 
   rx_args.synproxy = &synproxy;

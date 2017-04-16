@@ -108,21 +108,28 @@ struct worker_local {
 };
 
 static inline void worker_local_init(
-  struct worker_local *local,
-  size_t hash_size, size_t heap_size, size_t ratelimit_size)
+  struct worker_local *local, struct synproxy *synproxy, int deterministic)
 {
-  hash_table_init(&local->hash, hash_size, synproxy_hash_fn, NULL);
+  hash_table_init(
+    &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL);
   timer_linkheap_init(&local->timers);
-  secret_init_deterministic(&local->info);
-  local->ratelimit.hash_size = ratelimit_size;
-  local->ratelimit.batch_size = 16384;
-  if (local->ratelimit.batch_size > ratelimit_size)
+  if (deterministic)
   {
-    local->ratelimit.batch_size = ratelimit_size;
+    secret_init_deterministic(&local->info);
   }
-  local->ratelimit.initial_tokens = 2000;
-  local->ratelimit.timer_add = 400;
-  local->ratelimit.timer_period = 1000*1000;
+  else
+  {
+    secret_init_random(&local->info);
+  }
+  local->ratelimit.hash_size = synproxy->conf->ratehash.size;
+  local->ratelimit.batch_size = 16384;
+  if (local->ratelimit.batch_size > local->ratelimit.hash_size)
+  {
+    local->ratelimit.batch_size = local->ratelimit.hash_size;
+  }
+  local->ratelimit.initial_tokens = synproxy->conf->ratehash.initial_tokens;
+  local->ratelimit.timer_add = synproxy->conf->ratehash.timer_add;
+  local->ratelimit.timer_period = synproxy->conf->ratehash.timer_period_usec;
   ip_hash_init(&local->ratelimit, &local->timers);
 }
 
