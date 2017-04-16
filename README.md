@@ -155,3 +155,55 @@ Then you must start netmapproxy:
 Note that the order interfaces are specified matters. The first is the LAN
 interface. The second is the WAN interface. Only connections from WAN to LAN
 are SYN proxied.
+
+# Testing with network namespaces
+
+Execute:
+
+```
+ip link add veth0 type veth peer name veth1
+ip link add veth2 type veth peer name veth3
+ifconfig veth0 up
+ifconfig veth1 up
+ifconfig veth2 up
+ifconfig veth3 up
+ethtool -K veth0 rx off tx off tso off gso off gro off lro off
+ethtool -K veth1 rx off tx off tso off gso off gro off lro off
+ethtool -K veth2 rx off tx off tso off gso off gro off lro off
+ethtool -K veth3 rx off tx off tso off gso off gro off lro off
+ip netns add ns1
+ip netns add ns2
+ip link set veth0 netns ns1
+ip link set veth3 netns ns2
+ip netns exec ns1 ip addr add 10.200.1.1/24 dev veth0
+ip netns exec ns2 ip addr add 10.200.1.2/24 dev veth3
+ip netns exec ns1 ip link set veth0 up
+ip netns exec ns2 ip link set veth3 up
+```
+
+Then run in one terminal window and leave it running:
+```
+./synproxy/netmapproxy netmap:veth1 netmap:veth2
+```
+
+Verify that ping works to both directions:
+
+```
+ip netns exec ns1 ping 10.200.1.2
+ip netns exec ns2 ping 10.200.1.1
+```
+
+Then, execute netcat in two terminal windows:
+```
+ip netns exec ns1 nc -v -v -v -l -p 1234
+ip netns exec ns2 nc -v -v -v 10.200.1.1 1234
+```
+
+Type something to both windows and see that the counterparty gets the same
+text.
+
+Try also in other direction in two terminal windows:
+```
+ip netns exec ns2 nc -v -v -v -l -p 1234
+ip netns exec ns1 nc -v -v -v 10.200.1.2 1234
+```
