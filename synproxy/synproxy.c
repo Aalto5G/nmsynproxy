@@ -630,6 +630,8 @@ int downlink(
           "entry not found but A/SAFR set, SYN cookie invalid");
         return 1;
       }
+      ip_increment_one(
+        ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
       log_log(
         LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN");
       send_syn(ether, local, port, st, mss, wscale, sack_permitted);
