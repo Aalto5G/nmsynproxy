@@ -147,6 +147,11 @@ static inline int conf_postprocess(struct conf *conf)
     fprintf(stderr, "too long lists, too little cryptographic security\n");
     return -EINVAL;
   }
+  if (DYNARR_GET(&conf->wscalelist, 0) != 0)
+  {
+    fprintf(stderr, "first element of wscale list must be 0\n");
+    return -EINVAL;
+  }
   return 0;
 }
 
