@@ -1,5 +1,5 @@
-SACKHASH_SRC_LIB := 
-SACKHASH_SRC := $(SACKHASH_SRC_LIB) sackhashtest.c sackhashtest2.c sackhashtest3.c
+SACKHASH_SRC_LIB := sackhash.c
+SACKHASH_SRC := $(SACKHASH_SRC_LIB) sackhashtest.c sackhashtest2.c sackhashtest3.c sackhashtest4.c
 
 SACKHASH_SRC_LIB := $(patsubst %,$(DIRSACKHASH)/%,$(SACKHASH_SRC_LIB))
 SACKHASH_SRC := $(patsubst %,$(DIRSACKHASH)/%,$(SACKHASH_SRC))
@@ -11,7 +11,7 @@ SACKHASH_DEP_LIB := $(patsubst %.c,%.d,$(SACKHASH_SRC_LIB))
 SACKHASH_DEP := $(patsubst %.c,%.d,$(SACKHASH_SRC))
 
 CFLAGS_SACKHASH := -I$(DIRHASHLIST) -I$(DIRMISC) -I$(DIRHASHTABLE) -I$(DIRTIMERLINKHEAP) -I$(DIRLINKEDLIST)
-LIBS_SACKHASH := $(DIRTIMERLINKHEAP)/libtimerlinkheap.a
+LIBS_SACKHASH := $(DIRTIMERLINKHEAP)/libtimerlinkheap.a $(DIRMISC)/libmisc.a
 
 MAKEFILES_SACKHASH := $(DIRSACKHASH)/module.mk
 
@@ -22,7 +22,7 @@ clean_$(LCSACKHASH): clean_SACKHASH
 distclean_$(LCSACKHASH): distclean_SACKHASH
 unit_$(LCSACKHASH): unit_SACKHASH
 
-SACKHASH: $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest $(DIRSACKHASH)/sackhashtest2 $(DIRSACKHASH)/sackhashtest3
+SACKHASH: $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest $(DIRSACKHASH)/sackhashtest2 $(DIRSACKHASH)/sackhashtest3 $(DIRSACKHASH)/sackhashtest4
 
 unit_SACKHASH:
 	@true
@@ -40,6 +40,9 @@ $(DIRSACKHASH)/sackhashtest2: $(DIRSACKHASH)/sackhashtest2.o $(DIRSACKHASH)/libs
 $(DIRSACKHASH)/sackhashtest3: $(DIRSACKHASH)/sackhashtest3.o $(DIRSACKHASH)/libsackhash.a $(LIBS_SACKHASH) $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SACKHASH)
 
+$(DIRSACKHASH)/sackhashtest4: $(DIRSACKHASH)/sackhashtest4.o $(DIRSACKHASH)/libsackhash.a $(LIBS_SACKHASH) $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SACKHASH)
+
 $(SACKHASH_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SACKHASH)
 
@@ -50,6 +53,6 @@ clean_SACKHASH:
 	rm -f $(SACKHASH_OBJ) $(SACKHASH_DEP)
 
 distclean_SACKHASH: clean_SACKHASH
-	rm -f $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest $(DIRSACKHASH)/sackhashtest2 $(DIRSACKHASH)/sackhashtest3
+	rm -f $(DIRSACKHASH)/libsackhash.a $(DIRSACKHASH)/sackhashtest $(DIRSACKHASH)/sackhashtest2 $(DIRSACKHASH)/sackhashtest3 $(DIRSACKHASH)/sackhashtest4
 
 -include $(DIRSACKHASH)/*.d
