@@ -22,6 +22,7 @@ struct ratehashconf {
   uint32_t timer_period_usec;
   uint32_t timer_add;
   uint32_t initial_tokens;
+  uint8_t network_prefix;
 };
 
 struct conf {
@@ -54,6 +55,7 @@ struct conf {
     .timer_period_usec = (1000*1000), \
     .timer_add = 400, \
     .initial_tokens = 2000, \
+    .network_prefix = 24, \
   }, \
   .msslist = DYNARR_INITER, \
   .wscalelist = DYNARR_INITER, \

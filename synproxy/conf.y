@@ -47,6 +47,7 @@ int confyywrap(yyscan_t scanner)
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
+%token NETWORK_PREFIX
 
 %type<i> sackhashval
 %type<i> sackconflictval
@@ -324,5 +325,15 @@ SIZE EQUALS INT_LITERAL SEMICOLON
     YYABORT;
   }
   conf->ratehash.initial_tokens = $3;
+}
+| NETWORK_PREFIX EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 < 0 || $3 > 32)
+  {
+    fprintf(stderr, "invalid ratehash network prefix: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->ratehash.network_prefix = $3;
 }
 ;

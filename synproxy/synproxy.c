@@ -499,7 +499,8 @@ int downlink(
     }
     if (!tcp_ack(ippay))
     {
-      if (!ip_permitted(ip_src(ip), &local->ratelimit))
+      if (!ip_permitted(
+        ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP ratelimited");
         return 1;
