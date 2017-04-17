@@ -14,5 +14,6 @@ synproxyconf = {
     timer_period_usec = 1000000;
     timer_add = 400;
     initial_tokens = 2000;
+    network_prefix = 24;
   };
 };
