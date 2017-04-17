@@ -41,15 +41,18 @@ int confyywrap(yyscan_t scanner)
 %destructor { free ($$); } STRING_LITERAL
 
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
-%token SACKHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
+%token LEARNHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE TIMERHEAPSIZE
 %token COMMA MSS WSCALE OWN_MSS OWN_WSCALE
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
-%token NETWORK_PREFIX
+%token NETWORK_PREFIX MSSMODE WSCALEMODE DEFAULT
+
 
 %type<i> sackhashval
+%type<i> msshashval
+%type<i> wscalehashval
 %type<i> sackconflictval
 %type<i> INT_LITERAL
 %type<s> STRING_LITERAL
@@ -89,6 +92,36 @@ sackhashval:
 | HASHIPPORT
 {
   $$ = SACKMODE_HASHIPPORT;
+}
+;
+
+msshashval:
+  DEFAULT
+{
+  $$ = HASHMODE_DEFAULT;
+}
+| HASHIP
+{
+  $$ = HASHMODE_HASHIP;
+}
+| HASHIPPORT
+{
+  $$ = HASHMODE_HASHIPPORT;
+}
+;
+
+wscalehashval:
+  DEFAULT
+{
+  $$ = HASHMODE_DEFAULT;
+}
+| HASHIP
+{
+  $$ = HASHMODE_HASHIP;
+}
+| HASHIPPORT
+{
+  $$ = HASHMODE_HASHIPPORT;
 }
 ;
 
@@ -230,25 +263,33 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
 {
   conf->sackmode = $3;
 }
+| WSCALEMODE EQUALS wscalehashval SEMICOLON
+{
+  conf->wscalemode = $3;
+}
+| MSSMODE EQUALS msshashval SEMICOLON
+{
+  conf->mssmode = $3;
+}
 | SACKCONFLICT EQUALS sackconflictval SEMICOLON
 {
   conf->sackconflict = $3;
 }
-| SACKHASHSIZE EQUALS INT_LITERAL SEMICOLON
+| LEARNHASHSIZE EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid sackhash size: %d at line %d col %d\n",
+    fprintf(stderr, "invalid learnhash size: %d at line %d col %d\n",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
   if (($3 & ($3-1)) != 0)
   {
-    fprintf(stderr, "sackhash size not power of 2: %d at line %d col %d\n",
+    fprintf(stderr, "learnhash size not power of 2: %d at line %d col %d\n",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
-  conf->sackhashsize = $3;
+  conf->learnhashsize = $3;
 }
 | CONNTABLESIZE EQUALS INT_LITERAL SEMICOLON
 {

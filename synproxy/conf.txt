@@ -1,7 +1,9 @@
 synproxyconf = {
   sackmode = hashipport;
   sackconflict = remove;
-  sackhashsize = 131072;
+  wscalemode = hashipport;
+  mssmode = hashipport;
+  learnhashsize = 131072;
   conntablesize = 131072;
   timerheapsize = 131072;
   mss = {216, 1200, 1400, 1460};

@@ -12,6 +12,11 @@ enum sackmode {
   SACKMODE_HASHIP,
   SACKMODE_HASHIPPORT,
 };
+enum learnmode {
+  HASHMODE_DEFAULT,
+  HASHMODE_HASHIP,
+  HASHMODE_HASHIPPORT,
+};
 enum sackconflict {
   SACKCONFLICT_REMOVE,
   SACKCONFLICT_RETAIN,
@@ -28,7 +33,9 @@ struct ratehashconf {
 struct conf {
   enum sackmode sackmode;
   enum sackconflict sackconflict;
-  size_t sackhashsize;
+  enum learnmode wscalemode;
+  enum learnmode mssmode;
+  size_t learnhashsize;
   size_t conntablesize;
   size_t timerheapsize;
   struct ratehashconf ratehash;
@@ -47,7 +54,9 @@ struct conf {
 #define CONF_INITIALIZER { \
   .sackmode = SACKMODE_HASHIP, \
   .sackconflict = SACKCONFLICT_RETAIN, \
-  .sackhashsize = 131072, \
+  .mssmode = HASHMODE_HASHIP, \
+  .wscalemode = HASHMODE_HASHIP, \
+  .learnhashsize = 131072, \
   .conntablesize = 131072, \
   .timerheapsize = 131072, \
   .ratehash = { \
