@@ -214,7 +214,11 @@ static void send_syn(
   entry->wan_max =
     tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
 
-  entry->wan_max_window_unscaled = tcp_window(origtcp) || 1;
+  entry->wan_max_window_unscaled = tcp_window(origtcp);
+  if (entry->wan_max_window_unscaled == 0)
+  {
+    entry->wan_max_window_unscaled = 1;
+  }
   entry->state_data.downlink_syn_sent.this_isn = tcp_ack_number(origtcp) - 1;
   entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
@@ -585,7 +589,11 @@ int downlink(
         tcpinfo.mss = 1460;
       }
       entry->wan_wscale = tcpinfo.wscale;
-      entry->wan_max_window_unscaled = tcp_window(ippay) || 1;
+      entry->wan_max_window_unscaled = tcp_window(ippay);
+      if (entry->wan_max_window_unscaled == 0)
+      {
+        entry->wan_max_window_unscaled = 1;
+      }
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_number(ippay);
       entry->wan_sent = tcp_seq_number(ippay) + 1;
       entry->wan_acked = tcp_ack_number(ippay);
@@ -797,7 +805,11 @@ int downlink(
   }
   if (tcp_window(ippay) > entry->wan_max_window_unscaled)
   {
-    entry->wan_max_window_unscaled = tcp_window(ippay) || 1;
+    entry->wan_max_window_unscaled = tcp_window(ippay);
+    if (entry->wan_max_window_unscaled == 0)
+    {
+      entry->wan_max_window_unscaled = 1;
+    }
   }
   if (seq_cmp(last_seq, entry->wan_sent) >= 0)
   {
@@ -1010,7 +1022,11 @@ int uplink(
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
       entry->state_data.uplink_syn_sent.isn = tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
-      entry->lan_max_window_unscaled = tcp_window(ippay) || 1;
+      entry->lan_max_window_unscaled = tcp_window(ippay);
+      if (entry->lan_max_window_unscaled == 0)
+      {
+        entry->lan_max_window_unscaled = 1;
+      }
       entry->lan_sent = tcp_seq_number(ippay) + 1;
       if (synproxy->conf->mss_clamp_enabled)
       {
@@ -1080,7 +1096,11 @@ int uplink(
       entry->lan_sent = tcp_seq_number(ippay) + 1 + entry->seqoffset;
       entry->lan_acked = tcp_ack_number(ippay);
       entry->lan_max = tcp_ack_number(ippay) + (tcp_window(ippay) << entry->lan_wscale);
-      entry->lan_max_window_unscaled = tcp_window(ippay) || 1;
+      entry->lan_max_window_unscaled = tcp_window(ippay);
+      if (entry->lan_max_window_unscaled == 0)
+      {
+        entry->lan_max_window_unscaled = 1;
+      }
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_heap_modify(&local->timers, &entry->timer);
@@ -1267,7 +1287,11 @@ int uplink(
   }
   if (tcp_window(ippay) > entry->lan_max_window_unscaled)
   {
-    entry->lan_max_window_unscaled = tcp_window(ippay) || 1;
+    entry->lan_max_window_unscaled = tcp_window(ippay);
+    if (entry->lan_max_window_unscaled == 0)
+    {
+      entry->lan_max_window_unscaled = 1;
+    }
   }
   if (unlikely(tcp_fin(ippay)))
   {
