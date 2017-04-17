@@ -109,7 +109,15 @@ int sack_ip_port_hash_add(
     e = CONTAINER_OF(node, struct sack_ip_port_hash_entry, node);
     if (e->ipport == ipport)
     {
+      if (pthread_mutex_lock(&hash->read_mtx[hashval%SACK_HASH_READ_MTX_CNT]) != 0)
+      {
+        abort();
+      }
       e->data = *data; // struct assignment
+      if (pthread_mutex_unlock(&hash->read_mtx[hashval%SACK_HASH_READ_MTX_CNT]) != 0)
+      {
+        abort();
+      }
       result = 1;
       break;
     }
