@@ -526,14 +526,17 @@ int downlink(
         {
           uint16_t mss;
           tcp_parse_options(ippay, &tcpinfo);
-          mss = tcpinfo.mss;
-          if (mss > synproxy->conf->mss_clamp)
+          if (tcpinfo.options_valid)
           {
-            mss = synproxy->conf->mss_clamp;
-          }
-          if (tcpinfo.mssoff)
-          {
-            tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+            mss = tcpinfo.mss;
+            if (mss > synproxy->conf->mss_clamp)
+            {
+              mss = synproxy->conf->mss_clamp;
+            }
+            if (tcpinfo.mssoff)
+            {
+              tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+            }
           }
         }
         port->portfunc(pkt, port->userdata);
@@ -548,14 +551,17 @@ int downlink(
         {
           uint16_t mss;
           tcp_parse_options(ippay, &tcpinfo);
-          mss = tcpinfo.mss;
-          if (mss > synproxy->conf->mss_clamp)
+          if (tcpinfo.options_valid)
           {
-            mss = synproxy->conf->mss_clamp;
-          }
-          if (tcpinfo.mssoff)
-          {
-            tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+            mss = tcpinfo.mss;
+            if (mss > synproxy->conf->mss_clamp)
+            {
+              mss = synproxy->conf->mss_clamp;
+            }
+            if (tcpinfo.mssoff)
+            {
+              tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
+            }
           }
         }
         port->portfunc(pkt, port->userdata);
@@ -572,6 +578,12 @@ int downlink(
         return 1;
       }
       tcp_parse_options(ippay, &tcpinfo);
+      if (!tcpinfo.options_valid)
+      {
+        tcpinfo.wscale = 0;
+        tcpinfo.mssoff = 0;
+        tcpinfo.mss = 1460;
+      }
       entry->wan_wscale = tcpinfo.wscale;
       entry->wan_max_window_unscaled = tcp_window(ippay) || 1;
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_number(ippay);
@@ -989,6 +1001,12 @@ int uplink(
         return 1;
       }
       tcp_parse_options(ippay, &tcpinfo);
+      if (!tcpinfo.options_valid)
+      {
+        tcpinfo.wscale = 0;
+        tcpinfo.mssoff = 0;
+        tcpinfo.mss = 1460;
+      }
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
       entry->state_data.uplink_syn_sent.isn = tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
@@ -1044,6 +1062,11 @@ int uplink(
         return 1;
       }
       tcp_parse_options(ippay, &tcpinfo);
+      if (!tcpinfo.options_valid)
+      {
+        tcpinfo.wscale = 0;
+        tcpinfo.sack_permitted = 0;
+      }
       if (!tcpinfo.sack_permitted &&
           synproxy->conf->sackmode == SACKMODE_ENABLE)
       {
