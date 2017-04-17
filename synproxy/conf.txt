@@ -10,6 +10,7 @@ synproxyconf = {
   wscale = {0, 2, 4, 7};
   own_mss = 1460;
   own_wscale = 7;
+  own_sack = enable;
   mss_clamp = 1460;
   ratehash = {
     size = 131072;

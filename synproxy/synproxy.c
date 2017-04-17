@@ -166,7 +166,7 @@ static void send_synack(
   tcpopts[5] = 4;
   hdr_set16n(&tcpopts[6], synproxy->conf->own_mss);
   // FIXME implement learning
-  if (synproxy->conf->sackmode == SACKMODE_ENABLE)
+  if (synproxy->conf->own_sack)
   {
     tcpopts[8] = 4;
     tcpopts[9] = 2;
@@ -1083,8 +1083,7 @@ int uplink(
         tcpinfo.wscale = 0;
         tcpinfo.sack_permitted = 0;
       }
-      if (!tcpinfo.sack_permitted &&
-          synproxy->conf->sackmode == SACKMODE_ENABLE)
+      if (!tcpinfo.sack_permitted && synproxy->conf->own_sack)
       {
         log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "SACK conflict");
       }

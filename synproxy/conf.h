@@ -31,7 +31,7 @@ struct ratehashconf {
 };
 
 struct conf {
-  enum sackmode sackmode;
+  enum learnmode sackmode;
   enum sackconflict sackconflict;
   enum learnmode wscalemode;
   enum learnmode mssmode;
@@ -49,6 +49,7 @@ struct conf {
   uint8_t own_wscale;
   uint8_t mss_clamp_enabled;
   uint16_t mss_clamp;
+  uint8_t own_sack;
 };
 
 #define CONF_INITIALIZER { \

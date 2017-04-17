@@ -43,7 +43,7 @@ int confyywrap(yyscan_t scanner)
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token LEARNHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE TIMERHEAPSIZE
-%token COMMA MSS WSCALE OWN_MSS OWN_WSCALE
+%token COMMA MSS WSCALE OWN_MSS OWN_WSCALE OWN_SACK
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
@@ -54,6 +54,7 @@ int confyywrap(yyscan_t scanner)
 %type<i> msshashval
 %type<i> wscalehashval
 %type<i> sackconflictval
+%type<i> own_sack
 %type<i> INT_LITERAL
 %type<s> STRING_LITERAL
 
@@ -77,23 +78,29 @@ sackconflictval:
 }
 
 sackhashval:
-  ENABLE
+  DEFAULT
 {
-  $$ = SACKMODE_ENABLE;
-}
-| DISABLE
-{
-  $$ = SACKMODE_DISABLE;
+  $$ = HASHMODE_DEFAULT;
 }
 | HASHIP
 {
-  $$ = SACKMODE_HASHIP;
+  $$ = HASHMODE_HASHIP;
 }
 | HASHIPPORT
 {
-  $$ = SACKMODE_HASHIPPORT;
+  $$ = HASHMODE_HASHIPPORT;
 }
 ;
+
+own_sack:
+  ENABLE
+{
+  $$ = 1;
+}
+| DISABLE
+{
+  $$ = 0;
+}
 
 msshashval:
   DEFAULT
@@ -238,6 +245,10 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
     }
   }
   conf->wscalelist_present = 1;
+}
+| OWN_SACK EQUALS own_sack SEMICOLON
+{
+  conf->own_sack = $3;
 }
 | OWN_MSS EQUALS INT_LITERAL SEMICOLON
 {
