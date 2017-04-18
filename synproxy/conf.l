@@ -30,7 +30,6 @@ synproxyconf return SYNPROXYCONF;
 sackmode     return SACKHASHMODE;
 own_sack     return OWN_SACK;
 mssmode      return MSSMODE;
-wscalemode   return WSCALEMODE;
 default      return DEFAULT;
 =            return EQUALS;
 disable      return DISABLE;

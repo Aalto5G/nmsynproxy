@@ -47,12 +47,11 @@ int confyywrap(yyscan_t scanner)
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
-%token NETWORK_PREFIX MSSMODE WSCALEMODE DEFAULT
+%token NETWORK_PREFIX MSSMODE DEFAULT
 
 
 %type<i> sackhashval
 %type<i> msshashval
-%type<i> wscalehashval
 %type<i> sackconflictval
 %type<i> own_sack
 %type<i> INT_LITERAL
@@ -103,21 +102,6 @@ own_sack:
 }
 
 msshashval:
-  DEFAULT
-{
-  $$ = HASHMODE_DEFAULT;
-}
-| HASHIP
-{
-  $$ = HASHMODE_HASHIP;
-}
-| HASHIPPORT
-{
-  $$ = HASHMODE_HASHIPPORT;
-}
-;
-
-wscalehashval:
   DEFAULT
 {
   $$ = HASHMODE_DEFAULT;
@@ -273,10 +257,6 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
 | SACKHASHMODE EQUALS sackhashval SEMICOLON
 {
   conf->sackmode = $3;
-}
-| WSCALEMODE EQUALS wscalehashval SEMICOLON
-{
-  conf->wscalemode = $3;
 }
 | MSSMODE EQUALS msshashval SEMICOLON
 {

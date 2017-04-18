@@ -33,7 +33,6 @@ struct ratehashconf {
 struct conf {
   enum learnmode sackmode;
   enum sackconflict sackconflict;
-  enum learnmode wscalemode;
   enum learnmode mssmode;
   size_t learnhashsize;
   size_t conntablesize;
@@ -56,7 +55,6 @@ struct conf {
   .sackmode = SACKMODE_HASHIP, \
   .sackconflict = SACKCONFLICT_RETAIN, \
   .mssmode = HASHMODE_HASHIP, \
-  .wscalemode = HASHMODE_HASHIP, \
   .learnhashsize = 131072, \
   .conntablesize = 131072, \
   .timerheapsize = 131072, \
