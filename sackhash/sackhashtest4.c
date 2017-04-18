@@ -13,7 +13,6 @@ int main(int argc, char **argv)
   struct sack_hash_data data;
   struct sack_hash_data data2;
   data.mss = 1460;
-  data.wscale = 7;
   data.sack_supported = 1;
   hash_seed_init();
   if (sack_ip_port_hash_init(&hash, 128*1024) != 0)

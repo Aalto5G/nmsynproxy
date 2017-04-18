@@ -8,9 +8,8 @@
 #include <pthread.h>
 
 struct sack_hash_data {
-  uint8_t sack_supported;
-  uint8_t wscale;
   uint16_t mss;
+  uint8_t sack_supported;
 };
 
 struct sack_ip_port_hash_entry {
