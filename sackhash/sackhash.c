@@ -93,7 +93,7 @@ void sack_ip_port_hash_free(struct sack_ip_port_hash *hash)
 
 int sack_ip_port_hash_add(
   struct sack_ip_port_hash *hash, uint32_t ip, uint16_t port,
-  struct sack_hash_data *data)
+  const struct sack_hash_data *data)
 {
   int result = 0, status = 0;
   uint64_t ipport = ip_port(ip, port);
