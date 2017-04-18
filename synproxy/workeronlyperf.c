@@ -167,7 +167,7 @@ int main(int argc, char **argv)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv[0], "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   hash_seed_init();
   setlinebuf(stdout);
@@ -193,6 +193,8 @@ int main(int argc, char **argv)
   CPU_SET(0, &cpuset);
   pthread_setaffinity_np(rx, sizeof(cpuset), &cpuset);
   pthread_join(rx, NULL);
+
+  synproxy_free(&synproxy);
 
   return 0;
 }

@@ -180,7 +180,7 @@ int main(int argc, char **argv)
   cpu_set_t cpuset;
   struct conf conf = CONF_INITIALIZER;
 
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   confyydirparse(argv[0], "conf.txt", &conf, 0);
   hash_seed_init();
@@ -215,6 +215,7 @@ int main(int argc, char **argv)
 
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 
   return 0;
 }

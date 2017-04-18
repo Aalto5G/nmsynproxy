@@ -15,10 +15,12 @@
 #include "hashseed.h"
 #include "secret.h"
 #include "iphash.h"
+#include "sackhash.h"
 #include "conf.h"
 
 struct synproxy {
   struct conf *conf;
+  struct sack_ip_port_hash autolearn;
 };
 
 struct synproxy_hash_entry {
@@ -194,6 +196,21 @@ static inline void synproxy_hash_put_connected(
   e->lan_acked = 0;
   e->wan_wscale = 0;
   e->wan_max_window_unscaled = 65535;
+}
+
+static inline void synproxy_init(
+  struct synproxy *synproxy,
+  struct conf *conf)
+{
+  synproxy->conf = conf;
+  sack_ip_port_hash_init(&synproxy->autolearn, conf->learnhashsize);
+}
+
+static inline void synproxy_free(
+  struct synproxy *synproxy)
+{
+  synproxy->conf = NULL;
+  sack_ip_port_hash_free(&synproxy->autolearn);
 }
 
 static inline void synproxy_hash_del(

@@ -16,7 +16,7 @@ int main(int argc, char **argv)
   struct synproxy synproxy;
   struct conf conf = CONF_INITIALIZER;
   confyydirparse(argv[0], "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   secret_init_deterministic(&info);
   cookie = form_cookie(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale, 1);
@@ -34,5 +34,6 @@ int main(int argc, char **argv)
   {
     abort();
   }
+  synproxy_free(&synproxy);
   return 0;
 }

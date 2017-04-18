@@ -902,7 +902,7 @@ static void closed_port(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -1065,6 +1065,7 @@ static void closed_port(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void three_way_handshake_impl(
@@ -2084,7 +2085,7 @@ static void three_way_handshake_four_way_fin(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2101,6 +2102,7 @@ static void three_way_handshake_four_way_fin(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void established_rst_uplink(void)
@@ -2123,7 +2125,7 @@ static void established_rst_uplink(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2220,6 +2222,7 @@ static void established_rst_uplink(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void established_rst_downlink(void)
@@ -2242,7 +2245,7 @@ static void established_rst_downlink(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2339,6 +2342,7 @@ static void established_rst_downlink(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void three_way_handshake_ulretransmit(void)
@@ -2349,7 +2353,7 @@ static void three_way_handshake_ulretransmit(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2366,6 +2370,7 @@ static void three_way_handshake_ulretransmit(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void three_way_handshake_dlretransmit(void)
@@ -2376,7 +2381,7 @@ static void three_way_handshake_dlretransmit(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2393,6 +2398,7 @@ static void three_way_handshake_dlretransmit(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void three_way_handshake_findlretransmit(void)
@@ -2403,7 +2409,7 @@ static void three_way_handshake_findlretransmit(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2420,6 +2426,7 @@ static void three_way_handshake_findlretransmit(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void three_way_handshake_finulretransmit(void)
@@ -2430,7 +2437,7 @@ static void three_way_handshake_finulretransmit(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2447,6 +2454,7 @@ static void three_way_handshake_finulretransmit(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_handshake(void)
@@ -2460,7 +2468,7 @@ static void syn_proxy_handshake(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2480,6 +2488,7 @@ static void syn_proxy_handshake(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_uplink(void)
@@ -2494,7 +2503,7 @@ static void syn_proxy_uplink(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2522,6 +2531,7 @@ static void syn_proxy_uplink(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_downlink(void)
@@ -2536,7 +2546,7 @@ static void syn_proxy_downlink(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2564,6 +2574,7 @@ static void syn_proxy_downlink(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_uplink_downlink(void)
@@ -2579,7 +2590,7 @@ static void syn_proxy_uplink_downlink(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2611,6 +2622,7 @@ static void syn_proxy_uplink_downlink(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_closed_port(void)
@@ -2622,7 +2634,7 @@ static void syn_proxy_closed_port(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2638,6 +2650,7 @@ static void syn_proxy_closed_port(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_handshake_2_1_1(void)
@@ -2651,7 +2664,7 @@ static void syn_proxy_handshake_2_1_1(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2671,6 +2684,7 @@ static void syn_proxy_handshake_2_1_1(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_handshake_1_2_1(void)
@@ -2684,7 +2698,7 @@ static void syn_proxy_handshake_1_2_1(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2704,6 +2718,7 @@ static void syn_proxy_handshake_1_2_1(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 static void syn_proxy_handshake_1_1_2(void)
@@ -2717,7 +2732,7 @@ static void syn_proxy_handshake_1_1_2(void)
   struct conf conf = CONF_INITIALIZER;
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
-  synproxy.conf = &conf;
+  synproxy_init(&synproxy, &conf);
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
@@ -2737,6 +2752,7 @@ static void syn_proxy_handshake_1_1_2(void)
   ll_alloc_st_free(&st);
   worker_local_free(&local);
   conf_free(&conf);
+  synproxy_free(&synproxy);
 }
 
 int main(int argc, char **argv)
