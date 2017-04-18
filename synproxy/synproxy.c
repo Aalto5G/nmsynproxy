@@ -114,6 +114,9 @@ static void send_synack(
   struct packet *pktstruct;
   uint32_t syn_cookie;
   struct tcp_information tcpinfo;
+  struct sack_hash_data ipentry, ipportentry;
+  uint16_t own_mss;
+  uint8_t own_sack;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
@@ -127,6 +130,49 @@ static void send_synack(
     &local->info, synproxy, ip_dst(origip), ip_src(origip),
     tcp_dst_port(origtcp), tcp_src_port(origtcp),
     tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted);
+
+  if (   synproxy->conf->mssmode == HASHMODE_HASHIPPORT
+      || synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
+  {
+    if (sack_ip_port_hash_get(&synproxy->autolearn, ip_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
+    {
+      ipportentry.sack_supported = synproxy->conf->own_sack;
+      ipportentry.mss = synproxy->conf->own_mss;
+    }
+  }
+  if (   synproxy->conf->mssmode == HASHMODE_HASHIP
+      || synproxy->conf->sackmode == HASHMODE_HASHIP)
+  {
+    if (sack_ip_port_hash_get(&synproxy->autolearn, ip_dst(origip), 0, &ipentry) == 0)
+    {
+      ipentry.sack_supported = synproxy->conf->own_sack;
+      ipentry.mss = synproxy->conf->own_mss;
+    }
+  }
+  if (synproxy->conf->mssmode == HASHMODE_HASHIPPORT)
+  {
+    own_mss = ipportentry.mss;
+  }
+  else if (synproxy->conf->mssmode == HASHMODE_HASHIP)
+  {
+    own_mss = ipentry.mss;
+  }
+  else
+  {
+    own_mss = synproxy->conf->own_mss;
+  }
+  if (synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
+  {
+    own_sack = ipportentry.sack_supported;
+  }
+  else if (synproxy->conf->sackmode == HASHMODE_HASHIP)
+  {
+    own_sack = ipentry.sack_supported;
+  }
+  else
+  {
+    own_sack = synproxy->conf->own_sack;
+  }
 
   memcpy(ether_src(synack), ether_dst(orig), 6);
   memcpy(ether_dst(synack), ether_src(orig), 6);
@@ -164,9 +210,8 @@ static void send_synack(
   tcpopts[3] = 1;
   tcpopts[4] = 2;
   tcpopts[5] = 4;
-  hdr_set16n(&tcpopts[6], synproxy->conf->own_mss);
-  // FIXME implement learning
-  if (synproxy->conf->own_sack)
+  hdr_set16n(&tcpopts[6], own_mss);
+  if (own_sack)
   {
     tcpopts[8] = 4;
     tcpopts[9] = 2;
@@ -1047,6 +1092,7 @@ int uplink(
     else
     {
       struct tcp_information tcpinfo;
+      struct sack_hash_data sackdata;
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port);
       if (entry == NULL)
@@ -1078,12 +1124,27 @@ int uplink(
       tcp_parse_options(ippay, &tcpinfo);
       if (!tcpinfo.options_valid)
       {
+        tcpinfo.mss = synproxy->conf->own_mss;
         tcpinfo.wscale = 0;
         tcpinfo.sack_permitted = 0;
       }
-      if (!tcpinfo.sack_permitted && synproxy->conf->own_sack)
+      sackdata.sack_supported = tcpinfo.sack_permitted;
+      sackdata.mss = tcpinfo.mss;
+      if (sackdata.mss == 0)
       {
-        log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "SACK conflict");
+        sackdata.mss = synproxy->conf->own_mss;
+      }
+      if (   synproxy->conf->sackmode == HASHMODE_HASHIPPORT
+          || synproxy->conf->mssmode == HASHMODE_HASHIPPORT)
+      {
+        sack_ip_port_hash_add(
+          &synproxy->autolearn, ip_src(ip), tcp_src_port(ippay), &sackdata);
+      }
+      if (   synproxy->conf->sackmode == HASHMODE_HASHIP
+          || synproxy->conf->mssmode == HASHMODE_HASHIP)
+      {
+        sack_ip_port_hash_add(
+          &synproxy->autolearn, ip_src(ip), 0, &sackdata);
       }
       entry->wscalediff =
         ((int)synproxy->conf->own_wscale) - ((int)tcpinfo.wscale);
