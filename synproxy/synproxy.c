@@ -21,6 +21,15 @@ static inline int rst_is_valid(uint32_t rst_seq, uint32_t ref_seq)
   return ref_seq - rst_seq <= 3;
 }
 
+static inline int resend_request_is_valid(uint32_t seq, uint32_t ref_seq)
+{
+  if (seq >= ref_seq)
+  {
+    return seq - ref_seq <= 3;
+  }
+  return ref_seq - seq <= 3;
+}
+
 static void synproxy_expiry_fn(
   struct timer_link *timer, struct timer_linkheap *heap, void *ud)
 {
@@ -234,41 +243,19 @@ static void send_synack(
   port->portfunc(pktstruct, port->userdata);
 }
 
-static void send_syn(
+static void send_or_resend_syn(
   void *orig, struct worker_local *local, struct port *port,
   struct ll_alloc_st *st,
-  uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
+  struct synproxy_hash_entry *entry)
 {
   char syn[14+20+20+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   unsigned char *tcpopts;
   struct packet *pktstruct;
-  struct synproxy_hash_entry *entry;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
-
-  entry = synproxy_hash_put(
-    local, ip_dst(origip), tcp_dst_port(origtcp),
-    ip_src(origip), tcp_src_port(origtcp));
-
-  entry->wan_wscale = wscale;
-  entry->wan_sent = tcp_seq_number(origtcp);
-  entry->wan_acked = tcp_ack_number(origtcp);
-  entry->wan_max =
-    tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
-
-  entry->wan_max_window_unscaled = tcp_window(origtcp);
-  if (entry->wan_max_window_unscaled == 0)
-  {
-    entry->wan_max_window_unscaled = 1;
-  }
-  entry->state_data.downlink_syn_sent.this_isn = tcp_ack_number(origtcp) - 1;
-  entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
-  entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
-  entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
-  timer_heap_modify(&local->timers, &entry->timer);
 
   memcpy(ether_src(syn), ether_src(orig), 6);
   memcpy(ether_dst(syn), ether_dst(orig), 6);
@@ -289,7 +276,7 @@ static void send_syn(
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_syn_on(tcp);
   tcp_set_data_offset(tcp, sizeof(syn) - 14 - 20);
-  tcp_set_seq_number(tcp, tcp_seq_number(origtcp) - 1);
+  tcp_set_seq_number(tcp, entry->state_data.downlink_syn_sent.isn);
   tcp_set_ack_number(tcp, 0);
   tcp_set_window(tcp, tcp_window(origtcp));
   tcpopts = &((unsigned char*)tcp)[20];
@@ -301,12 +288,12 @@ static void send_syn(
   // pad, kind 0 len 1
   tcpopts[0] = 3;
   tcpopts[1] = 3;
-  tcpopts[2] = wscale;
+  tcpopts[2] = entry->wan_wscale;
   tcpopts[3] = 1;
   tcpopts[4] = 2;
   tcpopts[5] = 4;
-  hdr_set16n(&tcpopts[6], mss);
-  if (sack_permitted)
+  hdr_set16n(&tcpopts[6], entry->state_data.downlink_syn_sent.mss);
+  if (entry->state_data.downlink_syn_sent.sack_permitted)
   {
     tcpopts[8] = 4;
     tcpopts[9] = 2;
@@ -327,6 +314,87 @@ static void send_syn(
   pktstruct->sz = sizeof(syn);
   memcpy(packet_data(pktstruct), syn, sizeof(syn));
   port->portfunc(pktstruct, port->userdata);
+}
+
+static void resend_syn(
+  void *orig, struct worker_local *local, struct port *port,
+  struct ll_alloc_st *st,
+  struct synproxy_hash_entry *entry)
+{
+  void *origip;
+  void *origtcp;
+
+  if (entry->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    abort();
+  }
+
+  origip = ether_payload(orig);
+  origtcp = ip_payload(origip);
+
+  if (seq_cmp(tcp_seq_number(origtcp), entry->wan_sent) >= 0)
+  {
+    entry->wan_sent = tcp_seq_number(origtcp);
+  }
+  if (seq_cmp(tcp_ack_number(origtcp), entry->wan_acked) >= 0)
+  {
+    entry->wan_acked = tcp_ack_number(origtcp);
+  }
+  if (seq_cmp(
+    tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale),
+    entry->wan_max) >= 0)
+  {
+    entry->wan_max =
+      tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
+  }
+
+  if (tcp_window(origtcp) > entry->wan_max_window_unscaled)
+  {
+    entry->wan_max_window_unscaled = tcp_window(origtcp);
+  }
+  entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
+  timer_heap_modify(&local->timers, &entry->timer);
+
+  send_or_resend_syn(orig, local, port, st, entry);
+}
+
+static void send_syn(
+  void *orig, struct worker_local *local, struct port *port,
+  struct ll_alloc_st *st,
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
+{
+  void *origip;
+  void *origtcp;
+  struct synproxy_hash_entry *entry;
+
+  origip = ether_payload(orig);
+  origtcp = ip_payload(origip);
+
+  entry = synproxy_hash_put(
+    local, ip_dst(origip), tcp_dst_port(origtcp),
+    ip_src(origip), tcp_src_port(origtcp));
+
+  entry->state_data.downlink_syn_sent.mss = mss;
+  entry->state_data.downlink_syn_sent.sack_permitted = sack_permitted;
+
+  entry->wan_wscale = wscale;
+  entry->wan_sent = tcp_seq_number(origtcp);
+  entry->wan_acked = tcp_ack_number(origtcp);
+  entry->wan_max =
+    tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
+
+  entry->wan_max_window_unscaled = tcp_window(origtcp);
+  if (entry->wan_max_window_unscaled == 0)
+  {
+    entry->wan_max_window_unscaled = 1;
+  }
+  entry->state_data.downlink_syn_sent.this_isn = tcp_ack_number(origtcp) - 1;
+  entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
+  entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
+  entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
+  timer_heap_modify(&local->timers, &entry->timer);
+
+  send_or_resend_syn(orig, local, port, st, entry);
 }
 
 static void send_ack_only(
@@ -752,6 +820,15 @@ int downlink(
     synproxy_hash_del(local, entry);
     port->portfunc(pkt, port->userdata);
     return 0;
+  }
+  if (   tcp_ack(ippay)
+      && entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT
+      && resend_request_is_valid(tcp_seq_number(ippay), entry->wan_sent)
+      && resend_request_is_valid(tcp_ack_number(ippay), entry->wan_acked))
+  {
+    log_log(LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "resending SYN");
+    resend_syn(ether, local, port, st, entry);
+    return 1;
   }
   if (!synproxy_is_connected(entry))
   {
