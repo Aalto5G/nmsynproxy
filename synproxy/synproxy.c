@@ -16,7 +16,17 @@ static inline int rst_is_valid(uint32_t rst_seq, uint32_t ref_seq)
 {
   if (rst_seq >= ref_seq)
   {
+    if (rst_seq - ref_seq > 512*1024*1024)
+    {
+      log_log(LOG_LEVEL_EMERG, "WORKER",
+        "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", rst_seq, ref_seq);
+    }
     return rst_seq - ref_seq <= 3;
+  }
+  if (ref_seq - rst_seq > 512*1024*1024)
+  {
+    log_log(LOG_LEVEL_EMERG, "WORKER",
+      "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", rst_seq, ref_seq);
   }
   return ref_seq - rst_seq <= 3;
 }
@@ -25,7 +35,17 @@ static inline int resend_request_is_valid(uint32_t seq, uint32_t ref_seq)
 {
   if (seq >= ref_seq)
   {
+    if (seq - ref_seq > 512*1024*1024)
+    {
+      log_log(LOG_LEVEL_EMERG, "WORKER",
+        "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", seq, ref_seq);
+    }
     return seq - ref_seq <= 3;
+  }
+  if (ref_seq - seq > 512*1024*1024)
+  {
+    log_log(LOG_LEVEL_EMERG, "WORKER",
+      "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", seq, ref_seq);
   }
   return ref_seq - seq <= 3;
 }
