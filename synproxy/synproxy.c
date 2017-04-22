@@ -806,9 +806,12 @@ int downlink(
     else
     {
       uint32_t seq = tcp_seq_number(ippay);
-      if (!rst_is_valid(seq, entry->wan_sent))
+      if (!rst_is_valid(seq, entry->wan_sent) &&
+          !rst_is_valid(seq, entry->lan_acked))
       {
-        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "RST has invalid SEQ number");
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK",
+                "RST has invalid SEQ number, %u/%u/%u",
+                seq, entry->wan_sent, entry->lan_acked);
         return 1;
       }
     }
@@ -1265,9 +1268,12 @@ int uplink(
     if (tcp_rst(ippay))
     {
       uint32_t seq = tcp_seq_number(ippay);
-      if (!rst_is_valid(seq, entry->lan_sent))
+      if (!rst_is_valid(seq, entry->lan_sent) &&
+          !rst_is_valid(seq, entry->wan_acked))
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK",
+                "invalid SEQ num in RST, %u/%u/%u",
+                seq, entry->lan_sent, entry->wan_acked);
         return 1;
       }
       synproxy_hash_del(local, entry);
@@ -1350,9 +1356,12 @@ int uplink(
     else
     {
       uint32_t seq = tcp_seq_number(ippay);
-      if (!rst_is_valid(seq, entry->lan_sent))
+      if (!rst_is_valid(seq, entry->lan_sent) &&
+          !rst_is_valid(seq, entry->wan_acked))
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid SEQ num in RST");
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK",
+                "invalid SEQ num in RST, %u/%u/%u",
+                seq, entry->lan_sent, entry->wan_acked);
         return 1;
       }
     }
