@@ -14,40 +14,42 @@ static inline uint64_t gettime64(void)
 
 static inline int rst_is_valid(uint32_t rst_seq, uint32_t ref_seq)
 {
-  if (rst_seq >= ref_seq)
+  int32_t diff = rst_seq - ref_seq;
+  if (diff >= 0)
   {
-    if (rst_seq - ref_seq > 512*1024*1024)
+    if (diff > 512*1024*1024)
     {
       log_log(LOG_LEVEL_EMERG, "WORKER",
         "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", rst_seq, ref_seq);
     }
-    return rst_seq - ref_seq <= 3;
+    return diff <= 3;
   }
-  if (ref_seq - rst_seq > 512*1024*1024)
+  if (diff < -512*1024*1024)
   {
     log_log(LOG_LEVEL_EMERG, "WORKER",
       "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", rst_seq, ref_seq);
   }
-  return ref_seq - rst_seq <= 3;
+  return diff >= -3;
 }
 
 static inline int resend_request_is_valid(uint32_t seq, uint32_t ref_seq)
 {
-  if (seq >= ref_seq)
+  int32_t diff = seq - ref_seq;
+  if (diff >= 0)
   {
-    if (seq - ref_seq > 512*1024*1024)
+    if (diff > 512*1024*1024)
     {
       log_log(LOG_LEVEL_EMERG, "WORKER",
         "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", seq, ref_seq);
     }
-    return seq - ref_seq <= 3;
+    return diff <= 3;
   }
-  if (ref_seq - seq > 512*1024*1024)
+  if (diff < -512*1024*1024)
   {
     log_log(LOG_LEVEL_EMERG, "WORKER",
       "TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", seq, ref_seq);
   }
-  return ref_seq - seq <= 3;
+  return diff >= -3;
 }
 
 static void synproxy_expiry_fn(
