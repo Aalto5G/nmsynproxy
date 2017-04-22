@@ -215,7 +215,13 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
   size_t i;
   if ((len & (len-1)) != 0 || len == 0)
   {
-    fprintf(stderr, "mss list not power of 2 in size: %zu at line %d col %d\n",
+    fprintf(stderr, "wscale list not power of 2 in size: %zu at line %d col %d\n",
+            len, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  if (DYNARR_GET(&conf->wscalelist, 0) != 0)
+  {
+    fprintf(stderr, "wscale list must begin with 0: %zu at line %d col %d\n",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
