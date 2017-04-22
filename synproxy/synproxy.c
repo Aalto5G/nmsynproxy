@@ -276,7 +276,7 @@ static void send_or_resend_syn(
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_syn_on(tcp);
   tcp_set_data_offset(tcp, sizeof(syn) - 14 - 20);
-  tcp_set_seq_number(tcp, entry->state_data.downlink_syn_sent.isn);
+  tcp_set_seq_number(tcp, entry->state_data.downlink_syn_sent.remote_isn);
   tcp_set_ack_number(tcp, 0);
   tcp_set_window(tcp, tcp_window(origtcp));
   tcpopts = &((unsigned char*)tcp)[20];
@@ -388,8 +388,8 @@ static void send_syn(
   {
     entry->wan_max_window_unscaled = 1;
   }
-  entry->state_data.downlink_syn_sent.this_isn = tcp_ack_number(origtcp) - 1;
-  entry->state_data.downlink_syn_sent.isn = tcp_seq_number(origtcp) - 1;
+  entry->state_data.downlink_syn_sent.local_isn = tcp_ack_number(origtcp) - 1;
+  entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
   timer_heap_modify(&local->timers, &entry->timer);
@@ -1196,7 +1196,7 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != DL_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.remote_isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num");
         return 1;
@@ -1229,7 +1229,7 @@ int uplink(
       entry->wscalediff =
         ((int)synproxy->conf->own_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
-        entry->state_data.downlink_syn_sent.this_isn - tcp_seq_number(ippay);
+        entry->state_data.downlink_syn_sent.local_isn - tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_sent = tcp_seq_number(ippay) + 1 + entry->seqoffset;
       entry->lan_acked = tcp_ack_number(ippay);
@@ -1339,13 +1339,13 @@ int uplink(
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT");
         return 1;
       }
-      if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.isn + 1)
+      if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.remote_isn + 1)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in DL_SYN_SENT, bad seq");
         return 1;
       }
       tcp_set_seq_number_cksum_update(
-        ippay, tcp_len, entry->state_data.downlink_syn_sent.this_isn + 1);
+        ippay, tcp_len, entry->state_data.downlink_syn_sent.local_isn + 1);
       tcp_set_ack_off_cksum_update(ippay);
       tcp_set_ack_number_cksum_update(
         ippay, tcp_len, 0);

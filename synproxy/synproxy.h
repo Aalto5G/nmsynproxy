@@ -58,8 +58,10 @@ struct synproxy_hash_entry {
       uint32_t isn;
     } uplink_syn_sent;
     struct {
-      uint32_t this_isn;
-      uint32_t isn;
+      uint32_t local_isn; // ACK number - 1 of ACK packet
+      uint32_t remote_isn; // SEQ number - 1 of ACK packet
+      uint16_t mss;
+      uint8_t sack_permitted;
     } downlink_syn_sent;
     struct {
       uint32_t upfin; // valid if FLAG_STATE_UPLINK_FIN
