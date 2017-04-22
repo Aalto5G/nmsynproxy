@@ -1267,7 +1267,7 @@ int uplink(
     }
     if (tcp_rst(ippay))
     {
-      uint32_t seq = tcp_seq_number(ippay);
+      uint32_t seq = tcp_seq_number(ippay) + entry->seqoffset;
       if (!rst_is_valid(seq, entry->lan_sent) &&
           !rst_is_valid(seq, entry->wan_acked))
       {
@@ -1355,7 +1355,7 @@ int uplink(
     }
     else
     {
-      uint32_t seq = tcp_seq_number(ippay);
+      uint32_t seq = tcp_seq_number(ippay) + entry->seqoffset;
       if (!rst_is_valid(seq, entry->lan_sent) &&
           !rst_is_valid(seq, entry->wan_acked))
       {
