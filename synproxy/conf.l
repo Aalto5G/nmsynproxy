@@ -56,6 +56,7 @@ remove       return REMOVE;
 retain       return RETAIN;
 mss_clamp    return MSS_CLAMP;
 network_prefix return NETWORK_PREFIX;
+halfopen_cache_max return HALFOPEN_CACHE_MAX;
 \"([^\\\"]|\\.)*\"  yylval->s=yy_escape_string(yytext); return STRING_LITERAL;
 
 [0-9]+       {

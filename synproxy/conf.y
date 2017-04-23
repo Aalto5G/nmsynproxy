@@ -47,7 +47,7 @@ int confyywrap(yyscan_t scanner)
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
-%token NETWORK_PREFIX MSSMODE DEFAULT
+%token NETWORK_PREFIX MSSMODE DEFAULT HALFOPEN_CACHE_MAX
 
 
 %type<i> sackhashval
@@ -429,6 +429,16 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
     YYABORT;
   }
   conf->ts_bits = $3;
+}
+| HALFOPEN_CACHE_MAX EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 < 0)
+  {
+    fprintf(stderr, "invalid halfopen_cache_max: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->halfopen_cache_max = $3;
 }
 | RATEHASH EQUALS OPENBRACE ratehashlist CLOSEBRACE SEMICOLON
 ;

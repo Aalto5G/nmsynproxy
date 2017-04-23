@@ -42,6 +42,7 @@ struct conf {
   DYNARR(uint8_t) wscalelist;
   DYNARR(uint16_t) tsmsslist;
   DYNARR(uint8_t) tswscalelist;
+  uint32_t halfopen_cache_max;
   int msslist_present;
   int wscalelist_present;
   int tsmsslist_present;
@@ -83,6 +84,7 @@ struct conf {
   .mss_clamp_enabled = 0, \
   .mss_clamp = 1460, \
   .ts_bits = 5, \
+  .halfopen_cache_max = 0, \
 }
 
 static inline void conf_free(struct conf *conf)
