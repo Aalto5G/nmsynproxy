@@ -38,4 +38,16 @@ uint32_t form_cookie(
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
   uint16_t mss, uint8_t wscale, uint8_t sack_permitted);
 
+int verify_timestamp(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale);
+
+uint32_t form_timestamp(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale);
+
 #endif
