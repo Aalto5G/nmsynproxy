@@ -544,7 +544,11 @@ static void send_syn(
       local, ip_dst(origip), tcp_dst_port(origtcp),
       ip_src(origip), tcp_src_port(origtcp),
       1);
-    // FIXME what if entry is NULL? Now we crash.
+    if (entry == NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKER", "not enough memory");
+      return;
+    }
   }
 
   entry->state_data.downlink_syn_sent.mss = mss;
