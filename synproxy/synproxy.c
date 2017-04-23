@@ -59,6 +59,14 @@ static void synproxy_expiry_fn(
   struct synproxy_hash_entry *e;
   e = CONTAINER_OF(timer, struct synproxy_hash_entry, timer);
   hash_table_delete(&local->hash, &e->node);
+  if (e->was_synproxied)
+  {
+    local->synproxied_connections--;
+  }
+  else
+  {
+    local->direct_connections--;
+  }
   free(e);
 }
 
@@ -103,7 +111,8 @@ struct synproxy_hash_entry *synproxy_hash_put(
   uint32_t local_ip,
   uint16_t local_port,
   uint32_t remote_ip,
-  uint16_t remote_port)
+  uint16_t remote_port,
+  uint8_t was_synproxied)
 {
   struct synproxy_hash_entry *e;
   if (synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port))
@@ -120,11 +129,20 @@ struct synproxy_hash_entry *synproxy_hash_put(
   e->local_port = local_port;
   e->remote_ip = remote_ip;
   e->remote_port = remote_port;
+  e->was_synproxied = was_synproxied;
   e->timer.time64 = gettime64() + 86400ULL*1000ULL*1000ULL;
   e->timer.fn = synproxy_expiry_fn;
   e->timer.userdata = local;
   timer_linkheap_add(&local->timers, &e->timer);
   hash_table_add_nogrow(&local->hash, &e->node, synproxy_hash(e));
+  if (was_synproxied)
+  {
+    local->synproxied_connections++;
+  }
+  else
+  {
+    local->direct_connections++;
+  }
   return e;
 }
 
@@ -394,7 +412,8 @@ static void send_syn(
 
   entry = synproxy_hash_put(
     local, ip_dst(origip), tcp_dst_port(origtcp),
-    ip_src(origip), tcp_src_port(origtcp));
+    ip_src(origip), tcp_src_port(origtcp),
+    1);
 
   entry->state_data.downlink_syn_sent.mss = mss;
   entry->state_data.downlink_syn_sent.sack_permitted = sack_permitted;
@@ -1151,7 +1170,7 @@ int uplink(
         return 1;
       }
       entry = synproxy_hash_put(
-        local, lan_ip, lan_port, remote_ip, remote_port);
+        local, lan_ip, lan_port, remote_ip, remote_port, 0);
       if (entry == NULL)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "out of memory");

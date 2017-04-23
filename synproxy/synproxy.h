@@ -34,6 +34,8 @@ struct synproxy_hash_entry {
   int8_t wscalediff;
   uint8_t lan_wscale;
   uint8_t wan_wscale;
+  uint8_t was_synproxied;
+  // 16-bit hole here! Place new <16-bit variables here.
   uint32_t seqoffset;
   uint32_t timestamp;
   uint32_t lan_sent; // what LAN has sent plus 1
@@ -109,6 +111,8 @@ struct worker_local {
   struct timer_linkheap timers;
   struct secretinfo info;
   struct ip_hash ratelimit;
+  uint32_t synproxied_connections;
+  uint32_t direct_connections;
 };
 
 static inline void worker_local_init(
@@ -134,6 +138,8 @@ static inline void worker_local_init(
   local->ratelimit.initial_tokens = synproxy->conf->ratehash.initial_tokens;
   local->ratelimit.timer_add = synproxy->conf->ratehash.timer_add;
   local->ratelimit.timer_period = synproxy->conf->ratehash.timer_period_usec;
+  local->synproxied_connections = 0;
+  local->direct_connections = 0;
   ip_hash_init(&local->ratelimit, &local->timers);
 }
 
@@ -181,7 +187,8 @@ struct synproxy_hash_entry *synproxy_hash_put(
   uint32_t local_ip,
   uint16_t local_port,
   uint32_t remote_ip,
-  uint16_t remote_port);
+  uint16_t remote_port,
+  uint8_t was_synproxied);
 
 static inline void synproxy_hash_put_connected(
   struct worker_local *local,
@@ -191,7 +198,7 @@ static inline void synproxy_hash_put_connected(
   uint16_t remote_port)
 {
   struct synproxy_hash_entry *e;
-  e = synproxy_hash_put(local, local_ip, local_port, remote_ip, remote_port);
+  e = synproxy_hash_put(local, local_ip, local_port, remote_ip, remote_port, 0);
   e->flag_state = FLAG_STATE_ESTABLISHED;
   e->lan_max = 32768;
   e->lan_sent = 0;
@@ -221,6 +228,14 @@ static inline void synproxy_hash_del(
 {
   hash_table_delete(&local->hash, &e->node);
   timer_heap_remove(&local->timers, &e->timer);
+  if (e->was_synproxied)
+  {
+    local->synproxied_connections--;
+  }
+  else
+  {
+    local->direct_connections--;
+  }
   free(e);
 }
 
