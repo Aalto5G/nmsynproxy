@@ -43,7 +43,7 @@ int confyywrap(yyscan_t scanner)
 %token ENABLE DISABLE HASHIP HASHIPPORT SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token LEARNHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE TIMERHEAPSIZE
-%token COMMA MSS WSCALE OWN_MSS OWN_WSCALE OWN_SACK
+%token COMMA MSS WSCALE TSMSS TSWSCALE TS_BITS OWN_MSS OWN_WSCALE OWN_SACK
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
@@ -158,14 +158,58 @@ wscalelist_entry: INT_LITERAL
 }
 ;
 
+tsmsslist_entry: INT_LITERAL
+{
+  if ($1 > 65535)
+  {
+    fprintf(stderr, "invalid TS MSS list entry: %d at line %d col %d\n",
+            $1, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  if (!DYNARR_PUSH_BACK(&conf->tsmsslist, $1))
+  {
+    fprintf(stderr, "out of memory at line %d col %d\n",
+            @1.first_line, @1.first_column);
+    YYABORT;
+  }
+}
+;
+
+tswscalelist_entry: INT_LITERAL
+{
+  if ($1 > 255)
+  {
+    fprintf(stderr, "invalid TS wscale list entry: %d at line %d col %d\n",
+            $1, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  if (!DYNARR_PUSH_BACK(&conf->tswscalelist, $1))
+  {
+    fprintf(stderr, "out of memory at line %d col %d\n",
+            @1.first_line, @1.first_column);
+    YYABORT;
+  }
+}
+;
+
 msslist:
 msslist_entry
 | msslist COMMA msslist_entry
 ;
 
+tsmsslist:
+tsmsslist_entry
+| tsmsslist COMMA tsmsslist_entry
+;
+
 wscalelist:
 wscalelist_entry
 | wscalelist COMMA wscalelist_entry
+;
+
+tswscalelist:
+tswscalelist_entry
+| tswscalelist COMMA tswscalelist_entry
 ;
 
 msslist_maybe:
@@ -174,6 +218,14 @@ msslist_maybe:
 
 wscalelist_maybe:
 | wscalelist maybe_comma
+;
+
+tsmsslist_maybe:
+| tsmsslist maybe_comma
+;
+
+tswscalelist_maybe:
+| tswscalelist maybe_comma
 ;
 
 conflist_entry:
@@ -209,6 +261,27 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
   }
   conf->msslist_present = 1;
 }
+| TSMSS EQUALS OPENBRACE tsmsslist_maybe CLOSEBRACE SEMICOLON
+{
+  size_t len = DYNARR_SIZE(&conf->tsmsslist);
+  size_t i;
+  if ((len & (len-1)) != 0 || len == 0)
+  {
+    fprintf(stderr, "tsmss list not power of 2 in size: %zu at line %d col %d\n",
+            len, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  for (i = 1; i < len; i++)
+  {
+    if (DYNARR_GET(&conf->tsmsslist, i) < DYNARR_GET(&conf->tsmsslist, i-1))
+    {
+      fprintf(stderr, "tsmss list not increasing at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+  }
+  conf->tsmsslist_present = 1;
+}
 | WSCALE EQUALS OPENBRACE wscalelist_maybe CLOSEBRACE SEMICOLON
 {
   size_t len = DYNARR_SIZE(&conf->wscalelist);
@@ -235,6 +308,33 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
     }
   }
   conf->wscalelist_present = 1;
+}
+| TSWSCALE EQUALS OPENBRACE tswscalelist_maybe CLOSEBRACE SEMICOLON
+{
+  size_t len = DYNARR_SIZE(&conf->tswscalelist);
+  size_t i;
+  if ((len & (len-1)) != 0 || len == 0)
+  {
+    fprintf(stderr, "tswscale list not power of 2 in size: %zu at line %d col %d\n",
+            len, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  if (DYNARR_GET(&conf->tswscalelist, 0) != 0)
+  {
+    fprintf(stderr, "tswscale list must begin with 0: %zu at line %d col %d\n",
+            len, @1.first_line, @1.first_column);
+    YYABORT;
+  }
+  for (i = 1; i < len; i++)
+  {
+    if (DYNARR_GET(&conf->tswscalelist, i) < DYNARR_GET(&conf->tswscalelist, i-1))
+    {
+      fprintf(stderr, "tswscale list not increasing at line %d col %d\n",
+              @1.first_line, @1.first_column);
+      YYABORT;
+    }
+  }
+  conf->tswscalelist_present = 1;
 }
 | OWN_SACK EQUALS own_sack SEMICOLON
 {
@@ -313,6 +413,22 @@ MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
     YYABORT;
   }
   conf->timerheapsize = $3;
+}
+| TS_BITS EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 < 0)
+  {
+    fprintf(stderr, "invalid ts bits: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  if ($3 > 12)
+  {
+    fprintf(stderr, "invalid ts bits: %d at line %d col %d\n",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->ts_bits = $3;
 }
 | RATEHASH EQUALS OPENBRACE ratehashlist CLOSEBRACE SEMICOLON
 ;

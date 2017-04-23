@@ -40,10 +40,17 @@ struct conf {
   struct ratehashconf ratehash;
   DYNARR(uint16_t) msslist;
   DYNARR(uint8_t) wscalelist;
+  DYNARR(uint16_t) tsmsslist;
+  DYNARR(uint8_t) tswscalelist;
   int msslist_present;
   int wscalelist_present;
+  int tsmsslist_present;
+  int tswscalelist_present;
   uint8_t msslist_bits;
   uint8_t wscalelist_bits;
+  uint8_t tsmsslist_bits;
+  uint8_t tswscalelist_bits;
+  uint8_t ts_bits;
   uint16_t own_mss;
   uint8_t own_wscale;
   uint8_t mss_clamp_enabled;
@@ -67,18 +74,23 @@ struct conf {
   }, \
   .msslist = DYNARR_INITER, \
   .wscalelist = DYNARR_INITER, \
+  .tsmsslist = DYNARR_INITER, \
+  .tswscalelist = DYNARR_INITER, \
   .msslist_present = 0, \
   .wscalelist_present = 0, \
   .own_mss = 1460, \
   .own_wscale = 7, \
   .mss_clamp_enabled = 0, \
   .mss_clamp = 1460, \
+  .ts_bits = 5, \
 }
 
 static inline void conf_free(struct conf *conf)
 {
   DYNARR_FREE(&conf->msslist);
   DYNARR_FREE(&conf->wscalelist);
+  DYNARR_FREE(&conf->tsmsslist);
+  DYNARR_FREE(&conf->tswscalelist);
 }
 
 static inline int conf_postprocess(struct conf *conf)
@@ -108,6 +120,50 @@ static inline int conf_postprocess(struct conf *conf)
     }
     conf->wscalelist_present = 1;
   }
+  if (!conf->tswscalelist_present)
+  {
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 0))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 1))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 3))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 5))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 6))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 8))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 9))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 10))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    conf->tswscalelist_present = 1;
+  }
   if (!conf->msslist_present)
   {
     if (!DYNARR_PUSH_BACK(&conf->msslist, 216))
@@ -132,6 +188,50 @@ static inline int conf_postprocess(struct conf *conf)
     }
     conf->msslist_present = 1;
   }
+  if (!conf->tsmsslist_present)
+  {
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 216))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 344))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 536))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 712))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 940))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 1360))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 1440))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 1452))
+    {
+      fprintf(stderr, "out of memory\n");
+      return -ENOMEM;
+    }
+    conf->tsmsslist_present = 1;
+  }
   conf->msslist_bits = 255;
   for (bits = 0; bits <= 32; bits++)
   {
@@ -150,14 +250,42 @@ static inline int conf_postprocess(struct conf *conf)
       break;
     }
   }
+  conf->tsmsslist_bits = 255;
+  for (bits = 0; bits <= 32; bits++)
+  {
+    if ((1U<<bits) == DYNARR_SIZE(&conf->tsmsslist))
+    {
+      conf->tsmsslist_bits = bits;
+      break;
+    }
+  }
+  conf->tswscalelist_bits = 255;
+  for (bits = 0; bits <= 32; bits++)
+  {
+    if ((1U<<bits) == DYNARR_SIZE(&conf->tswscalelist))
+    {
+      conf->tswscalelist_bits = bits;
+      break;
+    }
+  }
   if (conf->msslist_bits + conf->wscalelist_bits + 1 > 12)
   {
     fprintf(stderr, "too long lists, too little cryptographic security\n");
     return -EINVAL;
   }
+  if (conf->tsmsslist_bits + conf->tswscalelist_bits + conf->ts_bits > 12)
+  {
+    fprintf(stderr, "too long lists, too little TS cryptographic security\n");
+    return -EINVAL;
+  }
   if (DYNARR_GET(&conf->wscalelist, 0) != 0)
   {
     fprintf(stderr, "first element of wscale list must be 0\n");
+    return -EINVAL;
+  }
+  if (DYNARR_GET(&conf->tswscalelist, 0) != 0)
+  {
+    fprintf(stderr, "first element of ts wscale list must be 0\n");
     return -EINVAL;
   }
   return 0;
