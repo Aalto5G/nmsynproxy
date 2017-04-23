@@ -72,6 +72,14 @@ struct synproxy_hash_entry {
       uint32_t upfin; // valid if FLAG_STATE_UPLINK_FIN
       uint32_t downfin; // valid if FLAG_STATE_DOWNLINK_FIN
     } established;
+    struct {
+      struct linked_list_node listnode;
+      uint8_t wscale;
+      uint8_t sack_permitted;
+      uint16_t mss;
+      uint32_t remote_isn;
+      uint32_t local_isn;
+    } downlink_half_open;
   } state_data;
 };
 
@@ -85,6 +93,7 @@ enum flag_state {
   FLAG_STATE_DOWNLINK_FIN = 64, // always with ESTABLISHED
   FLAG_STATE_DOWNLINK_FIN_ACK = 128, // always with DOWNLINK_FIN|ESTABLSIHED
   FLAG_STATE_TIME_WAIT = 256, // may not have other bits
+  FLAG_STATE_DOWNLINK_HALF_OPEN = 512, // may not have other bits
 };
 
 static inline int synproxy_is_connected(struct synproxy_hash_entry *e)
@@ -116,6 +125,8 @@ struct worker_local {
   struct ip_hash ratelimit;
   uint32_t synproxied_connections;
   uint32_t direct_connections;
+  uint32_t half_open_connections;
+  struct linked_list_head half_open_list;
 };
 
 static inline void worker_local_init(
@@ -143,7 +154,9 @@ static inline void worker_local_init(
   local->ratelimit.timer_period = synproxy->conf->ratehash.timer_period_usec;
   local->synproxied_connections = 0;
   local->direct_connections = 0;
+  local->half_open_connections = 0;
   ip_hash_init(&local->ratelimit, &local->timers);
+  linked_list_head_init(&local->half_open_list);
 }
 
 static inline void worker_local_free(struct worker_local *local)
@@ -238,6 +251,11 @@ static inline void synproxy_hash_del(
   else
   {
     local->direct_connections--;
+  }
+  if (e->flag_state == FLAG_STATE_DOWNLINK_HALF_OPEN)
+  {
+    linked_list_delete(&e->state_data.downlink_half_open.listnode);
+    local->half_open_connections--;
   }
   free(e);
 }

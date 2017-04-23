@@ -634,7 +634,7 @@ static void synproxy_closed_port_impl(
     }
   
     e = synproxy_hash_get(local, ip1, port1, ip2, port2);
-    if (e != NULL)
+    if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
       exit(1);
@@ -1444,7 +1444,7 @@ static void synproxy_handshake_impl(
     }
   
     e = synproxy_hash_get(local, ip1, port1, ip2, port2);
-    if (e != NULL)
+    if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
       exit(1);

@@ -67,6 +67,11 @@ static void synproxy_expiry_fn(
   {
     local->direct_connections--;
   }
+  if (e->flag_state == FLAG_STATE_DOWNLINK_HALF_OPEN)
+  {
+    linked_list_delete(&e->state_data.downlink_half_open.listnode);
+    local->half_open_connections--;
+  }
   free(e);
 }
 
@@ -167,6 +172,8 @@ static void send_synack(
   uint16_t own_mss;
   uint8_t own_sack;
   uint32_t ts;
+  uint32_t local_ip, remote_ip;
+  uint16_t local_port, remote_port;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
@@ -227,6 +234,11 @@ static void send_synack(
   {
     own_sack = synproxy->conf->own_sack;
   }
+
+  local_ip = ip_dst(origip);
+  remote_ip = ip_src(origip);
+  local_port = tcp_dst_port(origtcp);
+  remote_port = tcp_src_port(origtcp);
 
   memcpy(ether_src(synack), ether_dst(orig), 6);
   memcpy(ether_dst(synack), ether_src(orig), 6);
@@ -313,6 +325,60 @@ static void send_synack(
   pktstruct->sz = sizeof(synack);
   memcpy(packet_data(pktstruct), synack, sizeof(synack));
   port->portfunc(pktstruct, port->userdata);
+
+  if (synproxy->conf->halfopen_cache_max)
+  {
+    struct synproxy_hash_entry *e;
+    if (synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port))
+    {
+      return; // duplicate SYN
+    }
+    if (local->half_open_connections >= synproxy->conf->halfopen_cache_max)
+    {
+      struct linked_list_node *node = local->half_open_list.node.next;
+      e = CONTAINER_OF(
+            node, struct synproxy_hash_entry,
+            state_data.downlink_half_open.listnode);
+      linked_list_delete(&e->state_data.downlink_half_open.listnode);
+      timer_heap_remove(&local->timers, &e->timer);
+      hash_table_delete(&local->hash, &e->node);
+    }
+    else
+    {
+      local->half_open_connections++;
+      local->synproxied_connections++;
+      e = malloc(sizeof(*e));
+      if (e == NULL)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKER", "out of memory");
+        return;
+      }
+    }
+    memset(e, 0, sizeof(*e));
+    e->local_ip = local_ip;
+    e->local_port = local_port;
+    e->remote_ip = remote_ip;
+    e->remote_port = remote_port;
+    e->was_synproxied = 1;
+    e->timer.time64 = gettime64() + 64ULL*1000ULL*1000ULL;
+    e->timer.fn = synproxy_expiry_fn;
+    e->timer.userdata = local;
+    if (timer_heap_add_nogrow(&local->timers, &e->timer) != 0)
+    {
+      free(e);
+      log_log(LOG_LEVEL_ERR, "WORKER", "out of timer heap space");
+      return;
+    }
+    hash_table_add_nogrow(&local->hash, &e->node, synproxy_hash(e));
+    linked_list_add_tail(
+      &e->state_data.downlink_half_open.listnode, &local->half_open_list);
+    e->flag_state = FLAG_STATE_DOWNLINK_HALF_OPEN;
+    e->state_data.downlink_half_open.wscale = tcpinfo.wscale;
+    e->state_data.downlink_half_open.mss = tcpinfo.mss;
+    e->state_data.downlink_half_open.sack_permitted = tcpinfo.sack_permitted;
+    e->state_data.downlink_half_open.remote_isn = tcp_seq_number(origtcp);
+    e->state_data.downlink_half_open.local_isn = syn_cookie;
+  }
 }
 
 static void send_or_resend_syn(
@@ -461,21 +527,25 @@ static void resend_syn(
 static void send_syn(
   void *orig, struct worker_local *local, struct port *port,
   struct ll_alloc_st *st,
-  uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
+  struct synproxy_hash_entry *entry)
 {
   void *origip;
   void *origtcp;
-  struct synproxy_hash_entry *entry;
   struct tcp_information info;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
   tcp_parse_options(origtcp, &info);
 
-  entry = synproxy_hash_put(
-    local, ip_dst(origip), tcp_dst_port(origtcp),
-    ip_src(origip), tcp_src_port(origtcp),
-    1);
+  if (entry == NULL)
+  {
+    entry = synproxy_hash_put(
+      local, ip_dst(origip), tcp_dst_port(origtcp),
+      ip_src(origip), tcp_src_port(origtcp),
+      1);
+    // FIXME what if entry is NULL? Now we crash.
+  }
 
   entry->state_data.downlink_syn_sent.mss = mss;
   entry->state_data.downlink_syn_sent.sack_permitted = sack_permitted;
@@ -880,6 +950,55 @@ int downlink(
   }
   entry = synproxy_hash_get(
     local, lan_ip, lan_port, remote_ip, remote_port);
+  if (entry != NULL && entry->flag_state == FLAG_STATE_DOWNLINK_HALF_OPEN)
+  {
+    if (tcp_rst(ippay))
+    {
+      // FIXME verify
+    }
+    if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
+    {
+      uint32_t ack_num = tcp_ack_number(ippay);
+      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+        return 1;
+      }
+      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+        return 1;
+      }
+      if (((uint32_t)(entry->state_data.downlink_half_open.local_isn + 1)) != ack_num)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP ACK number");
+        return 1;
+      }
+      if (((uint32_t)(entry->state_data.downlink_half_open.remote_isn + 1)) != tcp_seq_number(ippay))
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP SEQ number");
+        return 1;
+      }
+      ip_increment_one(
+        ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
+      log_log(
+        LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN, found");
+      linked_list_delete(&entry->state_data.downlink_half_open.listnode);
+      if (local->half_open_connections <= 0)
+      {
+        abort();
+      }
+      local->half_open_connections--;
+      send_syn(
+        ether, local, port, st,
+        entry->state_data.downlink_half_open.mss,
+        entry->state_data.downlink_half_open.wscale,
+        entry->state_data.downlink_half_open.sack_permitted, entry);
+      return 1;
+    }
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry is HALF_OPEN");
+    return 1;
+  }
   if (entry == NULL)
   {
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
@@ -934,7 +1053,7 @@ int downlink(
         ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
       log_log(
         LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN");
-      send_syn(ether, local, port, st, mss, wscale, sack_permitted);
+      send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL);
       return 1;
     }
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found");
