@@ -1,3 +1,7 @@
 SACK option removal
 
 Better TCP RST option handling: don't drop state immediately
+
+odd_even indicator?
+- Yes, a very good idea! Increases reliability a lot without compromising
+  protection.
