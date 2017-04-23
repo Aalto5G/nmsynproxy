@@ -156,7 +156,7 @@ static void send_synack(
   void *orig, struct worker_local *local, struct synproxy *synproxy,
   struct port *port, struct ll_alloc_st *st)
 {
-  char synack[14+20+20+12] = {0};
+  char synack[14+20+20+12+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   unsigned char *tcpopts;
@@ -166,6 +166,7 @@ static void send_synack(
   struct sack_hash_data ipentry, ipportentry;
   uint16_t own_mss;
   uint8_t own_sack;
+  uint32_t ts;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
@@ -179,6 +180,10 @@ static void send_synack(
     &local->info, synproxy, ip_dst(origip), ip_src(origip),
     tcp_dst_port(origtcp), tcp_src_port(origtcp),
     tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted);
+  ts = form_timestamp(
+    &local->info, synproxy, ip_dst(origip), ip_src(origip),
+    tcp_dst_port(origtcp), tcp_src_port(origtcp),
+    tcpinfo.mss, tcpinfo.wscale);
 
   if (   synproxy->conf->mssmode == HASHMODE_HASHIPPORT
       || synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
@@ -264,8 +269,23 @@ static void send_synack(
   {
     tcpopts[8] = 4;
     tcpopts[9] = 2;
-    tcpopts[10] = 0;
-    tcpopts[11] = 0;
+    if (tcpinfo.options_valid && tcpinfo.ts_present)
+    {
+      tcpopts[10] = 1;
+      tcpopts[11] = 1;
+    }
+    else
+    {
+      tcpopts[10] = 0;
+      tcpopts[11] = 0;
+    }
+  }
+  else if (tcpinfo.options_valid && tcpinfo.ts_present)
+  {
+    tcpopts[8] = 1;
+    tcpopts[9] = 1;
+    tcpopts[10] = 1;
+    tcpopts[11] = 1;
   }
   else
   {
@@ -274,8 +294,20 @@ static void send_synack(
     tcpopts[10] = 0;
     tcpopts[11] = 0;
   }
+  if (tcpinfo.options_valid && tcpinfo.ts_present)
+  {
+    tcpopts[12] = 1;
+    tcpopts[13] = 1;
+    tcpopts[14] = 8;
+    tcpopts[15] = 10;
+    hdr_set32n(&tcpopts[16], ts); // ts
+    hdr_set32n(&tcpopts[20], tcpinfo.ts); // tsecho
+  }
+  else
+  {
+    memset(&tcpopts[12], 0, 12);
+  }
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(synack) - 14 - 20);
-  // FIXME timestamps
   pktstruct = ll_alloc_st(st, packet_size(sizeof(synack)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(synack);
@@ -288,7 +320,7 @@ static void send_or_resend_syn(
   struct ll_alloc_st *st,
   struct synproxy_hash_entry *entry)
 {
-  char syn[14+20+20+12] = {0};
+  char syn[14+20+20+12+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   unsigned char *tcpopts;
@@ -337,8 +369,23 @@ static void send_or_resend_syn(
   {
     tcpopts[8] = 4;
     tcpopts[9] = 2;
-    tcpopts[10] = 0;
-    tcpopts[11] = 0;
+    if (entry->state_data.downlink_syn_sent.timestamp_present)
+    {
+      tcpopts[10] = 1;
+      tcpopts[11] = 1;
+    }
+    else
+    {
+      tcpopts[10] = 0;
+      tcpopts[11] = 0;
+    }
+  }
+  else if (entry->state_data.downlink_syn_sent.timestamp_present)
+  {
+    tcpopts[8] = 1;
+    tcpopts[9] = 1;
+    tcpopts[10] = 1;
+    tcpopts[11] = 1;
   }
   else
   {
@@ -347,8 +394,21 @@ static void send_or_resend_syn(
     tcpopts[10] = 0;
     tcpopts[11] = 0;
   }
+  if (entry->state_data.downlink_syn_sent.timestamp_present)
+  {
+    tcpopts[12] = 1;
+    tcpopts[13] = 1;
+    tcpopts[14] = 8;
+    tcpopts[15] = 10;
+    hdr_set32n(&tcpopts[16],
+      entry->state_data.downlink_syn_sent.remote_timestamp);
+    hdr_set32n(&tcpopts[20], 0); // tsecho
+  }
+  else
+  {
+    memset(&tcpopts[12], 0, 12);
+  }
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(syn) - 14 - 20);
-  // FIXME timestamps
   pktstruct = ll_alloc_st(st, packet_size(sizeof(syn)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(syn);
@@ -406,9 +466,11 @@ static void send_syn(
   void *origip;
   void *origtcp;
   struct synproxy_hash_entry *entry;
+  struct tcp_information info;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
+  tcp_parse_options(origtcp, &info);
 
   entry = synproxy_hash_put(
     local, ip_dst(origip), tcp_dst_port(origtcp),
@@ -417,6 +479,12 @@ static void send_syn(
 
   entry->state_data.downlink_syn_sent.mss = mss;
   entry->state_data.downlink_syn_sent.sack_permitted = sack_permitted;
+  entry->state_data.downlink_syn_sent.timestamp_present = info.ts_present;
+  if (info.ts_present)
+  {
+    entry->state_data.downlink_syn_sent.local_timestamp = info.tsecho;
+    entry->state_data.downlink_syn_sent.remote_timestamp = info.ts;
+  }
 
   entry->wan_wscale = wscale;
   entry->wan_sent = tcp_seq_number(origtcp);
@@ -442,13 +510,16 @@ static void send_ack_only(
   void *orig, struct synproxy_hash_entry *entry, struct port *port,
   struct ll_alloc_st *st)
 {
-  char ack[14+20+20] = {0};
+  char ack[14+20+20+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   struct packet *pktstruct;
+  struct tcp_information tcpinfo;
+  unsigned char *tcpopts;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
+  tcp_parse_options(origtcp, &tcpinfo);
 
   memcpy(ether_src(ack), ether_dst(orig), 6);
   memcpy(ether_dst(ack), ether_src(orig), 6);
@@ -468,13 +539,27 @@ static void send_ack_only(
   tcp_set_src_port(tcp, tcp_dst_port(origtcp));
   tcp_set_dst_port(tcp, tcp_src_port(origtcp));
   tcp_set_ack_on(tcp);
-  tcp_set_data_offset(tcp, 20);
+  tcp_set_data_offset(tcp, sizeof(ack) - 14 - 20);
   tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
   tcp_set_window(tcp, entry->wan_max_window_unscaled);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(ack) - 14 - 20);
 
-  // FIXME timestamps, etc
+  tcpopts = &((unsigned char*)tcp)[20];
+
+  if (tcpinfo.options_valid && tcpinfo.ts_present)
+  {
+    tcpopts[0] = 1;
+    tcpopts[1] = 1;
+    tcpopts[2] = 8;
+    tcpopts[3] = 10;
+    hdr_set32n(&tcpopts[4], tcpinfo.tsecho);
+    hdr_set32n(&tcpopts[8], tcpinfo.ts);
+  }
+  else
+  {
+    memset(&tcpopts[0], 0, 12);
+  }
 
   pktstruct = ll_alloc_st(st, packet_size(sizeof(ack)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -487,15 +572,18 @@ static void send_ack_and_window_update(
   void *orig, struct synproxy_hash_entry *entry, struct port *port,
   struct ll_alloc_st *st)
 {
-  char windowupdate[14+20+20] = {0};
+  char windowupdate[14+20+20+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   struct packet *pktstruct;
+  struct tcp_information tcpinfo;
+  unsigned char *tcpopts;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
+  tcp_parse_options(origtcp, &tcpinfo);
 
-  send_ack_only(orig, entry, port, st);
+  send_ack_only(orig, entry, port, st); // XXX send_ack_only reparses opts
 
   memcpy(ether_src(windowupdate), ether_src(orig), 6);
   memcpy(ether_dst(windowupdate), ether_dst(orig), 6);
@@ -515,9 +603,13 @@ static void send_ack_and_window_update(
   tcp_set_src_port(tcp, tcp_src_port(origtcp));
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_ack_on(tcp);
-  tcp_set_data_offset(tcp, 20);
-  tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
-  tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
+  tcp_set_data_offset(tcp, sizeof(windowupdate)-14-20);
+#if 0
+  tcp_set_seq_number(tcp, tcp_ack_number(origtcp)); // FIXME looks suspicious
+  tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1); // FIXME the same
+#endif
+  tcp_set_seq_number(tcp, tcp_seq_number(origtcp)+1+entry->seqoffset);
+  tcp_set_ack_number(tcp, tcp_ack_number(origtcp));
   if (entry->wscalediff >= 0)
   {
     tcp_set_window(tcp, tcp_window(origtcp)>>entry->wscalediff);
@@ -531,9 +623,21 @@ static void send_ack_and_window_update(
     }
     tcp_set_window(tcp, win64);
   }
+  tcpopts = &((unsigned char*)tcp)[20];
+  if (tcpinfo.options_valid && tcpinfo.ts_present)
+  {
+    tcpopts[0] = 1;
+    tcpopts[1] = 1;
+    tcpopts[2] = 8;
+    tcpopts[3] = 10;
+    hdr_set32n(&tcpopts[4], tcpinfo.ts+entry->tsoffset);
+    hdr_set32n(&tcpopts[8], tcpinfo.tsecho);
+  }
+  else
+  {
+    memset(&tcpopts[0], 0, 12);
+  }
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(windowupdate) - 14 - 20);
-
-  // FIXME timestamps, etc
 
   pktstruct = ll_alloc_st(st, packet_size(sizeof(windowupdate)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -564,6 +668,7 @@ int downlink(
   int32_t data_len;
   int todelete = 0;
   uint32_t wan_min;
+  struct sack_ts_headers hdrs;
 
   if (ether_len < ETHER_HDR_LEN)
   {
@@ -781,8 +886,11 @@ int downlink(
     {
       uint32_t ack_num = tcp_ack_number(ippay);
       uint16_t mss;
+      uint16_t tsmss;
+      uint8_t tswscale;
       uint8_t wscale, sack_permitted;
       int ok;
+      struct tcp_information tcpinfo;
       if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
@@ -797,6 +905,24 @@ int downlink(
         &local->info, synproxy, ip_dst(ip), ip_src(ip),
         tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
         &mss, &wscale, &sack_permitted);
+      tcp_parse_options(ippay, &tcpinfo); // XXX send_syn reparses
+      if (tcpinfo.options_valid && tcpinfo.ts_present)
+      {
+        if (verify_timestamp(
+          &local->info, synproxy, ip_dst(ip), ip_src(ip),
+          tcp_dst_port(ippay), tcp_src_port(ippay), tcpinfo.tsecho,
+          &tsmss, &tswscale))
+        {
+          if (tsmss > mss)
+          {
+            mss = tsmss;
+          }
+          if (tswscale > wscale)
+          {
+            wscale = tswscale;
+          }
+        }
+      }
       if (!ok)
       {
         log_log(
@@ -1008,18 +1134,18 @@ int downlink(
     entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
   }
   timer_heap_modify(&local->timers, &entry->timer);
+  tcp_find_sack_ts_headers(ippay, &hdrs);
   if (tcp_ack(ippay))
   {
-    struct sack_ts_headers hdrs;
     tcp_set_ack_number_cksum_update(
       ippay, tcp_len, tcp_ack_number(ippay)-entry->seqoffset);
-    tcp_find_sack_ts_headers(ippay, &hdrs);
     if (hdrs.sackoff)
     {
       tcp_adjust_sack_cksum_update_2(
         ippay, &hdrs, -entry->seqoffset);
     }
   }
+  tcp_adjust_tsecho_cksum_update(ippay, &hdrs, -entry->tsoffset);
   port->portfunc(pkt, port->userdata);
   if (todelete)
   {
@@ -1061,6 +1187,7 @@ int uplink(
   int32_t data_len;
   int todelete = 0;
   uint32_t lan_min;
+  struct sack_ts_headers hdrs;
 
   if (ether_len < ETHER_HDR_LEN)
   {
@@ -1565,6 +1692,8 @@ int uplink(
     }
     tcp_set_window_cksum_update(ippay, tcp_len, win64);
   }
+  tcp_find_sack_ts_headers(ippay, &hdrs);
+  tcp_adjust_tsval_cksum_update(ippay, &hdrs, entry->tsoffset);
   port->portfunc(pkt, port->userdata);
   if (todelete)
   {

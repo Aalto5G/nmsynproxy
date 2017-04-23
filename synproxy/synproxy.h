@@ -37,7 +37,7 @@ struct synproxy_hash_entry {
   uint8_t was_synproxied;
   // 16-bit hole here! Place new <16-bit variables here.
   uint32_t seqoffset;
-  uint32_t timestamp;
+  uint32_t tsoffset;
   uint32_t lan_sent; // what LAN has sent plus 1
   uint32_t wan_sent; // what WAN has sent plus 1
   uint32_t lan_acked; // what WAN has sent and LAN has acked plus 1
@@ -64,6 +64,9 @@ struct synproxy_hash_entry {
       uint32_t remote_isn; // SEQ number - 1 of ACK packet
       uint16_t mss;
       uint8_t sack_permitted;
+      uint8_t timestamp_present;
+      uint32_t local_timestamp;
+      uint32_t remote_timestamp;
     } downlink_syn_sent;
     struct {
       uint32_t upfin; // valid if FLAG_STATE_UPLINK_FIN
