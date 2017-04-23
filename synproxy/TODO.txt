@@ -8,3 +8,5 @@ Hybrid SYN proxy
 - Timestamp support
 
 SACK option removal
+
+Better TCP RST option handling: don't drop state immediately
