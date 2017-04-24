@@ -874,9 +874,14 @@ static void synproxy_closed_port_impl(
       exit(1);
     }
     e = synproxy_hash_get(local, ip1, port1, ip2, port2);
-    if (e != NULL)
+    if (e == NULL)
     {
-      log_log(LOG_LEVEL_ERR, "UNIT", "entry found");
+      log_log(LOG_LEVEL_ERR, "UNIT", "entry not found");
+      exit(1);
+    }
+    if (e->flag_state != FLAG_STATE_RESETED)
+    {
+      log_log(LOG_LEVEL_ERR, "UNIT", "entry not RESETED");
       exit(1);
     }
   }
@@ -1056,9 +1061,14 @@ static void closed_port(void)
     exit(1);
   }
   e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321);
-  if (e != NULL)
+  if (e == NULL)
   {
-    log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
+    exit(1);
+  }
+  if (e->flag_state != FLAG_STATE_RESETED)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not RESETED");
     exit(1);
   }
 
@@ -2213,9 +2223,14 @@ static void established_rst_uplink(void)
     exit(1);
   }
   e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
-  if (e != NULL)
+  if (e == NULL)
   {
-    log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
+    exit(1);
+  }
+  if (e->flag_state != FLAG_STATE_RESETED)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not RESETED");
     exit(1);
   }
 
@@ -2333,9 +2348,14 @@ static void established_rst_downlink(void)
     exit(1);
   }
   e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
-  if (e != NULL)
+  if (e == NULL)
   {
-    log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
+    exit(1);
+  }
+  if (e->flag_state != FLAG_STATE_RESETED)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not RESETED");
     exit(1);
   }
 
@@ -2457,9 +2477,14 @@ static void syn_proxy_rst_uplink(void)
     exit(1);
   }
   e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
-  if (e != NULL)
+  if (e == NULL)
   {
-    log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
+    exit(1);
+  }
+  else if (e->flag_state != FLAG_STATE_RESETED)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not RESETED");
     exit(1);
   }
 
@@ -2579,9 +2604,14 @@ static void syn_proxy_rst_downlink(void)
     exit(1);
   }
   e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
-  if (e != NULL)
+  if (e == NULL)
   {
-    log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
+    exit(1);
+  }
+  if (e->flag_state != FLAG_STATE_RESETED)
+  {
+    log_log(LOG_LEVEL_ERR, "UNIT", "state entry not RESETED");
     exit(1);
   }
 

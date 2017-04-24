@@ -1,5 +1,3 @@
 SACK option removal
 
-Better TCP RST option handling: don't drop state immediately
-
 Timers to pcapngworkeronly using .pcap time, not wall-clock time

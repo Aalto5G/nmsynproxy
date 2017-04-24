@@ -94,6 +94,7 @@ enum flag_state {
   FLAG_STATE_DOWNLINK_FIN_ACK = 128, // always with DOWNLINK_FIN|ESTABLSIHED
   FLAG_STATE_TIME_WAIT = 256, // may not have other bits
   FLAG_STATE_DOWNLINK_HALF_OPEN = 512, // may not have other bits
+  FLAG_STATE_RESETED = 1024, // may not have other bits
 };
 
 static inline int synproxy_is_connected(struct synproxy_hash_entry *e)

@@ -1110,7 +1110,9 @@ int downlink(
       tcp_set_ack_number_cksum_update(
         ippay, tcp_len, tcp_ack_number(ippay)-entry->seqoffset);
     }
-    synproxy_hash_del(local, entry);
+    entry->flag_state = FLAG_STATE_RESETED;
+    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+    timer_heap_modify(&local->timers, &entry->timer);
     port->portfunc(pkt, port->userdata);
     return 0;
   }
@@ -1123,9 +1125,9 @@ int downlink(
     resend_syn(ether, local, port, st, entry);
     return 1;
   }
-  if (!synproxy_is_connected(entry))
+  if (!synproxy_is_connected(entry) && entry->flag_state != FLAG_STATE_RESETED)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
+    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "not CONNECTED/RESETED, dropping");
     return 1;
   }
   if (!tcp_ack(ippay))
@@ -1179,7 +1181,7 @@ int downlink(
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number");
     return 1;
   }
-  if (unlikely(tcp_fin(ippay)))
+  if (unlikely(tcp_fin(ippay)) && entry->flag_state != FLAG_STATE_RESETED)
   {
     if (ip_more_frags(ip))
     {
@@ -1243,8 +1245,12 @@ int downlink(
       entry->wan_max = ack + (window << entry->wan_wscale);
     }
   }
-  if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
-      (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
+  if (entry->flag_state == FLAG_STATE_RESETED)
+  {
+    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+  }
+  else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+           (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
     entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
   }
@@ -1567,7 +1573,9 @@ int uplink(
                 seq, entry->lan_sent, entry->wan_acked);
         return 1;
       }
-      synproxy_hash_del(local, entry);
+      entry->flag_state = FLAG_STATE_RESETED;
+      entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+      timer_heap_modify(&local->timers, &entry->timer);
       port->portfunc(pkt, port->userdata);
       return 0;
     }
@@ -1640,7 +1648,9 @@ int uplink(
       tcp_set_ack_off_cksum_update(ippay);
       tcp_set_ack_number_cksum_update(
         ippay, tcp_len, 0);
-      synproxy_hash_del(local, entry);
+      entry->flag_state = FLAG_STATE_RESETED;
+      entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+      timer_heap_modify(&local->timers, &entry->timer);
       port->portfunc(pkt, port->userdata);
       return 0;
     }
@@ -1658,13 +1668,15 @@ int uplink(
     }
     tcp_set_seq_number_cksum_update(
       ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
-    synproxy_hash_del(local, entry);
+    entry->flag_state = FLAG_STATE_RESETED;
+    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+    timer_heap_modify(&local->timers, &entry->timer);
     port->portfunc(pkt, port->userdata);
     return 0;
   }
-  if (!synproxy_is_connected(entry))
+  if (!synproxy_is_connected(entry) && entry->flag_state != FLAG_STATE_RESETED)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED, dropping pkt");
+    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "not CONNECTED/RESETED, dropping");
     return 1;
   }
   if (!tcp_ack(ippay))
@@ -1728,7 +1740,7 @@ int uplink(
       entry->lan_max_window_unscaled = 1;
     }
   }
-  if (unlikely(tcp_fin(ippay)))
+  if (unlikely(tcp_fin(ippay)) && entry->flag_state != FLAG_STATE_RESETED)
   {
     if (ip_more_frags(ip))
     {
@@ -1784,8 +1796,12 @@ int uplink(
       entry->lan_max = ack + (window << entry->lan_wscale);
     }
   }
-  if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
-      (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
+  if (entry->flag_state == FLAG_STATE_RESETED)
+  {
+    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+  }
+  else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+           (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
     entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
   }
