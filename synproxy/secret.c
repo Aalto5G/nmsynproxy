@@ -56,10 +56,8 @@ int verify_cookie(
   uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted)
 {
   struct conf *conf = synproxy->conf;
-  int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits;
-  int current_secret = info->current_secret_index;
-  struct secret secret1 = info->secrets[current_secret];
-  struct secret secret2 = info->secrets[!current_secret];
+  int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits + 1;
+  struct secret secret1 = info->secrets[isn>>31];
   uint16_t additional_bits = (isn>>(32-total_bits))&((1<<total_bits)-1);
   uint32_t bitmask = ((1<<(32-total_bits))-1);
   uint32_t mssmask = ((1<<(conf->msslist_bits))-1);
@@ -69,27 +67,6 @@ int verify_cookie(
   uint16_t *msstab = &DYNARR_GET(&conf->msslist, 0);
   uint8_t *wstab = &DYNARR_GET(&conf->wscalelist, 0);
   siphash_init(&ctx, secret1.data);
-  siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
-  siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
-  hash = siphash_get(&ctx) & bitmask;
-  if (hash == (isn & bitmask))
-  {
-    if (wscale)
-    {
-      *wscale = wstab[additional_bits&wsmask];
-    }
-    if (mss)
-    {
-      *mss = msstab[(additional_bits>>(conf->wscalelist_bits))&mssmask];
-    }
-    if (sack_permitted)
-    {
-      *sack_permitted =
-        (additional_bits>>(conf->wscalelist_bits+conf->msslist_bits))&1;
-    }
-    return 1;
-  }
-  siphash_init(&ctx, secret2.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
@@ -120,7 +97,7 @@ uint32_t form_cookie(
   uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
 {
   struct conf *conf = synproxy->conf;
-  int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits;
+  int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits + 1;
   uint32_t wsbits;
   uint32_t mssbits;
   uint32_t additional_bits;
@@ -164,7 +141,7 @@ uint32_t form_cookie(
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
-  return (additional_bits<<(32-total_bits)) | hash;
+  return (current_secret<<31) | (additional_bits<<(32-total_bits)) | hash;
 }
 
 int verify_timestamp(
@@ -175,10 +152,8 @@ int verify_timestamp(
 {
   struct conf *conf = synproxy->conf;
   int total_bits =
-    conf->ts_bits + conf->tsmsslist_bits + conf->tswscalelist_bits;
-  int current_secret = info->current_secret_index;
-  struct secret secret1 = info->secrets[current_secret];
-  struct secret secret2 = info->secrets[!current_secret];
+    conf->ts_bits + conf->tsmsslist_bits + conf->tswscalelist_bits + 1;
+  struct secret secret1 = info->secrets[isn>>31];
   uint16_t additional_bits = (isn>>(32-total_bits))&((1<<total_bits)-1);
   uint32_t bitmask = ((1<<(32-total_bits))-1);
   uint32_t mssmask = ((1<<(conf->msslist_bits))-1);
@@ -188,22 +163,6 @@ int verify_timestamp(
   uint16_t *msstab = &DYNARR_GET(&conf->tsmsslist, 0);
   uint8_t *wstab = &DYNARR_GET(&conf->tswscalelist, 0);
   siphash_init(&ctx, secret1.data);
-  siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
-  siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
-  hash = siphash_get(&ctx) & bitmask;
-  if (hash == (isn & bitmask))
-  {
-    if (wscale)
-    {
-      *wscale = wstab[additional_bits&wsmask];
-    }
-    if (mss)
-    {
-      *mss = msstab[(additional_bits>>(conf->wscalelist_bits))&mssmask];
-    }
-    return 1;
-  }
-  siphash_init(&ctx, secret2.data);
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
@@ -230,7 +189,7 @@ uint32_t form_timestamp(
 {
   struct conf *conf = synproxy->conf;
   int total_bits =
-    conf->ts_bits + conf->tsmsslist_bits + conf->tswscalelist_bits;
+    conf->ts_bits + conf->tsmsslist_bits + conf->tswscalelist_bits + 1;
   uint32_t wsbits;
   uint32_t mssbits;
   uint32_t additional_bits;
@@ -274,5 +233,5 @@ uint32_t form_timestamp(
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
-  return (additional_bits<<(32-total_bits)) | hash;
+  return (current_secret<<31) | (additional_bits<<(32-total_bits)) | hash;
 }
