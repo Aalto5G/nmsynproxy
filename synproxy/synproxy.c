@@ -958,7 +958,18 @@ int downlink(
   {
     if (tcp_rst(ippay))
     {
-      // FIXME verify
+      /*
+       * Ok, here we could verify that the RST is valid and drop the half-open
+       * state. But it's extremely unlikely that someone opens a connection
+       * with SYN and then to the SYN+ACK responds with RST. Also, the timeout
+       * for downlink half-open connections is 64 seconds, and the timeout for
+       * connections in the RST state is 45 seconds. So, the additional benefit
+       * for moving the connection to RST state is minimal. Also, by maintaining
+       * the connection in DOWNLINK_HALF_OPEN state, we can use the linked list
+       * to remove old expired connections. In reseted connections, there is no
+       * such list. So, the short summary is that moving the connection to the
+       * RST state is not worth it.
+       */
     }
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
     {
