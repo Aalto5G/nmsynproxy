@@ -79,12 +79,12 @@ static void *rx_func(void *userdata)
   for (;;)
   {
     struct packet *pktstruct;
-    uint64_t time64 = gettime64();
+    uint64_t pcaptime;
     int result;
     enum packet_direction direction;
 
     result = pcapng_in_ctx_read(
-      &ctx, &buf, &bufcapacity, &len, &snap, NULL, &ifname);
+      &ctx, &buf, &bufcapacity, &len, &snap, &pcaptime, &ifname);
 
     if (result < 0)
     {
@@ -97,6 +97,13 @@ static void *rx_func(void *userdata)
       buf = NULL;
       bufcapacity = 0;
       break;
+    }
+    while (timer_linkheap_next_expiry_time(&args->local->timers) < pcaptime)
+    {
+      struct timer_link *timer = timer_linkheap_next_expiry_timer(&args->local->timers);
+      //printf("EXECUTING TIMER\n");
+      timer_linkheap_remove(&args->local->timers, timer);
+      timer->fn(timer, &args->local->timers, timer->userdata);
     }
     printf("pkt %zu\n", ++cnt);
     if (snap != len)
@@ -129,14 +136,14 @@ static void *rx_func(void *userdata)
     memcpy(packet_data(pktstruct), buf, snap);
     if (direction == PACKET_DIRECTION_UPLINK)
     {
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+      if (uplink(args->synproxy, args->local, pktstruct, &outport, pcaptime, &st))
       {
         ll_free_st(&st, pktstruct);
       }
     }
     else
     {
-      if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+      if (downlink(args->synproxy, args->local, pktstruct, &outport, pcaptime, &st))
       {
         ll_free_st(&st, pktstruct);
       }
@@ -150,12 +157,12 @@ static void *rx_func(void *userdata)
         if (pktstruct->direction == PACKET_DIRECTION_UPLINK)
         {
           pcapng_out_ctx_write(
-            &outctx, packet_data(pktstruct), pktstruct->sz, time64, "out");
+            &outctx, packet_data(pktstruct), pktstruct->sz, pcaptime, "out");
         }
         else
         {
           pcapng_out_ctx_write(
-            &outctx, packet_data(pktstruct), pktstruct->sz, time64, "in");
+            &outctx, packet_data(pktstruct), pktstruct->sz, pcaptime, "in");
         }
       }
       ll_free_st(&st, pktstruct);
@@ -193,7 +200,6 @@ int main(int argc, char **argv)
   }
 
   worker_local_init(&local, &synproxy, 1);
-  synproxy_hash_put_connected(&local, (10<<24)|2, 12345, (11<<24)|1, 54321);
 
   rx_args.synproxy = &synproxy;
   rx_args.local = &local;

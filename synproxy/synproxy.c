@@ -117,7 +117,8 @@ struct synproxy_hash_entry *synproxy_hash_put(
   uint16_t local_port,
   uint32_t remote_ip,
   uint16_t remote_port,
-  uint8_t was_synproxied)
+  uint8_t was_synproxied,
+  uint64_t time64)
 {
   struct synproxy_hash_entry *e;
   if (synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port))
@@ -135,7 +136,7 @@ struct synproxy_hash_entry *synproxy_hash_put(
   e->remote_ip = remote_ip;
   e->remote_port = remote_port;
   e->was_synproxied = was_synproxied;
-  e->timer.time64 = gettime64() + 86400ULL*1000ULL*1000ULL;
+  e->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
   e->timer.fn = synproxy_expiry_fn;
   e->timer.userdata = local;
   timer_linkheap_add(&local->timers, &e->timer);
@@ -159,7 +160,7 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
 
 static void send_synack(
   void *orig, struct worker_local *local, struct synproxy *synproxy,
-  struct port *port, struct ll_alloc_st *st)
+  struct port *port, struct ll_alloc_st *st, uint64_t time64)
 {
   char synack[14+20+20+12+12] = {0};
   void *ip, *origip;
@@ -360,7 +361,7 @@ static void send_synack(
     e->remote_ip = remote_ip;
     e->remote_port = remote_port;
     e->was_synproxied = 1;
-    e->timer.time64 = gettime64() + 64ULL*1000ULL*1000ULL;
+    e->timer.time64 = time64 + 64ULL*1000ULL*1000ULL;
     e->timer.fn = synproxy_expiry_fn;
     e->timer.userdata = local;
     if (timer_heap_add_nogrow(&local->timers, &e->timer) != 0)
@@ -485,7 +486,8 @@ static void send_or_resend_syn(
 static void resend_syn(
   void *orig, struct worker_local *local, struct port *port,
   struct ll_alloc_st *st,
-  struct synproxy_hash_entry *entry)
+  struct synproxy_hash_entry *entry,
+  uint64_t time64)
 {
   void *origip;
   void *origtcp;
@@ -518,7 +520,7 @@ static void resend_syn(
   {
     entry->wan_max_window_unscaled = tcp_window(origtcp);
   }
-  entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
+  entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
   timer_heap_modify(&local->timers, &entry->timer);
 
   send_or_resend_syn(orig, local, port, st, entry);
@@ -528,7 +530,8 @@ static void send_syn(
   void *orig, struct worker_local *local, struct port *port,
   struct ll_alloc_st *st,
   uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
-  struct synproxy_hash_entry *entry)
+  struct synproxy_hash_entry *entry,
+  uint64_t time64)
 {
   void *origip;
   void *origtcp;
@@ -543,7 +546,7 @@ static void send_syn(
     entry = synproxy_hash_put(
       local, ip_dst(origip), tcp_dst_port(origtcp),
       ip_src(origip), tcp_src_port(origtcp),
-      1);
+      1, time64);
     if (entry == NULL)
     {
       log_log(LOG_LEVEL_ERR, "WORKER", "not enough memory");
@@ -574,7 +577,7 @@ static void send_syn(
   entry->state_data.downlink_syn_sent.local_isn = tcp_ack_number(origtcp) - 1;
   entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
-  entry->timer.time64 = gettime64() + 120ULL*1000ULL*1000ULL;
+  entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
   timer_heap_modify(&local->timers, &entry->timer);
 
   send_or_resend_syn(orig, local, port, st, entry);
@@ -842,7 +845,7 @@ int downlink(
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP ratelimited");
         return 1;
       }
-      send_synack(ether, local, synproxy, port, st);
+      send_synack(ether, local, synproxy, port, st, time64);
       return 1;
     }
     else
@@ -1008,7 +1011,7 @@ int downlink(
         ether, local, port, st,
         entry->state_data.downlink_half_open.mss,
         entry->state_data.downlink_half_open.wscale,
-        entry->state_data.downlink_half_open.sack_permitted, entry);
+        entry->state_data.downlink_half_open.sack_permitted, entry, time64);
       return 1;
     }
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry is HALF_OPEN");
@@ -1068,7 +1071,7 @@ int downlink(
         ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
       log_log(
         LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN");
-      send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL);
+      send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL, time64);
       return 1;
     }
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found");
@@ -1133,7 +1136,7 @@ int downlink(
       && resend_request_is_valid(tcp_ack_number(ippay), entry->wan_acked))
   {
     log_log(LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "resending SYN");
-    resend_syn(ether, local, port, st, entry);
+    resend_syn(ether, local, port, st, entry, time64);
     return 1;
   }
   if (!synproxy_is_connected(entry) && entry->flag_state != FLAG_STATE_RESETED)
@@ -1437,7 +1440,7 @@ int uplink(
         return 1;
       }
       entry = synproxy_hash_put(
-        local, lan_ip, lan_port, remote_ip, remote_port, 0);
+        local, lan_ip, lan_port, remote_ip, remote_port, 0, time64);
       if (entry == NULL)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "out of memory");

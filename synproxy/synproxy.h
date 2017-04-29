@@ -205,17 +205,20 @@ struct synproxy_hash_entry *synproxy_hash_put(
   uint16_t local_port,
   uint32_t remote_ip,
   uint16_t remote_port,
-  uint8_t was_synproxied);
+  uint8_t was_synproxied,
+  uint64_t time64);
 
 static inline void synproxy_hash_put_connected(
   struct worker_local *local,
   uint32_t local_ip,
   uint16_t local_port,
   uint32_t remote_ip,
-  uint16_t remote_port)
+  uint16_t remote_port,
+  uint64_t time64)
 {
   struct synproxy_hash_entry *e;
-  e = synproxy_hash_put(local, local_ip, local_port, remote_ip, remote_port, 0);
+  e = synproxy_hash_put(
+    local, local_ip, local_port, remote_ip, remote_port, 0, time64);
   e->flag_state = FLAG_STATE_ESTABLISHED;
   e->lan_max = 32768;
   e->lan_sent = 0;
