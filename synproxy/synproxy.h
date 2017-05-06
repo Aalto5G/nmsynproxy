@@ -35,7 +35,8 @@ struct synproxy_hash_entry {
   uint8_t lan_wscale;
   uint8_t wan_wscale;
   uint8_t was_synproxied;
-  // 16-bit hole here! Place new <16-bit variables here.
+  uint8_t lan_sack_was_supported;
+  // 8-bit hole here! Place new 8-bit variable here.
   uint32_t seqoffset;
   uint32_t tsoffset;
   uint32_t lan_sent; // what LAN has sent plus 1

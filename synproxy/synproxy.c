@@ -1284,8 +1284,18 @@ int downlink(
       ippay, tcp_len, tcp_ack_number(ippay)-entry->seqoffset);
     if (hdrs.sackoff)
     {
-      tcp_adjust_sack_cksum_update_2(
-        ippay, &hdrs, -entry->seqoffset);
+      if (   !entry->lan_sack_was_supported
+          && synproxy->conf->sackconflict == SACKCONFLICT_REMOVE)
+      {
+        char *cippay = ippay;
+        tcp_disable_sack_cksum_update(
+          ippay, &cippay[hdrs.sackoff], hdrs.sacklen, !(hdrs.sackoff%2));
+      }
+      else
+      {
+        tcp_adjust_sack_cksum_update_2(
+          ippay, &hdrs, -entry->seqoffset);
+      }
     }
   }
   tcp_adjust_tsecho_cksum_update(ippay, &hdrs, -entry->tsoffset);
@@ -1452,11 +1462,13 @@ int uplink(
         tcpinfo.wscale = 0;
         tcpinfo.mssoff = 0;
         tcpinfo.mss = 1460;
+        tcpinfo.sack_permitted = 0;
       }
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
       entry->state_data.uplink_syn_sent.isn = tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_max_window_unscaled = tcp_window(ippay);
+      entry->lan_sack_was_supported = tcpinfo.sack_permitted;
       if (entry->lan_max_window_unscaled == 0)
       {
         entry->lan_max_window_unscaled = 1;
@@ -1546,6 +1558,7 @@ int uplink(
       entry->lan_acked = tcp_ack_number(ippay);
       entry->lan_max = tcp_ack_number(ippay) + (tcp_window(ippay) << entry->lan_wscale);
       entry->lan_max_window_unscaled = tcp_window(ippay);
+      entry->lan_sack_was_supported = tcpinfo.sack_permitted;
       if (entry->lan_max_window_unscaled == 0)
       {
         entry->lan_max_window_unscaled = 1;
