@@ -13,6 +13,8 @@
 #define QUEUE_SIZE 512
 #define BLOCK_SIZE 1800
 
+#define NUM_THR 2
+
 static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
 {
   int i, j;
@@ -36,9 +38,15 @@ static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
   }
 }
 
-int main(int argc, char **argv)
+struct thr_arg {
+  int idx;
+};
+
+struct nm_desc *nmds[NUM_THR];
+
+static void *thr(void *arg)
 {
-  struct nm_desc *nmd;
+  struct thr_arg *args = arg;
   char pkt[1514] = {0};
   char pktsmall[64] = {0};
   void *ether;
@@ -46,7 +54,6 @@ int main(int argc, char **argv)
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
   void *ip;
   void *tcp;
-  struct nmreq nmr;
 
   ether = pkt;
   memcpy(ether_dst(ether), lan_mac, 6);
@@ -60,8 +67,8 @@ int main(int argc, char **argv)
   ip_set_id(ip, 123);
   ip_set_ttl(ip, 64);
   ip_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|2);
-  ip_set_dst(ip, (11<<24)|1);
+  ip_set_src(ip, (10<<24)|(2*args->idx+2));
+  ip_set_dst(ip, (11<<24)|(2*args->idx+1));
   ip_set_hdr_cksum_calc(ip, 20);
   tcp = ip_payload(ip);
   tcp_set_src_port(tcp, 12345);
@@ -81,14 +88,32 @@ int main(int argc, char **argv)
   ip_set_id(ip, 123);
   ip_set_ttl(ip, 64);
   ip_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|2);
-  ip_set_dst(ip, (11<<24)|1);
+  ip_set_src(ip, (10<<24)|(2*args->idx+2));
+  ip_set_dst(ip, (11<<24)|(2*args->idx+1));
   ip_set_hdr_cksum_calc(ip, 20);
   tcp = ip_payload(ip);
   tcp_set_src_port(tcp, 12345);
   tcp_set_dst_port(tcp, 54321);
   tcp_set_ack_on(tcp);
   tcp_set_cksum_calc(ip, 20, tcp, sizeof(pktsmall) - 14 - 20);
+
+  for (;;)
+  {
+    nm_my_inject(nmds[args->idx], pkt, sizeof(pkt));
+    nm_my_inject(nmds[args->idx], pkt, sizeof(pkt));
+    nm_my_inject(nmds[args->idx], pktsmall, sizeof(pktsmall));
+  }
+
+  return NULL;
+}
+
+int main(int argc, char **argv)
+{
+  struct thr_arg args[NUM_THR];
+  pthread_t thrs[NUM_THR];
+  struct nmreq nmr;
+  int i;
+  char nmifnamebuf[64];
 
   setlinebuf(stdout);
 
@@ -97,20 +122,31 @@ int main(int argc, char **argv)
     printf("usage: netmapsend vale0:0\n");
     exit(1);
   }
-  memset(&nmr, 0, sizeof(nmr));
-  nmr.nr_tx_slots = 64;
-  nmd = nm_open(argv[1], &nmr, 0, NULL);
-  if (nmd == NULL)
+  for (i = 0; i < NUM_THR; i++)
   {
-    printf("cannot open %s\n", argv[1]);
-    exit(1);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[1], i);
+    memset(&nmr, 0, sizeof(nmr));
+    nmr.nr_tx_slots = 64;
+    nmr.nr_tx_rings = NUM_THR;
+    nmr.nr_rx_rings = NUM_THR;
+    nmr.nr_flags = NR_REG_ONE_NIC;
+    nmds[i] = nm_open(nmifnamebuf, &nmr, 0, NULL);
+    if (nmds[i] == NULL)
+    {
+      printf("cannot open %s\n", argv[1]);
+      exit(1);
+    }
   }
 
-  for (;;)
+  for (i = 0; i < NUM_THR; i++)
   {
-    nm_my_inject(nmd, pkt, sizeof(pkt));
-    nm_my_inject(nmd, pkt, sizeof(pkt));
-    nm_my_inject(nmd, pktsmall, sizeof(pktsmall));
+    args[i].idx = i;
+    pthread_create(&thrs[i], NULL, thr, &args[i]);
+  }
+
+  for (i = 0; i < NUM_THR; i++)
+  {
+    pthread_join(thrs[i], NULL);
   }
 
   return 0;
