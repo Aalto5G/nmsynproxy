@@ -44,64 +44,76 @@ struct thr_arg {
 
 struct nm_desc *nmds[NUM_THR];
 
+struct pktctx {
+  char pkt[1514];
+  char pktsmall[64];
+};
+
 static void *thr(void *arg)
 {
   struct thr_arg *args = arg;
-  char pkt[1514] = {0};
-  char pktsmall[64] = {0};
+  struct pktctx ctx[90];
   void *ether;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
   void *ip;
   void *tcp;
+  int i;
+  int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
 
-  ether = pkt;
-  memcpy(ether_dst(ether), lan_mac, 6);
-  memcpy(ether_src(ether), cli_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
-  ip = ether_payload(ether);
-  ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|(2*args->idx+2));
-  ip_set_dst(ip, (11<<24)|(2*args->idx+1));
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
-  tcp_set_src_port(tcp, 12345);
-  tcp_set_dst_port(tcp, 54321);
-  tcp_set_ack_on(tcp);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
-
-  ether = pktsmall;
-  memcpy(ether_dst(ether), lan_mac, 6);
-  memcpy(ether_src(ether), cli_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
-  ip = ether_payload(ether);
-  ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pktsmall) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|(2*args->idx+2));
-  ip_set_dst(ip, (11<<24)|(2*args->idx+1));
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
-  tcp_set_src_port(tcp, 12345);
-  tcp_set_dst_port(tcp, 54321);
-  tcp_set_ack_on(tcp);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pktsmall) - 14 - 20);
+  for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+  {
+    ether = ctx[i].pkt;
+    memcpy(ether_dst(ether), lan_mac, 6);
+    memcpy(ether_src(ether), cli_mac, 6);
+    ether_set_type(ether, ETHER_TYPE_IP);
+    ip = ether_payload(ether);
+    ip_set_version(ip, 4);
+    ip_set_hdr_len(ip, 20);
+    ip_set_total_len(ip, sizeof(ctx[i].pkt) - 14);
+    ip_set_dont_frag(ip, 1);
+    ip_set_id(ip, 123);
+    ip_set_ttl(ip, 64);
+    ip_set_proto(ip, 6);
+    ip_set_src(ip, (10<<24)|(2*(i+cnt*args->idx)+2));
+    ip_set_dst(ip, (11<<24)|(2*(i+cnt*args->idx)+1));
+    ip_set_hdr_cksum_calc(ip, 20);
+    tcp = ip_payload(ip);
+    tcp_set_src_port(tcp, 12345);
+    tcp_set_dst_port(tcp, 54321);
+    tcp_set_ack_on(tcp);
+    tcp_set_cksum_calc(ip, 20, tcp, sizeof(ctx[i].pkt) - 14 - 20);
+  
+    ether = ctx[i].pktsmall;
+    memcpy(ether_dst(ether), lan_mac, 6);
+    memcpy(ether_src(ether), cli_mac, 6);
+    ether_set_type(ether, ETHER_TYPE_IP);
+    ip = ether_payload(ether);
+    ip_set_version(ip, 4);
+    ip_set_hdr_len(ip, 20);
+    ip_set_total_len(ip, sizeof(ctx[i].pktsmall) - 14);
+    ip_set_dont_frag(ip, 1);
+    ip_set_id(ip, 123);
+    ip_set_ttl(ip, 64);
+    ip_set_proto(ip, 6);
+    ip_set_src(ip, (10<<24)|(2*(i+cnt*args->idx)+2));
+    ip_set_dst(ip, (11<<24)|(2*(i+cnt*args->idx)+1));
+    ip_set_hdr_cksum_calc(ip, 20);
+    tcp = ip_payload(ip);
+    tcp_set_src_port(tcp, 12345);
+    tcp_set_dst_port(tcp, 54321);
+    tcp_set_ack_on(tcp);
+    tcp_set_cksum_calc(ip, 20, tcp, sizeof(ctx[i].pktsmall) - 14 - 20);
+  }
 
   for (;;)
   {
-    nm_my_inject(nmds[args->idx], pkt, sizeof(pkt));
-    nm_my_inject(nmds[args->idx], pkt, sizeof(pkt));
-    nm_my_inject(nmds[args->idx], pktsmall, sizeof(pktsmall));
+    for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+    {
+      nm_my_inject(nmds[args->idx], ctx[i].pkt, sizeof(ctx[i].pkt));
+      nm_my_inject(nmds[args->idx], ctx[i].pkt, sizeof(ctx[i].pkt));
+      nm_my_inject(nmds[args->idx], ctx[i].pktsmall, sizeof(ctx[i].pktsmall));
+    }
   }
 
   return NULL;
