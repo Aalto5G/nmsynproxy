@@ -210,7 +210,7 @@ static inline void worker_local_init(
   local->synproxied_connections = 0;
   local->direct_connections = 0;
   local->half_open_connections = 0;
-  ip_hash_init(&local->ratelimit, &local->timers);
+  ip_hash_init(&local->ratelimit, &local->timers, locked ? &local->rwlock : NULL);
   linked_list_head_init(&local->half_open_list);
 }
 
