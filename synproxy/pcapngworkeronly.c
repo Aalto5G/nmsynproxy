@@ -199,7 +199,7 @@ int main(int argc, char **argv)
     exit(1);
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   rx_args.synproxy = &synproxy;
   rx_args.local = &local;

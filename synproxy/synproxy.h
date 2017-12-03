@@ -122,6 +122,8 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata);
 
 struct worker_local {
   struct hash_table hash;
+  int locked;
+  pthread_mutex_t mutex; // Lock order: first hash locks, then mutex
   struct timer_linkheap timers;
   struct secretinfo info;
   struct ip_hash ratelimit;
@@ -131,11 +133,44 @@ struct worker_local {
   struct linked_list_head half_open_list;
 };
 
-static inline void worker_local_init(
-  struct worker_local *local, struct synproxy *synproxy, int deterministic)
+static inline void worker_local_lock(struct worker_local *local)
 {
-  hash_table_init(
-    &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL);
+  if (!local->locked)
+  {
+    return;
+  }
+  pthread_mutex_lock(&local->mutex);
+}
+
+static inline void worker_local_unlock(struct worker_local *local)
+{
+  if (!local->locked)
+  {
+    return;
+  }
+  pthread_mutex_unlock(&local->mutex);
+}
+
+static inline void worker_local_init(
+  struct worker_local *local, struct synproxy *synproxy, int deterministic,
+  int locked)
+{
+  if (locked)
+  {
+    hash_table_init_locked(
+      &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL);
+    local->locked = 1;
+    if (pthread_mutex_init(&local->mutex, NULL) != 0)
+    {
+      abort();
+    }
+  }
+  else
+  {
+    hash_table_init(
+      &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL);
+    local->locked = 0;
+  }
   timer_linkheap_init(&local->timers);
   if (deterministic)
   {
@@ -178,14 +213,34 @@ static inline void worker_local_free(struct worker_local *local)
   timer_linkheap_free(&local->timers);
 }
 
+struct synproxy_hash_ctx {
+  int locked;
+  uint32_t hashval;
+  struct synproxy_hash_entry *entry;
+};
+
+static inline void synproxy_hash_unlock(
+  struct worker_local *local, struct synproxy_hash_ctx *ctx)
+{
+  if (ctx->locked)
+  {
+    hash_table_unlock_bucket(&local->hash, ctx->hashval);
+    ctx->locked = 0;
+  }
+}
+
 static inline struct synproxy_hash_entry *synproxy_hash_get(
   struct worker_local *local,
-  uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port)
+  uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
 {
-  uint32_t hashval;
   struct hash_list_node *node;
-  hashval = synproxy_hash_separate(local_ip, local_port, remote_ip, remote_port);
-  HASH_TABLE_FOR_EACH_POSSIBLE(&local->hash, node, hashval)
+  ctx->hashval = synproxy_hash_separate(local_ip, local_port, remote_ip, remote_port);
+  if (!ctx->locked)
+  {
+    hash_table_lock_bucket(&local->hash, ctx->hashval);
+    ctx->locked = 1;
+  }
+  HASH_TABLE_FOR_EACH_POSSIBLE(&local->hash, node, ctx->hashval)
   {
     struct synproxy_hash_entry *entry;
     entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
@@ -194,6 +249,7 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
         && entry->remote_ip == remote_ip
         && entry->remote_port == remote_port)
     {
+      ctx->entry = entry;
       return entry;
     }
   }

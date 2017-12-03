@@ -503,6 +503,10 @@ static void downlink_impl(
   }
 }
 
+struct synproxy_hash_ctx hashctx = {
+  .locked = 1
+};
+
 static void synproxy_closed_port_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
@@ -633,7 +637,7 @@ static void synproxy_closed_port_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
     if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
@@ -745,7 +749,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -873,7 +877,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "entry not found");
@@ -914,7 +918,7 @@ static void closed_port(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -985,7 +989,7 @@ static void closed_port(void)
     exit(1);
   }
 
-  e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1060,7 +1064,7 @@ static void closed_port(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1169,7 +1173,7 @@ static void three_way_handshake_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1453,7 +1457,7 @@ static void synproxy_handshake_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
     if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
@@ -1565,7 +1569,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1777,7 +1781,7 @@ static void four_way_fin_seq_impl(
 
   time64 = gettime64();
 
-  e = synproxy_hash_get(local, ip1, port1, ip2, port2);
+  e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2102,7 +2106,7 @@ static void three_way_handshake_four_way_fin(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
@@ -2142,7 +2146,7 @@ static void established_rst_uplink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2154,7 +2158,7 @@ static void established_rst_uplink(void)
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321, 1, 1);
 
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2222,7 +2226,7 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2267,7 +2271,7 @@ static void established_rst_downlink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2279,7 +2283,7 @@ static void established_rst_downlink(void)
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321, 1, 1);
 
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2347,7 +2351,7 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2393,7 +2397,7 @@ static void syn_proxy_rst_uplink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2406,7 +2410,7 @@ static void syn_proxy_rst_uplink(void)
     &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321,
     &isn, 1, 1, 1);
 
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2476,7 +2480,7 @@ static void syn_proxy_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2522,7 +2526,7 @@ static void syn_proxy_rst_downlink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -2535,7 +2539,7 @@ static void syn_proxy_rst_downlink(void)
     &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321,
     &isn, 1, 1, 1);
 
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2603,7 +2607,7 @@ static void syn_proxy_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321);
+  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2636,7 +2640,7 @@ static void three_way_handshake_ulretransmit(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 2, 1);
@@ -2664,7 +2668,7 @@ static void three_way_handshake_dlretransmit(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 2);
@@ -2692,7 +2696,7 @@ static void three_way_handshake_findlretransmit(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 1);
@@ -2720,7 +2724,7 @@ static void three_way_handshake_finulretransmit(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 1, 1);
@@ -2751,7 +2755,7 @@ static void syn_proxy_handshake(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2786,7 +2790,7 @@ static void syn_proxy_uplink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2829,7 +2833,7 @@ static void syn_proxy_downlink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2873,7 +2877,7 @@ static void syn_proxy_uplink_downlink(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2917,7 +2921,7 @@ static void syn_proxy_closed_port(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_closed_port_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2947,7 +2951,7 @@ static void syn_proxy_handshake_2_1_1(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -2981,7 +2985,7 @@ static void syn_proxy_handshake_1_2_1(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
@@ -3015,7 +3019,7 @@ static void syn_proxy_handshake_1_1_2(void)
     abort();
   }
 
-  worker_local_init(&local, &synproxy, 1);
+  worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
