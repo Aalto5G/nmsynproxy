@@ -123,7 +123,7 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata);
 struct worker_local {
   struct hash_table hash;
   int locked;
-  pthread_mutex_t mutex; // Lock order: first hash locks, then mutex
+  pthread_rwlock_t rwlock; // Lock order: first hash bucket lock, then mutex, then global hash lock
   struct timer_linkheap timers;
   struct secretinfo info;
   struct ip_hash ratelimit;
@@ -133,22 +133,40 @@ struct worker_local {
   struct linked_list_head half_open_list;
 };
 
-static inline void worker_local_lock(struct worker_local *local)
+static inline void worker_local_rdlock(struct worker_local *local)
 {
   if (!local->locked)
   {
     return;
   }
-  pthread_mutex_lock(&local->mutex);
+  pthread_rwlock_rdlock(&local->rwlock);
 }
 
-static inline void worker_local_unlock(struct worker_local *local)
+static inline void worker_local_rdunlock(struct worker_local *local)
 {
   if (!local->locked)
   {
     return;
   }
-  pthread_mutex_unlock(&local->mutex);
+  pthread_rwlock_unlock(&local->rwlock);
+}
+
+static inline void worker_local_wrlock(struct worker_local *local)
+{
+  if (!local->locked)
+  {
+    return;
+  }
+  pthread_rwlock_wrlock(&local->rwlock);
+}
+
+static inline void worker_local_wrunlock(struct worker_local *local)
+{
+  if (!local->locked)
+  {
+    return;
+  }
+  pthread_rwlock_unlock(&local->rwlock);
 }
 
 static inline void worker_local_init(
@@ -160,7 +178,7 @@ static inline void worker_local_init(
     hash_table_init_locked(
       &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL);
     local->locked = 1;
-    if (pthread_mutex_init(&local->mutex, NULL) != 0)
+    if (pthread_rwlock_init(&local->rwlock, NULL) != 0)
     {
       abort();
     }
@@ -206,7 +224,9 @@ static inline void worker_local_free(struct worker_local *local)
     struct synproxy_hash_entry *e;
     e = CONTAINER_OF(n, struct synproxy_hash_entry, node);
     hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
+#if 0
     timer_heap_remove(&local->timers, &e->timer);
+#endif
     free(e);
   }
   hash_table_free(&local->hash);
@@ -304,7 +324,9 @@ static inline void synproxy_hash_del(
   struct synproxy_hash_entry *e)
 {
   hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
+#if 0
   timer_heap_remove(&local->timers, &e->timer);
+#endif
   if (e->was_synproxied)
   {
     local->synproxied_connections--;
