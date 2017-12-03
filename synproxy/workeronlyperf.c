@@ -83,6 +83,9 @@ struct pktctx {
 
 int uniformcnt = 128;
 
+struct uniform_userdata uniform_userdata[128] = {};
+struct timer_link uniformtimer[128] = {};
+
 static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
@@ -101,8 +104,6 @@ static void *rx_func(void *userdata)
   uint64_t count = 0;
   int i;
   int cnt = sizeof(ctx)/sizeof(*ctx);
-  struct uniform_userdata uniform_userdata[128] = {};
-  struct timer_link uniformtimer[128] = {};
 
   gettimeofday(&tv1, NULL);
 
