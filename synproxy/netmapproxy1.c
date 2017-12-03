@@ -165,7 +165,6 @@ static void *rx_func(void *userdata)
     for (i = 0; i < 1000; i++)
     {
       struct packet *pktstruct;
-      struct siphash_ctx ctx1;
       struct nm_pkthdr hdr;
       unsigned char *pkt;
       pkt = nm_nextpkt(dlnmds[args->idx], &hdr);
@@ -173,8 +172,6 @@ static void *rx_func(void *userdata)
       {
         break;
       }
-
-      siphash_init(&ctx1, hash_seed_get());
 
       pktstruct = ll_alloc_st(&st, packet_size(hdr.len));
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -207,7 +204,6 @@ static void *rx_func(void *userdata)
     for (i = 0; i < 1000; i++)
     {
       struct packet *pktstruct;
-      struct siphash_ctx ctx1;
       struct nm_pkthdr hdr;
       unsigned char *pkt;
       pkt = nm_nextpkt(ulnmds[args->idx], &hdr);
@@ -215,8 +211,6 @@ static void *rx_func(void *userdata)
       {
         break;
       }
-
-      siphash_init(&ctx1, hash_seed_get());
 
       pktstruct = ll_alloc_st(&st, packet_size(hdr.len));
       pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
