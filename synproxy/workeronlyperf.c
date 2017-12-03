@@ -205,7 +205,7 @@ int main(int argc, char **argv)
   worker_local_init(&local, &synproxy, 0, 1);
   //synproxy_hash_put_connected(
   //  &local, (10<<24)|2, 12345, (11<<24)|1, 54321, gettime64());
-  for (j = 0; j < 90*2; j++)
+  for (j = 0; j < 90*threadcnt; j++)
   {
     synproxy_hash_put_connected(
       &local, (10<<24)|(2*j+2), 12345, (11<<24)|(2*j+1), 54321,
