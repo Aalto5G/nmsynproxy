@@ -14,6 +14,39 @@ static inline uint64_t gettime64(void)
   return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
 }
 
+struct uniform_userdata {
+  struct worker_local *local;
+  uint32_t table_start;
+  uint32_t table_end;
+};
+
+static void uniform_fn(
+  struct timer_link *timer, struct timer_linkheap *heap, void *userdata)
+{
+  struct uniform_userdata *ud = userdata;
+  uint64_t time64 = gettime64();
+  uint32_t bucket;
+  for (bucket = ud->table_start; bucket < ud->table_end; bucket++)
+  {
+    struct hash_list_node *node;
+    hash_table_lock_bucket(&ud->local->hash, bucket);
+    HASH_TABLE_FOR_EACH_POSSIBLE(&ud->local->hash, node, bucket)
+    {
+      struct synproxy_hash_entry *entry;
+      entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
+      if (entry->timer.time64 < time64)
+      {
+        entry->timer.fn(timer, heap, entry->timer.userdata);
+      }
+    }
+    hash_table_unlock_bucket(&ud->local->hash, bucket);
+  }
+  timer->time64 += (1000*1000);
+  worker_local_wrlock(ud->local);
+  timer_linkheap_add(heap, timer);
+  worker_local_wrunlock(ud->local);
+}
+
 int threadcnt = 1;
 
 #define POOL_SIZE 300
@@ -48,6 +81,8 @@ struct pktctx {
   char pktsmall[64];
 };
 
+int uniformcnt = 128;
+
 static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
@@ -66,6 +101,8 @@ static void *rx_func(void *userdata)
   uint64_t count = 0;
   int i;
   int cnt = sizeof(ctx)/sizeof(*ctx);
+  struct uniform_userdata uniform_userdata[128] = {};
+  struct timer_link uniformtimer[128] = {};
 
   gettimeofday(&tv1, NULL);
 
@@ -80,6 +117,23 @@ static void *rx_func(void *userdata)
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
   {
     abort();
+  }
+
+  if (threadidx == 0)
+  {
+    uint64_t time64 = gettime64();
+    for (i = 0; i < uniformcnt; i++)
+    {
+      uniform_userdata[i].local = args->local;
+      uniform_userdata[i].table_start =
+        args->local->hash.bucketcnt*i/uniformcnt;
+      uniform_userdata[i].table_end =
+        args->local->hash.bucketcnt*(i+1)/uniformcnt;
+      uniformtimer[i].userdata = &uniform_userdata[i];
+      uniformtimer[i].fn = uniform_fn;
+      uniformtimer[i].time64 = time64 + (i+1)*1000*1000/uniformcnt;
+      timer_linkheap_add(&args->local->timers, &uniformtimer[i]);
+    }
   }
   
   for (i = 0; i < cnt; i++)
@@ -129,12 +183,34 @@ static void *rx_func(void *userdata)
 
   for (;;)
   {
+    uint64_t expiry;
+    uint64_t time64;
+    int try;
     worker_local_rdlock(args->local);
+    expiry = timer_linkheap_next_expiry_time(&args->local->timers);
     worker_local_rdunlock(args->local);
+    (void)expiry;
+    time64 = gettime64();
+    worker_local_rdlock(args->local);
+    try = (timer_linkheap_next_expiry_time(&args->local->timers) < time64);
+    worker_local_rdunlock(args->local);
+    if (try)
+    {
+      worker_local_wrlock(args->local);
+      while (timer_linkheap_next_expiry_time(&args->local->timers) < time64)
+      {
+        struct timer_link *timer = timer_linkheap_next_expiry_timer(&args->local->timers);
+        timer_linkheap_remove(&args->local->timers, timer);
+        worker_local_wrunlock(args->local);
+        timer->fn(timer, &args->local->timers, timer->userdata);
+        worker_local_wrlock(args->local);
+      }
+      worker_local_wrunlock(args->local);
+    }
     for (i = 0; i < cnt; i++)
     {
       struct packet *pktstruct;
-      uint64_t time64 = gettime64();
+      time64 = gettime64();
   
       pktstruct = ll_alloc_st(&st, packet_size(sizeof(ctx[i].pkt)));
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
