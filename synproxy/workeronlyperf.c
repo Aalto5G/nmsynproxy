@@ -129,6 +129,8 @@ static void *rx_func(void *userdata)
 
   for (;;)
   {
+    worker_local_rdlock(args->local);
+    worker_local_rdunlock(args->local);
     for (i = 0; i < cnt; i++)
     {
       struct packet *pktstruct;
