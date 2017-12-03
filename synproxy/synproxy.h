@@ -170,7 +170,7 @@ static inline void worker_local_free(struct worker_local *local)
   {
     struct synproxy_hash_entry *e;
     e = CONTAINER_OF(n, struct synproxy_hash_entry, node);
-    hash_table_delete(&local->hash, &e->node);
+    hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
     timer_heap_remove(&local->timers, &e->timer);
     free(e);
   }
@@ -247,7 +247,7 @@ static inline void synproxy_hash_del(
   struct worker_local *local,
   struct synproxy_hash_entry *e)
 {
-  hash_table_delete(&local->hash, &e->node);
+  hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
   timer_heap_remove(&local->timers, &e->timer);
   if (e->was_synproxied)
   {

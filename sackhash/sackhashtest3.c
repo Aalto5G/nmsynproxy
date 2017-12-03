@@ -90,9 +90,11 @@ static void sack_ip_port_hash_free(struct sack_ip_port_hash *hash)
   {
     struct linked_list_node *llnode = hash->list.node.next;
     struct sack_ip_port_hash_entry *old;
+    uint32_t hashval2;
     old = CONTAINER_OF(llnode, struct sack_ip_port_hash_entry, llnode);
+    hashval2 = sack_ipport_hash_value(old->ipport);
     linked_list_delete(llnode);
-    hash_table_delete(&hash->hash, &old->node);
+    hash_table_delete(&hash->hash, &old->node, hashval2);
     free(old);
   }
   for (i = 0; i < READ_MTX_CNT; i++)
@@ -124,7 +126,7 @@ static __attribute__((noinline)) int sack_ip_port_hash_del(
       {
         abort();
       }
-      hash_table_delete(&hash->hash, node);
+      hash_table_delete(&hash->hash, node, hashval);
       if (pthread_mutex_unlock(&hash->read_mtx[hashval%READ_MTX_CNT]) != 0)
       {
         abort();
@@ -184,7 +186,7 @@ static __attribute__((noinline)) int sack_ip_port_hash_add(
       {
         abort();
       }
-      hash_table_delete(&hash->hash, &old->node);
+      hash_table_delete(&hash->hash, &old->node, hashval2);
       if (pthread_mutex_unlock(&hash->read_mtx[hashval2%READ_MTX_CNT]) != 0)
       {
         abort();
@@ -256,7 +258,7 @@ int main(int argc, char **argv)
     uint32_t ip = randval&0xFFF;
     uint16_t port = 128 | ((randval>>16)&0xF);
     int oper = (randval>>24)%2;
-    if (oper)
+    if (oper || !oper)
     {
       if (sack_ip_port_hash_add(&hash, ip, port) != 0)
       {

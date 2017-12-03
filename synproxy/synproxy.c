@@ -58,7 +58,7 @@ static void synproxy_expiry_fn(
   struct worker_local *local = ud;
   struct synproxy_hash_entry *e;
   e = CONTAINER_OF(timer, struct synproxy_hash_entry, timer);
-  hash_table_delete(&local->hash, &e->node);
+  hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
   if (e->was_synproxied)
   {
     local->synproxied_connections--;
@@ -342,7 +342,7 @@ static void send_synack(
             state_data.downlink_half_open.listnode);
       linked_list_delete(&e->state_data.downlink_half_open.listnode);
       timer_heap_remove(&local->timers, &e->timer);
-      hash_table_delete(&local->hash, &e->node);
+      hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
     }
     else
     {

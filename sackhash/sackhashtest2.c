@@ -78,9 +78,11 @@ static void sack_ip_hash_free(struct sack_ip_hash *hash)
   {
     struct linked_list_node *llnode = hash->list.node.next;
     struct sack_ip_hash_entry *old;
+    uint32_t hashval2;
     old = CONTAINER_OF(llnode, struct sack_ip_hash_entry, llnode);
+    hashval2 = sack_ip_hash_value(old->ip);
     linked_list_delete(llnode);
-    hash_table_delete(&hash->hash, &old->node);
+    hash_table_delete(&hash->hash, &old->node, hashval2);
     free(old);
   }
   for (i = 0; i < READ_MTX_CNT; i++)
@@ -110,7 +112,7 @@ static int sack_ip_hash_del(struct sack_ip_hash *hash, uint32_t ip)
       {
         abort();
       }
-      hash_table_delete(&hash->hash, node);
+      hash_table_delete(&hash->hash, node, hashval);
       if (pthread_mutex_unlock(&hash->read_mtx[hashval%READ_MTX_CNT]) != 0)
       {
         abort();
@@ -168,7 +170,7 @@ static int sack_ip_hash_add(struct sack_ip_hash *hash, uint32_t ip)
       {
         abort();
       }
-      hash_table_delete(&hash->hash, &old->node);
+      hash_table_delete(&hash->hash, &old->node, hashval2);
       if (pthread_mutex_unlock(&hash->read_mtx[hashval2%READ_MTX_CNT]) != 0)
       {
         abort();

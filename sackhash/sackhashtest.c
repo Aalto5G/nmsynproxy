@@ -51,9 +51,11 @@ static void sack_ip_hash_free(struct sack_ip_hash *hash)
   {
     struct linked_list_node *llnode = hash->list.node.next;
     struct sack_ip_hash_entry *old;
+    uint32_t hashval2;
     old = CONTAINER_OF(llnode, struct sack_ip_hash_entry, llnode);
+    hashval2 = sack_ip_hash_value(old->ip);
     linked_list_delete(llnode);
-    hash_table_delete(&hash->hash, &old->node);
+    hash_table_delete(&hash->hash, &old->node, hashval2);
     free(old);
   }
   pthread_mutex_destroy(&hash->mtx);
@@ -75,7 +77,7 @@ static int sack_ip_hash_del(struct sack_ip_hash *hash, uint32_t ip)
     e = CONTAINER_OF(node, struct sack_ip_hash_entry, node);
     if (e->ip == ip)
     {
-      hash_table_delete(&hash->hash, node);
+      hash_table_delete(&hash->hash, node, hashval);
       linked_list_delete(&e->llnode);
       free(e);
       status = 1;
@@ -121,9 +123,11 @@ static int sack_ip_hash_add(struct sack_ip_hash *hash, uint32_t ip)
     {
       struct linked_list_node *llnode = hash->list.node.next;
       struct sack_ip_hash_entry *old;
+      uint32_t hashval2;
       old = CONTAINER_OF(llnode, struct sack_ip_hash_entry, llnode);
+      hashval2 = sack_ip_hash_value(old->ip);
       linked_list_delete(llnode);
-      hash_table_delete(&hash->hash, &old->node);
+      hash_table_delete(&hash->hash, &old->node, hashval2);
       free(old);
     }
     linked_list_add_tail(&e->llnode, &hash->list);
