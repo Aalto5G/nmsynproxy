@@ -155,13 +155,40 @@ static void *rx_func(void *userdata)
   for (;;)
   {
     uint64_t time64;
+    uint64_t expiry;
+    int try;
     struct pollfd pfds[2];
+
     pfds[0].fd = dlnmds[args->idx]->fd;
     pfds[0].events = POLLIN;
     pfds[1].fd = ulnmds[args->idx]->fd;
     pfds[1].events = POLLIN;
-    poll(pfds, 2, -1);
+
+    worker_local_rdlock(args->local);
+    expiry = timer_linkheap_next_expiry_time(&args->local->timers);
     time64 = gettime64();
+    worker_local_rdunlock(args->local);
+
+    poll(pfds, 2, expiry > time64 ? (expiry - time64)/1000 : 0);
+
+    time64 = gettime64();
+    worker_local_rdlock(args->local);
+    try = (timer_linkheap_next_expiry_time(&args->local->timers) < time64);
+    worker_local_rdunlock(args->local);
+
+    if (try)
+    {
+      worker_local_wrlock(args->local);
+      while (timer_linkheap_next_expiry_time(&args->local->timers) < time64)
+      {
+        struct timer_link *timer = timer_linkheap_next_expiry_timer(&args->local->timers);
+        timer_linkheap_remove(&args->local->timers, timer);
+        worker_local_wrunlock(args->local);
+        timer->fn(timer, &args->local->timers, timer->userdata);
+        worker_local_wrlock(args->local);
+      }
+      worker_local_wrunlock(args->local);
+    }
     for (i = 0; i < 1000; i++)
     {
       struct packet *pktstruct;
