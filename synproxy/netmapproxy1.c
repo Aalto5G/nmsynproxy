@@ -387,7 +387,7 @@ int main(int argc, char **argv)
 
   {
     int j;
-    worker_local_init(&local, &synproxy, 0, 0);
+    worker_local_init(&local, &synproxy, 0, 1);
     for (j = 0; j < 90*6; j++)
     {
       synproxy_hash_put_connected(
