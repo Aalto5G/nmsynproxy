@@ -34,10 +34,10 @@ static void uniform_fn(
   struct uniform_userdata *ud = userdata;
   uint64_t time64 = gettime64();
   uint32_t bucket;
+  hash_table_lock_bucket(&ud->local->hash, ud->table_start);
   for (bucket = ud->table_start; bucket < ud->table_end; bucket++)
   {
     struct hash_list_node *node;
-    hash_table_lock_bucket(&ud->local->hash, bucket);
     HASH_TABLE_FOR_EACH_POSSIBLE(&ud->local->hash, node, bucket)
     {
       struct synproxy_hash_entry *entry;
@@ -47,17 +47,21 @@ static void uniform_fn(
         entry->timer.fn(timer, heap, entry->timer.userdata);
       }
     }
-    hash_table_unlock_bucket(&ud->local->hash, bucket);
+    if (bucket + 1 < ud->table_end)
+    {
+      hash_table_lock_next_bucket(&ud->local->hash, bucket);
+    }
   }
+  hash_table_unlock_bucket(&ud->local->hash, ud->table_end - 1);
   timer->time64 += (1000*1000);
   worker_local_wrlock(ud->local);
   timer_linkheap_add(heap, timer);
   worker_local_wrunlock(ud->local);
 }
 
-const int uniformcnt = 128;
-struct uniform_userdata uniform_userdata[128] = {};
-struct timer_link uniformtimer[128] = {};
+const int uniformcnt = 32;
+struct uniform_userdata uniform_userdata[32] = {};
+struct timer_link uniformtimer[32] = {};
 
 #define MAX_WORKERS 64
 #define MAX_RX_TX 64
@@ -157,6 +161,7 @@ static void *rx_func(void *userdata)
     uint64_t time64;
     uint64_t expiry;
     int try;
+    uint32_t timeout;
     struct pollfd pfds[2];
 
     pfds[0].fd = dlnmds[args->idx]->fd;
@@ -169,7 +174,11 @@ static void *rx_func(void *userdata)
     time64 = gettime64();
     worker_local_rdunlock(args->local);
 
-    poll(pfds, 2, expiry > time64 ? (expiry - time64)/1000 : 0);
+    timeout = (expiry > time64 ? (expiry - time64)/1000 : 0);
+    if (timeout > 0)
+    {
+      poll(pfds, 2, timeout);
+    }
 
     time64 = gettime64();
     worker_local_rdlock(args->local);
