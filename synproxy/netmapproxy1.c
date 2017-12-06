@@ -44,7 +44,7 @@ static void uniform_fn(
       entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
       if (entry->timer.time64 < time64)
       {
-        entry->timer.fn(timer, heap, entry->timer.userdata);
+        entry->timer.fn(&entry->timer, heap, entry->timer.userdata);
       }
     }
     if (bucket + 1 < ud->table_end)
