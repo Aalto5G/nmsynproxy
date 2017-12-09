@@ -174,7 +174,7 @@ static void *rx_func(void *userdata)
     time64 = gettime64();
     worker_local_rdunlock(args->local);
 
-    timeout = (expiry > time64 ? (expiry - time64)/1000 : 0);
+    timeout = (expiry > time64 ? (999 + expiry - time64)/1000 : 0);
     if (timeout > 0)
     {
       poll(pfds, 2, timeout);
