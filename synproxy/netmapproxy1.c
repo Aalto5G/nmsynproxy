@@ -453,6 +453,15 @@ int main(int argc, char **argv)
     rx_args[i].local = &local;
   }
 
+  char pktdl[14] = {0x02,0,0,0,0,0x04, 0x02,0,0,0,0,0x01, 0, 0};
+  char pktul[14] = {0x02,0,0,0,0,0x01, 0x02,0,0,0,0,0x04, 0, 0};
+
+  nm_my_inject(dlnmds[0], pktdl, sizeof(pktdl));
+  ioctl(dlnmds[0]->fd, NIOCTXSYNC, NULL);
+  nm_my_inject(ulnmds[0], pktul, sizeof(pktul));
+  ioctl(ulnmds[0]->fd, NIOCTXSYNC, NULL);
+
+
   for (i = 0; i < num_rx; i++)
   {
     pthread_create(&rx[i], NULL, rx_func, &rx_args[i]);
