@@ -142,6 +142,7 @@ int main(int argc, char **argv)
     nmr.nr_tx_rings = NUM_THR;
     nmr.nr_rx_rings = NUM_THR;
     nmr.nr_flags = NR_REG_ONE_NIC;
+    nmr.nr_ringid = i;
     nmds[i] = nm_open(nmifnamebuf, &nmr, 0, NULL);
     if (nmds[i] == NULL)
     {
