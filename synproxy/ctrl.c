@@ -93,8 +93,31 @@ void *ctrl_func(void *userdata)
              (uint8_t)proto,
              !!(operation&(1<<1)),
              !!(operation&(1<<2)));
-      threetuplectx_delete(&args->synproxy->threetuplectx, ip, port, proto,
-                           !!(operation & (1<<1)), !!(operation & (1<<2)));
+      if (threetuplectx_delete(&args->synproxy->threetuplectx, ip, port, proto,
+                               !!(operation & (1<<1)), !!(operation & (1<<2)))
+          == 0)
+      {
+        if (write(fd2, "1\n", 2) != 2)
+        {
+          close(fd2);
+          log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+          fd2 = accept(fd, NULL, NULL);
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+          continue;
+        }
+      }
+      else
+      {
+        if (write(fd2, "0\n", 2) != 2)
+        {
+          close(fd2);
+          log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+          fd2 = accept(fd, NULL, NULL);
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+          continue;
+        }
+      }
+       
     }
     else
     {
@@ -113,9 +136,30 @@ void *ctrl_func(void *userdata)
              payload.mss,
              payload.sack_supported,
              payload.wscaleshift);
-      threetuplectx_add(&args->synproxy->threetuplectx, ip, port, proto,
-                        !!(operation & (1<<1)), !!(operation & (1<<2)),
-                        &payload);
+      if (threetuplectx_add(&args->synproxy->threetuplectx, ip, port, proto,
+                            !!(operation & (1<<1)), !!(operation & (1<<2)),
+                            &payload) == 0)
+      {
+        if (write(fd2, "1\n", 2) != 2)
+        {
+          close(fd2);
+          log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+          fd2 = accept(fd, NULL, NULL);
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+          continue;
+        }
+      }
+      else
+      {
+        if (write(fd2, "0\n", 2) != 2)
+        {
+          close(fd2);
+          log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+          fd2 = accept(fd, NULL, NULL);
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+          continue;
+        }
+      }
     }
   }
   return 0;
