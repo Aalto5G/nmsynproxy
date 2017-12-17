@@ -16,6 +16,7 @@ enum learnmode {
   HASHMODE_DEFAULT,
   HASHMODE_HASHIP,
   HASHMODE_HASHIPPORT,
+  HASHMODE_COMMANDED,
 };
 enum sackconflict {
   SACKCONFLICT_REMOVE,
@@ -34,6 +35,7 @@ struct conf {
   enum learnmode sackmode;
   enum sackconflict sackconflict;
   enum learnmode mssmode;
+  enum learnmode wscalemode;
   size_t learnhashsize;
   size_t conntablesize;
   size_t timerheapsize;

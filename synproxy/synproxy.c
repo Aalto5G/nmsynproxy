@@ -181,6 +181,8 @@ static void send_synack(
   uint32_t ts;
   uint32_t local_ip, remote_ip;
   uint16_t local_port, remote_port;
+  uint8_t own_wscale;
+  struct threetuplepayload threetuplepayload;
 
   origip = ether_payload(orig);
   origtcp = ip_payload(origip);
@@ -199,6 +201,17 @@ static void send_synack(
     tcp_dst_port(origtcp), tcp_src_port(origtcp),
     tcpinfo.mss, tcpinfo.wscale);
 
+  if (   synproxy->conf->mssmode == HASHMODE_COMMANDED
+      || synproxy->conf->sackmode == HASHMODE_COMMANDED
+      || synproxy->conf->wscalemode == HASHMODE_COMMANDED)
+  {
+    if (threetuplectx_find(&synproxy->threetuplectx, ip_dst(origip), tcp_dst_port(origtcp), 17, &threetuplepayload) != 0)
+    {
+      threetuplepayload.sack_supported = synproxy->conf->own_sack;
+      threetuplepayload.mss = synproxy->conf->own_mss;
+      threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+    }
+  }
   if (   synproxy->conf->mssmode == HASHMODE_HASHIPPORT
       || synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
   {
@@ -225,6 +238,10 @@ static void send_synack(
   {
     own_mss = ipentry.mss;
   }
+  else if (synproxy->conf->mssmode == HASHMODE_COMMANDED)
+  {
+    own_mss = threetuplepayload.mss;
+  }
   else
   {
     own_mss = synproxy->conf->own_mss;
@@ -237,9 +254,21 @@ static void send_synack(
   {
     own_sack = ipentry.sack_supported;
   }
+  else if (synproxy->conf->sackmode == HASHMODE_COMMANDED)
+  {
+    own_sack = threetuplepayload.sack_supported;
+  }
   else
   {
     own_sack = synproxy->conf->own_sack;
+  }
+  if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
+  {
+    own_wscale = threetuplepayload.wscaleshift;
+  }
+  else
+  {
+    own_wscale = synproxy->conf->own_wscale;
   }
 
   local_ip = ip_dst(origip);
@@ -279,7 +308,7 @@ static void send_synack(
   // pad, kind 0 len 1
   tcpopts[0] = 3;
   tcpopts[1] = 3;
-  tcpopts[2] = synproxy->conf->own_wscale;
+  tcpopts[2] = own_wscale;
   tcpopts[3] = 1;
   tcpopts[4] = 2;
   tcpopts[5] = 4;
@@ -1621,6 +1650,8 @@ int uplink(
     {
       struct tcp_information tcpinfo;
       struct sack_hash_data sackdata;
+      struct threetuplepayload threetuplepayload;
+      uint8_t own_wscale;
       ctx.locked = 0;
       entry = synproxy_hash_get(
         local, lan_ip, lan_port, remote_ip, remote_port, &ctx);
@@ -1679,8 +1710,23 @@ int uplink(
         sack_ip_port_hash_add(
           &synproxy->autolearn, ip_src(ip), 0, &sackdata);
       }
+      if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
+      {
+        if (threetuplectx_find(&synproxy->threetuplectx, ip_src(ip), tcp_src_port(ippay), 17, &threetuplepayload) != 0)
+        {
+          threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+        }
+      }
+      if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
+      {
+        own_wscale = threetuplepayload.wscaleshift;
+      }
+      else
+      {
+        own_wscale = synproxy->conf->own_wscale;
+      }
       entry->wscalediff =
-        ((int)synproxy->conf->own_wscale) - ((int)tcpinfo.wscale);
+        ((int)own_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
         entry->state_data.downlink_syn_sent.local_isn - tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;

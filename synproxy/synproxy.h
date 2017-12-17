@@ -17,10 +17,12 @@
 #include "iphash.h"
 #include "sackhash.h"
 #include "conf.h"
+#include "threetuple.h"
 
 struct synproxy {
   struct conf *conf;
   struct sack_ip_port_hash autolearn;
+  struct threetuplectx threetuplectx;
 };
 
 struct synproxy_hash_entry {
@@ -310,6 +312,7 @@ static inline void synproxy_init(
 {
   synproxy->conf = conf;
   sack_ip_port_hash_init(&synproxy->autolearn, conf->learnhashsize);
+  threetuplectx_init(&synproxy->threetuplectx);
 }
 
 static inline void synproxy_free(
@@ -317,6 +320,7 @@ static inline void synproxy_free(
 {
   synproxy->conf = NULL;
   sack_ip_port_hash_free(&synproxy->autolearn);
+  threetuplectx_free(&synproxy->threetuplectx);
 }
 
 static inline void synproxy_hash_del(
