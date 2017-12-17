@@ -9,9 +9,10 @@
 int main(int argc, char **argv)
 {
   struct threetuplectx ctx = {};
+  struct threetuplepayload payload = {};
   hash_seed_init();
   threetuplectx_init(&ctx);
-  if (threetuplectx_find(&ctx, (10<<24) | 1, 12345, 17) != NULL)
+  if (threetuplectx_find(&ctx, (10<<24) | 1, 12345, 17, NULL) != -ENOENT)
   {
     abort();
   }
@@ -19,15 +20,15 @@ int main(int argc, char **argv)
   {
     abort();
   }
-  if (threetuplectx_add(&ctx, (10<<24) | 1, 12345, 17, 1, 1, 1460, 1, 6) != 0)
+  if (threetuplectx_add(&ctx, (10<<24) | 1, 12345, 17, 1, 1, &payload) != 0)
   {
     abort();
   }
-  if (threetuplectx_find(&ctx, (10<<24) | 1, 12345, 17) == NULL)
+  if (threetuplectx_find(&ctx, (10<<24) | 1, 12345, 17, NULL) != 0)
   {
     abort();
   }
-  if (threetuplectx_add(&ctx, (10<<24) | 1, 12345, 17, 1, 1, 1460, 1, 6)
+  if (threetuplectx_add(&ctx, (10<<24) | 1, 12345, 17, 1, 1, &payload)
       != -EEXIST)
   {
     abort();
@@ -36,9 +37,10 @@ int main(int argc, char **argv)
   {
     abort();
   }
-  if (threetuplectx_find(&ctx, (10<<24) | 1, 12345, 17) != NULL)
+  if (threetuplectx_find(&ctx, (10<<24) | 1, 12345, 17, NULL) != -ENOENT)
   {
     abort();
   }
+  threetuplectx_free(&ctx);
   return 0;
 }

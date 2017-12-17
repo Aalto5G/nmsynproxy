@@ -27,7 +27,7 @@ static uint32_t threetuple_hash_fn(struct hash_list_node *node, void *userdata)
 int threetuplectx_add(
   struct threetuplectx *ctx,
   uint32_t ip, uint16_t port, uint8_t proto, int port_valid, int proto_valid,
-  uint16_t mss, uint8_t sack_supported, uint8_t wscaleshift)
+  const struct threetuplepayload *payload)
 {
   struct threetupleentry *e = malloc(sizeof(*e));
   uint32_t hashval;
@@ -47,10 +47,9 @@ int threetuplectx_add(
   e->proto = proto;
   e->port_valid = port_valid;
   e->proto_valid = proto_valid;
-  e->mss = mss;
-  e->sack_supported = sack_supported;
-  e->wscaleshift = wscaleshift;
+  e->payload = *payload;
   hashval = threetuple_hash(e);
+  hash_table_lock_bucket(&ctx->tbl, hashval);
   HASH_TABLE_FOR_EACH_POSSIBLE(&ctx->tbl, node, hashval)
   {
     struct threetupleentry *e2 =
@@ -58,19 +57,25 @@ int threetuplectx_add(
     if (e2->ip == ip && e2->port == port && e2->proto == proto &&
         e2->port_valid == port_valid && e2->proto_valid == proto_valid)
     {
+      hash_table_unlock_bucket(&ctx->tbl, hashval);
+      free(e);
       return -EEXIST;
     }
   }
-  hash_table_add_nogrow(&ctx->tbl, &e->node, threetuple_hash(e));
+  hash_table_add_nogrow_already_bucket_locked(
+    &ctx->tbl, &e->node, threetuple_hash(e));
+  hash_table_unlock_bucket(&ctx->tbl, hashval);
   return 0;
 }
 
-struct threetupleentry *threetuplectx_find(
+int threetuplectx_find(
   struct threetuplectx *ctx,
-  uint32_t ip, uint16_t port, uint8_t proto)
+  uint32_t ip, uint16_t port, uint8_t proto,
+  struct threetuplepayload *payload)
 {
   uint32_t hashval = threetuple_iphash(ip);
   struct hash_list_node *node;
+  hash_table_lock_bucket(&ctx->tbl, hashval);
   HASH_TABLE_FOR_EACH_POSSIBLE(&ctx->tbl, node, hashval)
   {
     struct threetupleentry *e =
@@ -78,10 +83,16 @@ struct threetupleentry *threetuplectx_find(
     if (e->ip == ip && (e->port == port || !e->port_valid) &&
         (e->proto == proto || !e->proto_valid))
     {
-      return e;
+      if (payload)
+      {
+        *payload = e->payload;
+      }
+      hash_table_unlock_bucket(&ctx->tbl, hashval);
+      return 0;
     }
   }
-  return NULL;
+  hash_table_unlock_bucket(&ctx->tbl, hashval);
+  return -ENOENT;
 }
 
 int threetuplectx_delete(
@@ -100,6 +111,7 @@ int threetuplectx_delete(
   {
     proto = 0;
   }
+  hash_table_lock_bucket(&ctx->tbl, hashval);
   HASH_TABLE_FOR_EACH_POSSIBLE(&ctx->tbl, node, hashval)
   {
     struct threetupleentry *e =
@@ -108,15 +120,18 @@ int threetuplectx_delete(
         e->port_valid == port_valid && e->proto_valid == proto_valid)
     {
       hash_table_delete(&ctx->tbl, &e->node, threetuple_hash(e));
+      hash_table_unlock_bucket(&ctx->tbl, hashval);
+      free(e);
       return 0;
     }
   }
+  hash_table_unlock_bucket(&ctx->tbl, hashval);
   return -ENOENT;
 }
 
 void threetuplectx_init(struct threetuplectx *ctx)
 {
-  if (hash_table_init(&ctx->tbl, 256, threetuple_hash_fn, NULL))
+  if (hash_table_init_locked(&ctx->tbl, 256, threetuple_hash_fn, NULL, 0))
   {
     abort();
   }
