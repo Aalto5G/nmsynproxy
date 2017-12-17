@@ -6,13 +6,7 @@
 #include "packet.h"
 #include "hashseed.h"
 #include "yyutils.h"
-
-static inline uint64_t gettime64(void)
-{
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
-}
+#include "time64.h"
 
 struct uniform_userdata {
   struct worker_local *local;

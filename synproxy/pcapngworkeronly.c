@@ -8,13 +8,7 @@
 #include "hashseed.h"
 #include "mypcapng.h"
 #include "yyutils.h"
-
-static inline uint64_t gettime64(void)
-{
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
-}
+#include "time64.h"
 
 #define POOL_SIZE 300
 #define CACHE_SIZE 100

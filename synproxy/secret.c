@@ -5,13 +5,7 @@
 #include "secret.h"
 #include "conf.h"
 #include "synproxy.h"
-
-static inline uint64_t gettime64(void)
-{
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
-}
+#include "time64.h"
 
 void secret_init_deterministic(struct secretinfo *info)
 {

@@ -7,6 +7,7 @@
 #include "hashseed.h"
 #include "log.h"
 #include "yyutils.h"
+#include "time64.h"
 
 const char *argv0;
 
@@ -19,13 +20,6 @@ struct tcp_ctx {
   uint16_t port1;
   uint16_t port2;
 };
-
-static inline uint64_t gettime64(void)
-{
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
-}
 
 static struct packet *fetch_packet(struct linked_list_head *head)
 {

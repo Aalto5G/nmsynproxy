@@ -2,15 +2,9 @@
 #include "ipcksum.h"
 #include "branchpredict.h"
 #include <sys/time.h>
+#include "time64.h"
 
 #define MAX_FRAG 65535
-
-static inline uint64_t gettime64(void)
-{
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec*1000UL*1000UL + tv.tv_usec;
-}
 
 static inline int rst_is_valid(uint32_t rst_seq, uint32_t ref_seq)
 {
