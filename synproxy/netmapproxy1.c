@@ -162,7 +162,7 @@ static void *ctrl_func(void *userdata)
     uint8_t operation;
     struct threetuplepayload payload;
     struct datainbuf inbuf;
-    if (readall(fd, buf, sizeof(buf)) != sizeof(buf))
+    if (readall(fd2, buf, sizeof(buf)) != sizeof(buf))
     {
       close(fd2);
       log_log(LOG_LEVEL_ERR, "CTRL", "can't read, reopening connection\n");
