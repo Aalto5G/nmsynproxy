@@ -133,9 +133,15 @@ static void *ctrl_func(void *userdata)
   int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   int fd2;
   struct sockaddr_in sin;
+  int enable = 1;
   if (fd < 0)
   {
-    log_log(LOG_LEVEL_ERR, "CTRL", "can't create socket\n");
+    log_log(LOG_LEVEL_ERR, "CTRL", "can't create socket");
+    abort();
+  }
+  if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+  {
+    log_log(LOG_LEVEL_ERR, "CTRL", "setting SO_REUSEADDR failed");
     abort();
   }
   sin.sin_family = AF_INET;
@@ -143,16 +149,16 @@ static void *ctrl_func(void *userdata)
   sin.sin_port = htons(12345);
   if (bind(fd, (struct sockaddr*)&sin, sizeof(sin)) != 0)
   {
-    log_log(LOG_LEVEL_ERR, "CTRL", "can't bind\n");
+    log_log(LOG_LEVEL_ERR, "CTRL", "can't bind");
     abort();
   }
   if (listen(fd, 16) != 0)
   {
-    log_log(LOG_LEVEL_ERR, "CTRL", "can't listen\n");
+    log_log(LOG_LEVEL_ERR, "CTRL", "can't listen");
     abort();
   }
   fd2 = accept(fd, NULL, NULL);
-  log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted\n");
+  log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
   for (;;)
   {
     char buf[12];
@@ -165,9 +171,9 @@ static void *ctrl_func(void *userdata)
     if (readall(fd2, buf, sizeof(buf)) != sizeof(buf))
     {
       close(fd2);
-      log_log(LOG_LEVEL_ERR, "CTRL", "can't read, reopening connection\n");
+      log_log(LOG_LEVEL_ERR, "CTRL", "can't read, reopening connection");
       fd2 = accept(fd, NULL, NULL);
-      log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted\n");
+      log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
       continue;
     }
     datainbuf_init(&inbuf, buf, sizeof(buf));
@@ -203,7 +209,7 @@ static void *ctrl_func(void *userdata)
     {
       log_log(
              LOG_LEVEL_NOTICE, "CTRL",
-             "rm %d.%d.%d.%d:%d proto %d port_valid %d proto_valid %d\n",
+             "rm %d.%d.%d.%d:%d proto %d port_valid %d proto_valid %d",
              (uint8_t)(ip>>24),
              (uint8_t)(ip>>16),
              (uint8_t)(ip>>8),
