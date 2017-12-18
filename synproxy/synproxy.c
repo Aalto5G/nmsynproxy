@@ -205,7 +205,7 @@ static void send_synack(
       || synproxy->conf->sackmode == HASHMODE_COMMANDED
       || synproxy->conf->wscalemode == HASHMODE_COMMANDED)
   {
-    if (threetuplectx_find(&synproxy->threetuplectx, ip_dst(origip), tcp_dst_port(origtcp), 17, &threetuplepayload) != 0)
+    if (threetuplectx_find(&synproxy->threetuplectx, ip_dst(origip), tcp_dst_port(origtcp), 6, &threetuplepayload) != 0)
     {
       threetuplepayload.sack_supported = synproxy->conf->own_sack;
       threetuplepayload.mss = synproxy->conf->own_mss;
@@ -1712,7 +1712,7 @@ int uplink(
       }
       if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
       {
-        if (threetuplectx_find(&synproxy->threetuplectx, ip_src(ip), tcp_src_port(ippay), 17, &threetuplepayload) != 0)
+        if (threetuplectx_find(&synproxy->threetuplectx, ip_src(ip), tcp_src_port(ippay), 6, &threetuplepayload) != 0)
         {
           threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
         }
