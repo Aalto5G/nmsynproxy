@@ -324,6 +324,8 @@ int main(int argc, char **argv)
   sigset_t set;
   int pipefd[2];
 
+  log_open("NETMAPPROXY1", LOG_LEVEL_DEBUG, LOG_LEVEL_INFO);
+
   sigemptyset(&set);
   sigaddset(&set, SIGINT);
   sigaddset(&set, SIGPIPE);
@@ -544,6 +546,7 @@ int main(int argc, char **argv)
   synproxy_free(&synproxy);
   as_alloc_global_free(&glob);
   conf_free(&conf);
+  log_close();
 
   return 0;
 }
