@@ -297,6 +297,7 @@ static void *rx_func(void *userdata)
       }
     }
   }
+  as_alloc_local_free(&loc);
   log_log(LOG_LEVEL_NOTICE, "RX", "exiting RX thread");
   return NULL;
 }
@@ -539,7 +540,10 @@ int main(int argc, char **argv)
   close(pipefd[0]);
   close(pipefd[1]);
 
+  worker_local_free(&local);
   synproxy_free(&synproxy);
+  as_alloc_global_free(&glob);
+  conf_free(&conf);
 
   return 0;
 }
