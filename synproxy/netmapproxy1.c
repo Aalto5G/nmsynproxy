@@ -19,6 +19,25 @@
 #include "read.h"
 #include "ctrl.h"
 
+atomic_int exit_threads = 0;
+
+static void *signal_handler_thr(void *arg)
+{
+  sigset_t set;
+  int sig;
+  sigemptyset(&set);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGPIPE);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGUSR1);
+  sigaddset(&set, SIGUSR2);
+  sigaddset(&set, SIGALRM);
+  sigwait(&set, &sig);
+  atomic_store(&exit_threads, 1);
+  return NULL;
+}
+
 struct uniform_userdata {
   struct worker_local *local;
   uint32_t table_start;
@@ -153,7 +172,7 @@ static void *rx_func(void *userdata)
     abort();
   }
 
-  for (;;)
+  while (!atomic_load(&exit_threads))
   {
     uint64_t time64;
     uint64_t expiry;
@@ -169,6 +188,10 @@ static void *rx_func(void *userdata)
     worker_local_rdlock(args->local);
     expiry = timer_linkheap_next_expiry_time(&args->local->timers);
     time64 = gettime64();
+    if (expiry > time64 + 1000*1000)
+    {
+      expiry = time64 + 1000*1000;
+    }
     worker_local_rdunlock(args->local);
 
     timeout = (expiry > time64 ? (999 + expiry - time64)/1000 : 0);
@@ -274,12 +297,14 @@ static void *rx_func(void *userdata)
       }
     }
   }
+  log_log(LOG_LEVEL_NOTICE, "RX", "exiting RX thread");
+  return NULL;
 }
 
 
 int main(int argc, char **argv)
 {
-  pthread_t rx[MAX_RX], ctrl;
+  pthread_t rx[MAX_RX], ctrl, sigthr;
   struct rx_args rx_args[MAX_RX];
   struct ctrl_args ctrl_args;
   struct synproxy synproxy;
@@ -295,6 +320,18 @@ int main(int argc, char **argv)
   int i;
   char nmifnamebuf[64];
   uint64_t time64;
+  sigset_t set;
+  int pipefd[2];
+
+  sigemptyset(&set);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGPIPE);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGUSR1);
+  sigaddset(&set, SIGUSR2);
+  sigaddset(&set, SIGALRM);
+  pthread_sigmask(SIG_BLOCK, &set, NULL);
 
   confyydirparse(argv[0], "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -464,8 +501,14 @@ int main(int argc, char **argv)
   {
     pthread_create(&rx[i], NULL, rx_func, &rx_args[i]);
   }
+  if (pipe(pipefd) != 0)
+  {
+    abort();
+  }
+  ctrl_args.piperd = pipefd[0];
   ctrl_args.synproxy = &synproxy;
   pthread_create(&ctrl, NULL, ctrl_func, &ctrl_args);
+  pthread_create(&sigthr, NULL, signal_handler_thr, NULL);
   int cpu = 0;
   if (num_rx <= sysconf(_SC_NPROCESSORS_ONLN))
   {
@@ -481,7 +524,20 @@ int main(int argc, char **argv)
   {
     pthread_join(rx[i], NULL);
   }
+  pthread_join(sigthr, NULL);
+  if (write(pipefd[1], "X", 1) != 1)
+  {
+    printf("pipe write failed\n");
+  }
   pthread_join(ctrl, NULL);
+
+  for (i = 0; i < num_rx; i++)
+  {
+    nm_close(ulnmds[i]);
+    nm_close(dlnmds[i]);
+  }
+  close(pipefd[0]);
+  close(pipefd[1]);
 
   synproxy_free(&synproxy);
 

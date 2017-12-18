@@ -1,6 +1,22 @@
 #include "ctrl.h"
 #include "databuf.h"
 #include "read.h"
+#include <fcntl.h>
+
+static void set_nonblock(int fd)
+{
+  int opt;
+  opt = fcntl(fd, F_GETFL);
+  if (opt < 0)
+  {
+    abort();
+  }
+  opt |= O_NONBLOCK;
+  if (fcntl(fd, F_SETFL, opt) < 0)
+  {
+    abort();
+  }
+}
 
 void *ctrl_func(void *userdata)
 {
@@ -9,6 +25,7 @@ void *ctrl_func(void *userdata)
   int fd2;
   struct sockaddr_in sin;
   int enable = 1;
+  set_nonblock(args->piperd);
   if (fd < 0)
   {
     log_log(LOG_LEVEL_ERR, "CTRL", "can't create socket");
@@ -32,7 +49,13 @@ void *ctrl_func(void *userdata)
     log_log(LOG_LEVEL_ERR, "CTRL", "can't listen");
     abort();
   }
-  fd2 = accept(fd, NULL, NULL);
+  fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+  if (fd2 < 0 && errno == EINTR)
+  {
+    log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+    return NULL;
+  }
+  set_nonblock(fd2);
   log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
   for (;;)
   {
@@ -43,11 +66,25 @@ void *ctrl_func(void *userdata)
     uint8_t operation;
     struct threetuplepayload payload;
     struct datainbuf inbuf;
-    if (readall(fd2, buf, sizeof(buf)) != sizeof(buf))
+    errno = 0;
+    if (readall_interrupt(fd2, buf, sizeof(buf), args->piperd) != sizeof(buf))
     {
+      if (errno == EINTR)
+      {
+        log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+        close(fd2);
+        close(fd);
+        return NULL;
+      }
       close(fd2);
       log_log(LOG_LEVEL_ERR, "CTRL", "can't read, reopening connection");
-      fd2 = accept(fd, NULL, NULL);
+      fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+      if (fd2 < 0 && errno == EINTR)
+      {
+        log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+        return NULL;
+      }
+      set_nonblock(fd2);
       log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
       continue;
     }
@@ -101,7 +138,13 @@ void *ctrl_func(void *userdata)
         {
           close(fd2);
           log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
-          fd2 = accept(fd, NULL, NULL);
+          fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+          if (fd2 < 0 && errno == EINTR)
+          {
+            log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+            return NULL;
+          }
+          set_nonblock(fd2);
           log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
           continue;
         }
@@ -112,7 +155,13 @@ void *ctrl_func(void *userdata)
         {
           close(fd2);
           log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
-          fd2 = accept(fd, NULL, NULL);
+          fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+          if (fd2 < 0 && errno == EINTR)
+          {
+            log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+            return NULL;
+          }
+          set_nonblock(fd2);
           log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
           continue;
         }
@@ -144,7 +193,13 @@ void *ctrl_func(void *userdata)
         {
           close(fd2);
           log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
-          fd2 = accept(fd, NULL, NULL);
+          fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+          if (fd2 < 0 && errno == EINTR)
+          {
+            log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+            return NULL;
+          }
+          set_nonblock(fd2);
           log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
           continue;
         }
@@ -155,7 +210,13 @@ void *ctrl_func(void *userdata)
         {
           close(fd2);
           log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
-          fd2 = accept(fd, NULL, NULL);
+          fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+          if (fd2 < 0 && errno == EINTR)
+          {
+            log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+            return NULL;
+          }
+          set_nonblock(fd2);
           log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
           continue;
         }

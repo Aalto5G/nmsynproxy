@@ -5,6 +5,7 @@
 
 struct ctrl_args {
   struct synproxy *synproxy;
+  int piperd;
 };
 
 void *ctrl_func(void *userdata);
