@@ -38,6 +38,50 @@ static void *signal_handler_thr(void *arg)
   return NULL;
 }
 
+struct rx_args {
+  struct synproxy *synproxy;
+  struct worker_local *local;
+  int idx;
+};
+
+
+struct periodic_userdata {
+  struct rx_args *args;
+  uint64_t dlbytes, ulbytes;
+  uint64_t dlpkts, ulpkts;
+  uint64_t last_dlbytes, last_ulbytes;
+  uint64_t last_dlpkts, last_ulpkts;
+  uint64_t last_time64;
+  uint64_t next_time64;
+};
+
+static void periodic_fn(
+  struct periodic_userdata *ud)
+{
+  uint64_t time64 = gettime64();
+  double diff = (time64 - ud->last_time64)/1000.0/1000.0;
+  uint64_t ulbdiff = ud->ulbytes - ud->last_ulbytes;
+  uint64_t dlbdiff = ud->dlbytes - ud->last_dlbytes;
+  uint64_t ulpdiff = ud->ulpkts - ud->last_ulpkts;
+  uint64_t dlpdiff = ud->dlpkts - ud->last_dlpkts;
+  ud->last_ulbytes = ud->ulbytes;
+  ud->last_dlbytes = ud->dlbytes;
+  ud->last_ulpkts = ud->ulpkts;
+  ud->last_dlpkts = ud->dlpkts;
+  worker_local_rdlock(ud->args->local);
+  printf("worker/%d %g MPPS %g Gbps ul %g MPPS %g Gbps dl"
+         " %u conns synproxied %u conns not\n",
+         ud->args->idx,
+         ulpdiff/diff/1e6, 8*ulbdiff/diff/1e9,
+         dlpdiff/diff/1e6, 8*dlbdiff/diff/1e9,
+         ud->args->local->synproxied_connections,
+         ud->args->local->direct_connections);
+  fflush(stdout);
+  worker_local_rdunlock(ud->args->local);
+  ud->last_time64 = time64;
+  ud->next_time64 += 2*1000*1000;
+}
+
 struct uniform_userdata {
   struct worker_local *local;
   uint32_t table_start;
@@ -130,25 +174,6 @@ static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
   }
 }
 
-static void periodic(uint64_t count, struct timeval *tv1ptr)
-{
-  struct timeval tv2;
-  if ((count & (16*1024*1024-1)) == 0)
-  {
-    double diff;
-    gettimeofday(&tv2, NULL);
-    diff = tv2.tv_sec - tv1ptr->tv_sec + (tv2.tv_usec - tv1ptr->tv_usec)/1000.0/1000.0;
-    printf("%g Mpps\n", 16*1024*1024/diff/1000.0/1000.0);
-    *tv1ptr = tv2;
-  }
-}
-
-struct rx_args {
-  struct synproxy *synproxy;
-  struct worker_local *local;
-  int idx;
-};
-
 static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
@@ -157,7 +182,7 @@ static void *rx_func(void *userdata)
   struct port outport;
   struct netmapfunc2_userdata ud;
   struct timeval tv1;
-  uint64_t count = 0;
+  struct periodic_userdata periodic = {};
 
   gettimeofday(&tv1, NULL);
 
@@ -171,6 +196,10 @@ static void *rx_func(void *userdata)
   {
     abort();
   }
+
+  periodic.last_time64 = gettime64();
+  periodic.next_time64 = periodic.last_time64 + 2*1000*1000;
+  periodic.args = args;
 
   while (!atomic_load(&exit_threads))
   {
@@ -205,6 +234,11 @@ static void *rx_func(void *userdata)
     try = (timer_linkheap_next_expiry_time(&args->local->timers) < time64);
     worker_local_rdunlock(args->local);
 
+    if (time64 >= periodic.next_time64)
+    {
+      periodic_fn(&periodic);
+    }
+
     if (try)
     {
       worker_local_wrlock(args->local);
@@ -238,8 +272,8 @@ static void *rx_func(void *userdata)
       {
         ll_free_st(&st, pktstruct);
       }
-      count++;
-      periodic(count, &tv1);
+      periodic.ulpkts++;
+      periodic.ulbytes += hdr.len;
       if (in)
       {
         if (pcapng_out_ctx_write(&inctx, pkt, hdr.len, gettime64(), "out"))
@@ -277,8 +311,8 @@ static void *rx_func(void *userdata)
       {
         ll_free_st(&st, pktstruct);
       }
-      count++;
-      periodic(count, &tv1);
+      periodic.dlpkts++;
+      periodic.dlbytes += hdr.len;
       if (in)
       {
         if (pcapng_out_ctx_write(&inctx, pkt, hdr.len, gettime64(), "in"))
@@ -297,7 +331,7 @@ static void *rx_func(void *userdata)
       }
     }
   }
-  as_alloc_local_free(&loc);
+  ll_alloc_st_free(&st);
   log_log(LOG_LEVEL_NOTICE, "RX", "exiting RX thread");
   return NULL;
 }
@@ -544,7 +578,6 @@ int main(int argc, char **argv)
 
   worker_local_free(&local);
   synproxy_free(&synproxy);
-  as_alloc_global_free(&glob);
   conf_free(&conf);
   log_close();
 
