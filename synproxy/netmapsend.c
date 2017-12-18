@@ -7,6 +7,7 @@
 #include "packet.h"
 #include "net/netmap_user.h"
 #include <sys/poll.h>
+#include <stdatomic.h>
 
 #define POOL_SIZE 300
 #define CACHE_SIZE 100
@@ -14,6 +15,25 @@
 #define BLOCK_SIZE 1800
 
 #define NUM_THR 2
+
+atomic_int exit_threads = 0;
+
+static void *signal_handler_thr(void *arg)
+{
+  sigset_t set;
+  int sig;
+  sigemptyset(&set);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGPIPE);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGUSR1);
+  sigaddset(&set, SIGUSR2);
+  sigaddset(&set, SIGALRM);
+  sigwait(&set, &sig);
+  atomic_store(&exit_threads, 1);
+  return NULL;
+}
 
 static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
 {
@@ -106,7 +126,7 @@ static void *thr(void *arg)
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(ctx[i].pktsmall) - 14 - 20);
   }
 
-  for (;;)
+  while (!atomic_load(&exit_threads))
   {
     for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
     {
@@ -123,9 +143,21 @@ int main(int argc, char **argv)
 {
   struct thr_arg args[NUM_THR];
   pthread_t thrs[NUM_THR];
+  pthread_t sigthr;
   struct nmreq nmr;
   int i;
   char nmifnamebuf[64];
+  sigset_t set;
+
+  sigemptyset(&set);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGPIPE);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGUSR1);
+  sigaddset(&set, SIGUSR2);
+  sigaddset(&set, SIGALRM);
+  pthread_sigmask(SIG_BLOCK, &set, NULL);
 
   setlinebuf(stdout);
 
@@ -156,10 +188,17 @@ int main(int argc, char **argv)
     args[i].idx = i;
     pthread_create(&thrs[i], NULL, thr, &args[i]);
   }
+  pthread_create(&sigthr, NULL, signal_handler_thr, NULL);
 
   for (i = 0; i < NUM_THR; i++)
   {
     pthread_join(thrs[i], NULL);
+  }
+  pthread_join(sigthr, NULL);
+
+  for (i = 0; i < NUM_THR; i++)
+  {
+    nm_close(nmds[i]);
   }
 
   return 0;
