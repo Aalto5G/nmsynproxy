@@ -72,10 +72,11 @@ struct pktctx {
 static void *thr(void *arg)
 {
   struct thr_arg *args = arg;
-  struct pktctx ctx[90];
+  struct pktctx ctx[90] = {};
   void *ether;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
-  char lan_mac[6] = {0x02,0,0,0,0,0x01};
+  //char lan_mac[6] = {0x02,0,0,0,0,0x01};
+  char lan_mac[6] = {0x3c,0xfd,0xfe,0xa5,0x41,0x49};
   void *ip;
   void *tcp;
   int i;
@@ -102,6 +103,7 @@ static void *thr(void *arg)
     tcp_set_src_port(tcp, 12345);
     tcp_set_dst_port(tcp, 54321);
     tcp_set_ack_on(tcp);
+    tcp_set_data_offset(tcp, 20);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(ctx[i].pkt) - 14 - 20);
   
     ether = ctx[i].pktsmall;
@@ -123,6 +125,7 @@ static void *thr(void *arg)
     tcp_set_src_port(tcp, 12345);
     tcp_set_dst_port(tcp, 54321);
     tcp_set_ack_on(tcp);
+    tcp_set_data_offset(tcp, 20);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(ctx[i].pktsmall) - 14 - 20);
   }
 
