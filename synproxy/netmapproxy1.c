@@ -478,8 +478,6 @@ int main(int argc, char **argv)
   }
   link_wait(sockfd, argv[optind + 0]);
   link_wait(sockfd, argv[optind + 1]);
-  set_promisc_mode(sockfd, argv[optind + 0], 1);
-  set_promisc_mode(sockfd, argv[optind + 1], 1);
 
   {
     int j;
@@ -545,6 +543,9 @@ int main(int argc, char **argv)
       pthread_setaffinity_np(rx[i], sizeof(cpuset), &cpuset);
     }
   }
+  sleep(1);
+  set_promisc_mode(sockfd, argv[optind + 0], 1);
+  set_promisc_mode(sockfd, argv[optind + 1], 1);
   for (i = 0; i < num_rx; i++)
   {
     pthread_join(rx[i], NULL);
