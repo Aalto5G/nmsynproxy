@@ -18,6 +18,7 @@
 #include "databuf.h"
 #include "read.h"
 #include "ctrl.h"
+#include "netmapcommon.h"
 
 atomic_int exit_threads = 0;
 
@@ -150,29 +151,6 @@ struct tx_args {
   struct queue *txq;
   int idx;
 };
-
-static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
-{
-  int i, j;
-  for (i = 0; i < 3; i++)
-  {
-    for (j = 0; j < 3; j++)
-    {
-      if (nm_inject(nmd, data, sz) == 0)
-      {
-        struct pollfd pollfd;
-        pollfd.fd = nmd->fd;
-        pollfd.events = POLLOUT;
-        poll(&pollfd, 1, 0);
-      }
-      else
-      {
-        return;
-      }
-    }
-    ioctl(nmd->fd, NIOCTXSYNC, NULL);
-  }
-}
 
 static void *rx_func(void *userdata)
 {
@@ -334,74 +312,6 @@ static void *rx_func(void *userdata)
   ll_alloc_st_free(&st);
   log_log(LOG_LEVEL_NOTICE, "RX", "exiting RX thread");
   return NULL;
-}
-
-static void set_promisc_mode(int sockfd, const char *ifname, int on)
-{
-  struct ifreq ifr;
-  if (strncmp(ifname, "vale", 4) == 0)
-  {
-    return;
-  }
-  if (strncmp(ifname, "netmap:", 7) != 0)
-  {
-    printf("invalid interface name, does not begin with netmap:\n");
-    exit(1);
-  }
-  if (on)
-  {
-    snprintf(ifr.ifr_name, IF_NAMESIZE, "%s", ifname + 7);
-    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0)
-    {
-      printf("can't get interface flags\n");
-      exit(1);
-    }
-    ifr.ifr_flags &= ~IFF_PROMISC;
-    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) < 0)
-    {
-      printf("can't turn promiscuous mode off\n");
-      exit(1);
-    }
-    snprintf(ifr.ifr_name, IF_NAMESIZE, "%s", ifname + 7);
-    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0)
-    {
-      printf("can't get interface flags\n");
-      exit(1);
-    }
-    ifr.ifr_flags |= IFF_PROMISC;
-    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) < 0)
-    {
-      printf("can't turn promiscuous mode on\n");
-      exit(1);
-    }
-  }
-  else
-  {
-    snprintf(ifr.ifr_name, IF_NAMESIZE, "%s", ifname + 7);
-    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0)
-    {
-      printf("can't get interface flags\n");
-      exit(1);
-    }
-    ifr.ifr_flags |= IFF_PROMISC;
-    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) < 0)
-    {
-      printf("can't turn promiscuous mode on\n");
-      exit(1);
-    }
-    snprintf(ifr.ifr_name, IF_NAMESIZE, "%s", ifname + 7);
-    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0)
-    {
-      printf("can't get interface flags\n");
-      exit(1);
-    }
-    ifr.ifr_flags &= ~IFF_PROMISC;
-    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) < 0)
-    {
-      printf("can't turn promiscuous mode off\n");
-      exit(1);
-    }
-  }
 }
 
 int main(int argc, char **argv)
@@ -566,6 +476,8 @@ int main(int argc, char **argv)
     printf("RX rings: %u\n", ulnmds[i]->last_rx_ring - ulnmds[i]->first_rx_ring + 1);
     printf("TX rings: %u\n", ulnmds[i]->last_tx_ring - ulnmds[i]->first_tx_ring + 1);
   }
+  link_wait(sockfd, argv[optind + 0]);
+  link_wait(sockfd, argv[optind + 1]);
   set_promisc_mode(sockfd, argv[optind + 0], 1);
   set_promisc_mode(sockfd, argv[optind + 1], 1);
 
