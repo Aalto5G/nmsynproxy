@@ -93,7 +93,8 @@ static void *rx_func(void *userdata)
   struct ll_alloc_st st;
   //struct queue_cache cache;
   struct port outport;
-  struct asdiscardfunc_userdata ud;
+  struct allocifdiscardfunc_userdata ud;
+  struct allocif intf = {.ops = &ll_allocif_ops_st, .userdata = &st};
   struct timeval tv1;
   uint64_t count = 0;
   int i;
@@ -101,8 +102,8 @@ static void *rx_func(void *userdata)
 
   gettimeofday(&tv1, NULL);
 
-  ud.loc = &loc;
-  outport.portfunc = asdiscardfunc;
+  ud.intf = &intf;
+  outport.portfunc = allocifdiscardfunc;
   outport.userdata = &ud;
 
   //if (queue_cache_init(&cache, args->workerq, CACHE_SIZE) != 0)
