@@ -161,10 +161,11 @@ static void *rx_func(void *userdata)
   struct netmapfunc2_userdata ud;
   struct timeval tv1;
   struct periodic_userdata periodic = {};
+  struct allocif intf = {.ops = &ll_allocif_ops_st, .userdata = &st};
 
   gettimeofday(&tv1, NULL);
 
-  ud.loc = &loc;
+  ud.intf = &intf;
   ud.dlnmd = dlnmds[args->idx];
   ud.ulnmd = ulnmds[args->idx];
   outport.portfunc = netmapfunc2;
