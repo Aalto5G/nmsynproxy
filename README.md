@@ -5,6 +5,11 @@ Also, needless to say, compiler tools and GNU make must be available. To
 actually communicate with real network interfaces, you also need netmap, but
 more on that later.
 
+# Git history
+
+The git history has been edited to remove some proprietary code. Thus,
+historical versions of the repository may not compile correctly.
+
 # Compilation
 
 To compile, type `make -j4` where the number after `-j` is the number of cores.
