@@ -134,6 +134,22 @@ ip link set eth0 promisc on
 ip link set eth1 promisc on
 ```
 
+Then you must set the interfaces to have one queue each (or if using multiple
+threads, you must use multiple queues with the same number of queues as the
+number of threads configured in conf.txt):
+
+```
+ethtool -L eth0 combined 1
+ethtool -L eth1 combined 1
+```
+
+If the NIC has separate RX and TX queues, you must configure them separately:
+
+```
+ethtool -L eth0 rx 1 tx 1
+ethtool -L eth1 rx 1 tx 1
+```
+
 It is also recommended to turn off offloads:
 
 ```
