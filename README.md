@@ -70,7 +70,7 @@ You can try netmap with the following commands to be run in two terminal
 windows:
 
 ```
-./synproxy/netmapproxy vale0:1{0 vale1:1
+./synproxy/netmapproxy1 vale0:1{0 vale1:1
 taskset -c 3 ./synproxy/netmapsend vale0:1}0
 ```
 
@@ -118,7 +118,7 @@ ifconfig veth3 up
 
 Then run these two commands in two terminal windows:
 ```
-./synproxy/netmapproxy netmap:veth1 netmap:veth2
+./synproxy/netmapproxy1 netmap:veth1 netmap:veth2
 taskset -c 3 ./synproxy/netmapsend netmap:veth0
 ```
 
@@ -170,7 +170,7 @@ ethtool -A eth1 rx off tx off autoneg off
 
 Then you must start netmapproxy:
 ```
-./synproxy/netmapproxy netmap:eth0 netmap:eth1
+./synproxy/netmapproxy1 netmap:eth0 netmap:eth1
 ```
 
 Note that the order interfaces are specified matters. The first is the LAN
@@ -204,7 +204,7 @@ ip netns exec ns2 ip link set veth3 up
 
 Then run in one terminal window and leave it running:
 ```
-./synproxy/netmapproxy netmap:veth1 netmap:veth2
+./synproxy/netmapproxy1 netmap:veth1 netmap:veth2
 ```
 
 Verify that ping works to both directions:
