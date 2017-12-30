@@ -1,0 +1,3 @@
+[submodule "pptk"]
+	path = pptk
+	url = ssh://git@gitlab.cloud.mobilesdn.org:60022/jmtilli/pptk.git
