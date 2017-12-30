@@ -178,7 +178,7 @@ static inline void worker_local_init(
   if (locked)
   {
     hash_table_init_locked(
-      &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL, 4); // WAS: 0
+      &local->hash, synproxy->conf->conntablesize, synproxy_hash_fn, NULL, 2); // WAS: 0
     local->locked = 1;
     if (pthread_rwlock_init(&local->rwlock, NULL) != 0)
     {

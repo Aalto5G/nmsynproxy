@@ -8,39 +8,6 @@
 #include "yyutils.h"
 #include "time64.h"
 
-struct uniform_userdata {
-  struct worker_local *local;
-  uint32_t table_start;
-  uint32_t table_end;
-};
-
-static void uniform_fn(
-  struct timer_link *timer, struct timer_linkheap *heap, void *userdata)
-{
-  struct uniform_userdata *ud = userdata;
-  uint64_t time64 = gettime64();
-  uint32_t bucket;
-  for (bucket = ud->table_start; bucket < ud->table_end; bucket++)
-  {
-    struct hash_list_node *node;
-    hash_table_lock_bucket(&ud->local->hash, bucket);
-    HASH_TABLE_FOR_EACH_POSSIBLE(&ud->local->hash, node, bucket)
-    {
-      struct synproxy_hash_entry *entry;
-      entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
-      if (entry->timer.time64 < time64)
-      {
-        entry->timer.fn(&entry->timer, heap, entry->timer.userdata);
-      }
-    }
-    hash_table_unlock_bucket(&ud->local->hash, bucket);
-  }
-  timer->time64 += (1000*1000);
-  worker_local_wrlock(ud->local);
-  timer_linkheap_add(heap, timer);
-  worker_local_wrunlock(ud->local);
-}
-
 int threadcnt = 1;
 
 #define POOL_SIZE 300
@@ -74,11 +41,6 @@ struct pktctx {
   char pkt[1514];
   char pktsmall[64];
 };
-
-int uniformcnt = 128;
-
-struct uniform_userdata uniform_userdata[128] = {};
-struct timer_link uniformtimer[128] = {};
 
 static void *rx_func(void *userdata)
 {
@@ -115,23 +77,6 @@ static void *rx_func(void *userdata)
     abort();
   }
 
-  if (threadidx == 0)
-  {
-    uint64_t time64 = gettime64();
-    for (i = 0; i < uniformcnt; i++)
-    {
-      uniform_userdata[i].local = args->local;
-      uniform_userdata[i].table_start =
-        args->local->hash.bucketcnt*i/uniformcnt;
-      uniform_userdata[i].table_end =
-        args->local->hash.bucketcnt*(i+1)/uniformcnt;
-      uniformtimer[i].userdata = &uniform_userdata[i];
-      uniformtimer[i].fn = uniform_fn;
-      uniformtimer[i].time64 = time64 + (i+1)*1000*1000/uniformcnt;
-      timer_linkheap_add(&args->local->timers, &uniformtimer[i]);
-    }
-  }
-  
   for (i = 0; i < cnt; i++)
   {
     ether = ctx[i].pkt;

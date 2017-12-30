@@ -47,14 +47,14 @@ static inline int resend_request_is_valid(uint32_t seq, uint32_t ref_seq)
 }
 
 // caller must not have worker_local lock
-// caller must have bucket lock
+// caller must not have bucket lock
 static void synproxy_expiry_fn(
   struct timer_link *timer, struct timer_linkheap *heap, void *ud)
 {
   struct worker_local *local = ud;
   struct synproxy_hash_entry *e;
   e = CONTAINER_OF(timer, struct synproxy_hash_entry, timer);
-  hash_table_delete_already_bucket_locked(&local->hash, &e->node);
+  hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
   worker_local_wrlock(local);
   if (e->was_synproxied)
   {
@@ -140,9 +140,7 @@ struct synproxy_hash_entry *synproxy_hash_put(
   e->timer.fn = synproxy_expiry_fn;
   e->timer.userdata = local;
   worker_local_wrlock(local);
-#if 0
   timer_linkheap_add(&local->timers, &e->timer);
-#endif
   hash_table_add_nogrow_already_bucket_locked(
     &local->hash, &e->node, synproxy_hash(e));
   if (was_synproxied)
@@ -383,9 +381,7 @@ static void send_synack(
             state_data.downlink_half_open.listnode);
       hashval = synproxy_hash(e);
       linked_list_delete(&e->state_data.downlink_half_open.listnode);
-#if 0
-      timer_heap_remove(&local->timers, &e->timer);
-#endif
+      timer_linkheap_remove(&local->timers, &e->timer);
       if (ctx.hashval == hashval)
       {
         hash_table_delete_already_bucket_locked(&local->hash, &e->node);
@@ -420,16 +416,7 @@ static void send_synack(
     e->timer.time64 = time64 + 64ULL*1000ULL*1000ULL;
     e->timer.fn = synproxy_expiry_fn;
     e->timer.userdata = local;
-#if 0
-    if (timer_heap_add_nogrow(&local->timers, &e->timer) != 0)
-    {
-      free(e);
-      log_log(LOG_LEVEL_ERR, "WORKER", "out of timer heap space");
-      worker_local_wrunlock(local);
-      synproxy_hash_unlock(local, &ctx);
-      return;
-    }
-#endif
+    timer_linkheap_add(&local->timers, &e->timer);
     hash_table_add_nogrow(&local->hash, &e->node, synproxy_hash(e));
     linked_list_add_tail(
       &e->state_data.downlink_half_open.listnode, &local->half_open_list);
@@ -584,9 +571,7 @@ static void resend_syn(
     entry->wan_max_window_unscaled = tcp_window(origtcp);
   }
   entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
-#if 0
-  timer_heap_modify(&local->timers, &entry->timer);
-#endif
+  timer_linkheap_modify(&local->timers, &entry->timer);
 
   send_or_resend_syn(orig, local, port, st, entry);
 }
@@ -643,9 +628,7 @@ static void send_syn(
   entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1;
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
-#if 0
-  timer_heap_modify(&local->timers, &entry->timer);
-#endif
+  timer_linkheap_modify(&local->timers, &entry->timer);
 
   send_or_resend_syn(orig, local, port, st, entry);
 }
@@ -1013,14 +996,10 @@ int downlink(
       entry->wan_max =
         entry->wan_acked + (tcp_window(ippay) << entry->wan_wscale);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
-#if 0
       worker_local_wrlock(local);
-#endif
       entry->timer.time64 = time64 + 60ULL*1000ULL*1000ULL;
-#if 0
-      timer_heap_modify(&local->timers, &entry->timer);
+      timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-#endif
       if (synproxy->conf->mss_clamp_enabled)
       {
         uint16_t mss;
@@ -1231,14 +1210,10 @@ int downlink(
         ippay, tcp_len, tcp_ack_number(ippay)-entry->seqoffset);
     }
     entry->flag_state = FLAG_STATE_RESETED;
-#if 0
     worker_local_wrlock(local);
-#endif
     entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
-#if 0
-    timer_heap_modify(&local->timers, &entry->timer);
+    timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
-#endif
     synproxy_hash_unlock(local, &ctx);
     port->portfunc(pkt, port->userdata);
     return 0;
@@ -1249,13 +1224,9 @@ int downlink(
       && resend_request_is_valid(tcp_ack_number(ippay), entry->wan_acked))
   {
     log_log(LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "resending SYN");
-#if 0
     worker_local_wrlock(local);
-#endif
     resend_syn(ether, local, port, st, entry, time64);
-#if 0
     worker_local_wrunlock(local);
-#endif
     synproxy_hash_unlock(local, &ctx);
     return 1;
   }
@@ -1388,30 +1359,31 @@ int downlink(
       entry->wan_max = ack + (window << entry->wan_wscale);
     }
   }
-#if 0
-  worker_local_wrlock(local);
-#endif
+  uint64_t next64;
   if (entry->flag_state == FLAG_STATE_RESETED)
   {
-    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+    next64 = time64 + 45ULL*1000ULL*1000ULL;
   }
   else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
            (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+    next64 = time64 + 45ULL*1000ULL*1000ULL;
   }
   else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
   {
-    entry->timer.time64 = time64 + 900ULL*1000ULL*1000ULL;
+    next64 = time64 + 900ULL*1000ULL*1000ULL;
   }
   else
   {
-    entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+    next64 = time64 + 86400ULL*1000ULL*1000ULL;
   }
-#if 0
-  timer_heap_modify(&local->timers, &entry->timer);
-  worker_local_wrunlock(local);
-#endif
+  if (abs(next64 - entry->timer.time64) >= 1000*1000)
+  {
+    worker_local_wrlock(local);
+    entry->timer.time64 = next64;
+    timer_linkheap_modify(&local->timers, &entry->timer);
+    worker_local_wrunlock(local);
+  }
   tcp_find_sack_ts_headers(ippay, &hdrs);
   if (tcp_ack(ippay))
   {
@@ -1437,15 +1409,11 @@ int downlink(
   port->portfunc(pkt, port->userdata);
   if (todelete)
   {
-#if 0
     worker_local_wrlock(local);
-#endif
     entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
     entry->flag_state = FLAG_STATE_TIME_WAIT;
-#if 0
-    timer_heap_modify(&local->timers, &entry->timer);
+    timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
-#endif
   }
   synproxy_hash_unlock(local, &ctx);
   return 0;
@@ -1635,14 +1603,10 @@ int uplink(
         }
       }
       port->portfunc(pkt, port->userdata);
-#if 0
       worker_local_wrlock(local);
-#endif
       entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
-#if 0
-      timer_heap_modify(&local->timers, &entry->timer);
+      timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-#endif
       synproxy_hash_unlock(local, &ctx);
       return 0;
     }
@@ -1740,14 +1704,10 @@ int uplink(
         entry->lan_max_window_unscaled = 1;
       }
       entry->flag_state = FLAG_STATE_ESTABLISHED;
-#if 0
       worker_local_wrlock(local);
-#endif
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
-#if 0
-      timer_heap_modify(&local->timers, &entry->timer);
+      timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-#endif
       send_ack_and_window_update(ether, entry, port, st);
       synproxy_hash_unlock(local, &ctx);
       return 1;
@@ -1789,14 +1749,10 @@ int uplink(
         return 1;
       }
       entry->flag_state = FLAG_STATE_RESETED;
-#if 0
       worker_local_wrlock(local);
-#endif
       entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
-#if 0
-      timer_heap_modify(&local->timers, &entry->timer);
+      timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-#endif
       port->portfunc(pkt, port->userdata);
       synproxy_hash_unlock(local, &ctx);
       return 0;
@@ -1829,14 +1785,10 @@ int uplink(
       entry->lan_acked = ack;
       entry->lan_max = ack + (window << entry->lan_wscale);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
-#if 0
       worker_local_wrlock(local);
-#endif
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
-#if 0
-      timer_heap_modify(&local->timers, &entry->timer);
+      timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-#endif
       port->portfunc(pkt, port->userdata);
       synproxy_hash_unlock(local, &ctx);
       return 0;
@@ -1885,14 +1837,10 @@ int uplink(
       tcp_set_ack_number_cksum_update(
         ippay, tcp_len, 0);
       entry->flag_state = FLAG_STATE_RESETED;
-#if 0
       worker_local_wrlock(local);
-#endif
       entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
-#if 0
-      timer_heap_modify(&local->timers, &entry->timer);
+      timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-#endif
       port->portfunc(pkt, port->userdata);
       synproxy_hash_unlock(local, &ctx);
       return 0;
@@ -1913,14 +1861,10 @@ int uplink(
     tcp_set_seq_number_cksum_update(
       ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
     entry->flag_state = FLAG_STATE_RESETED;
-#if 0
     worker_local_wrlock(local);
-#endif
     entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
-#if 0
-    timer_heap_modify(&local->timers, &entry->timer);
+    timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
-#endif
     port->portfunc(pkt, port->userdata);
     synproxy_hash_unlock(local, &ctx);
     return 0;
@@ -2056,30 +2000,31 @@ int uplink(
       entry->lan_max = ack + (window << entry->lan_wscale);
     }
   }
-#if 0
-  worker_local_wrlock(local);
-#endif
+  uint64_t next64;
   if (entry->flag_state == FLAG_STATE_RESETED)
   {
-    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+    next64 = time64 + 45ULL*1000ULL*1000ULL;
   }
   else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
            (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
+    next64 = time64 + 45ULL*1000ULL*1000ULL;
   }
   else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
   {
-    entry->timer.time64 = time64 + 900ULL*1000ULL*1000ULL;
+    next64 = time64 + 900ULL*1000ULL*1000ULL;
   }
   else
   {
-    entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
+    next64 = time64 + 86400ULL*1000ULL*1000ULL;
   }
-#if 0
-  timer_linkheap_modify(&local->timers, &entry->timer);
-  worker_local_wrunlock(local);
-#endif
+  if (abs(next64 - entry->timer.time64) >= 1000*1000)
+  {
+    worker_local_wrlock(local);
+    entry->timer.time64 = next64;
+    timer_linkheap_modify(&local->timers, &entry->timer);
+    worker_local_wrunlock(local);
+  }
   tcp_set_seq_number_cksum_update(
     ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
   wscalediff = entry->wscalediff;
@@ -2102,15 +2047,11 @@ int uplink(
   port->portfunc(pkt, port->userdata);
   if (todelete)
   {
-#if 0
     worker_local_wrlock(local);
-#endif
     entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
     entry->flag_state = FLAG_STATE_TIME_WAIT;
-#if 0
-    timer_heap_modify(&local->timers, &entry->timer);
+    timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
-#endif
   }
   synproxy_hash_unlock(local, &ctx);
   return 0;

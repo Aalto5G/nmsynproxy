@@ -83,47 +83,6 @@ static void periodic_fn(
   ud->next_time64 += 2*1000*1000;
 }
 
-struct uniform_userdata {
-  struct worker_local *local;
-  uint32_t table_start;
-  uint32_t table_end;
-};
-
-static void uniform_fn(
-  struct timer_link *timer, struct timer_linkheap *heap, void *userdata)
-{
-  struct uniform_userdata *ud = userdata;
-  uint64_t time64 = gettime64();
-  uint32_t bucket;
-  hash_table_lock_bucket(&ud->local->hash, ud->table_start);
-  for (bucket = ud->table_start; bucket < ud->table_end; bucket++)
-  {
-    struct hash_list_node *node;
-    HASH_TABLE_FOR_EACH_POSSIBLE(&ud->local->hash, node, bucket)
-    {
-      struct synproxy_hash_entry *entry;
-      entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
-      if (entry->timer.time64 < time64)
-      {
-        entry->timer.fn(&entry->timer, heap, entry->timer.userdata);
-      }
-    }
-    if (bucket + 1 < ud->table_end)
-    {
-      hash_table_lock_next_bucket(&ud->local->hash, bucket);
-    }
-  }
-  hash_table_unlock_bucket(&ud->local->hash, ud->table_end - 1);
-  timer->time64 += (1000*1000);
-  worker_local_wrlock(ud->local);
-  timer_linkheap_add(heap, timer);
-  worker_local_wrunlock(ud->local);
-}
-
-const int uniformcnt = 32;
-struct uniform_userdata uniform_userdata[32] = {};
-struct timer_link uniformtimer[32] = {};
-
 #define MAX_WORKERS 64
 #define MAX_RX_TX 64
 #define MAX_TX 64
@@ -332,7 +291,6 @@ int main(int argc, char **argv)
   char *wanname = NULL;
   int i;
   char nmifnamebuf[64];
-  uint64_t time64;
   sigset_t set;
   int pipefd[2];
   int sockfd;
@@ -490,20 +448,6 @@ int main(int argc, char **argv)
         gettime64());
     }
   }
-  time64 = gettime64();
-  for (i = 0; i < uniformcnt; i++)
-  {
-    uniform_userdata[i].local = &local;
-    uniform_userdata[i].table_start =
-      local.hash.bucketcnt*i/uniformcnt;
-    uniform_userdata[i].table_end =
-      local.hash.bucketcnt*(i+1)/uniformcnt;
-    uniformtimer[i].userdata = &uniform_userdata[i];
-    uniformtimer[i].fn = uniform_fn;
-    uniformtimer[i].time64 = time64 + (i+1)*1000*1000/uniformcnt;
-    timer_linkheap_add(&local.timers, &uniformtimer[i]);
-  }
-
 
   for (i = 0; i < num_rx; i++)
   {
