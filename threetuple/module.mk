@@ -36,6 +36,7 @@ $(DIRTHREETUPLE)/threetupletest: $(DIRTHREETUPLE)/threetupletest.o $(DIRTHREETUP
 
 $(THREETUPLE_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_THREETUPLE)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_THREETUPLE)
+	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_THREETUPLE)
 
 $(THREETUPLE_DEP): %.d: %.c $(MAKEFILES_COMMON) $(MAKEFILES_THREETUPLE)
 	$(CC) $(CFLAGS) -MM -MP -MT "$*.d $*.o" -o $*.d $*.c $(CFLAGS_THREETUPLE)

@@ -92,8 +92,10 @@ $(DIRSYNPROXY)/sizeof: $(DIRSYNPROXY)/sizeof.o $(DIRSYNPROXY)/libsynproxy.a $(LI
 
 $(SYNPROXY_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SYNPROXY)
+	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_SYNPROXY)
 $(SYNPROXY_OBJGEN): %.o: %.c %.h %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SYNPROXY) -Wno-sign-compare -Wno-missing-prototypes
+	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_SYNPROXY) -Wno-sign-compare -Wno-missing-prototypes
 
 $(SYNPROXY_DEP): %.d: %.c $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -MM -MP -MT "$*.d $*.o" -o $*.d $*.c $(CFLAGS_SYNPROXY)

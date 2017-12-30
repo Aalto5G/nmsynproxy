@@ -45,6 +45,7 @@ $(DIRSACKHASH)/sackhashtest4: $(DIRSACKHASH)/sackhashtest4.o $(DIRSACKHASH)/libs
 
 $(SACKHASH_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SACKHASH)
+	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_SACKHASH)
 
 $(SACKHASH_DEP): %.d: %.c $(MAKEFILES_COMMON) $(MAKEFILES_SACKHASH)
 	$(CC) $(CFLAGS) -MM -MP -MT "$*.d $*.o" -o $*.d $*.c $(CFLAGS_SACKHASH)
