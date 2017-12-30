@@ -38,6 +38,7 @@ struct conf {
   enum learnmode wscalemode;
   size_t learnhashsize;
   size_t conntablesize;
+  unsigned threadcount;
   struct ratehashconf ratehash;
   DYNARR(uint16_t) msslist;
   DYNARR(uint8_t) wscalelist;
@@ -85,6 +86,7 @@ struct conf {
   .mss_clamp = 1460, \
   .ts_bits = 5, \
   .halfopen_cache_max = 0, \
+  .threadcount = 1, \
 }
 
 static inline void conf_free(struct conf *conf)

@@ -218,6 +218,8 @@ int main(int argc, char **argv)
   //  abort();
   //}
 
+  threadcnt = conf.threadcount;
+
   //worker_local_init(&local, &synproxy, 0, 0);
   worker_local_init(&local, &synproxy, 0, 1);
   //synproxy_hash_put_connected(

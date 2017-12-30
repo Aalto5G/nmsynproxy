@@ -2,6 +2,7 @@ synproxyconf = {
   sackmode = hashipport;
   sackconflict = remove;
   mssmode = hashipport;
+  threadcount = 1;
   learnhashsize = 131072;
   conntablesize = 131072;
   halfopen_cache_max = 0;

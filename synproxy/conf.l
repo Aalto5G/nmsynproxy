@@ -40,6 +40,7 @@ hashipport   return HASHIPPORT;
 commanded    return COMMANDED;
 learnhashsize return LEARNHASHSIZE;
 ratehash     return RATEHASH;
+threadcount  return THREADCOUNT;
 size         return SIZE;
 timer_period_usec return TIMER_PERIOD_USEC;
 timer_add    return TIMER_ADD;

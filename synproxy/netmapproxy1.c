@@ -88,8 +88,6 @@ static void periodic_fn(
 #define MAX_TX 64
 #define MAX_RX 64
 
-const int num_rx = 2;
-
 struct nm_desc *dlnmds[MAX_RX_TX], *ulnmds[MAX_RX_TX];
 
 int in = 0;
@@ -384,7 +382,14 @@ int main(int argc, char **argv)
     wan = 1;
   }
 
+  int num_rx;
   int max;
+  num_rx = conf.threadcount;
+  if (num_rx > MAX_RX)
+  {
+    printf("too many threads: %d\n", num_rx);
+    exit(1);
+  }
   max = num_rx;
 
   for (i = 0; i < max; i++)
