@@ -38,7 +38,6 @@ struct conf {
   enum learnmode wscalemode;
   size_t learnhashsize;
   size_t conntablesize;
-  size_t timerheapsize;
   struct ratehashconf ratehash;
   DYNARR(uint16_t) msslist;
   DYNARR(uint8_t) wscalelist;
@@ -67,7 +66,6 @@ struct conf {
   .mssmode = HASHMODE_HASHIP, \
   .learnhashsize = 131072, \
   .conntablesize = 131072, \
-  .timerheapsize = 131072, \
   .ratehash = { \
     .size = 131072, \
     .timer_period_usec = (1000*1000), \

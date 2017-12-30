@@ -4,7 +4,6 @@ synproxyconf = {
   mssmode = hashipport;
   learnhashsize = 131072;
   conntablesize = 131072;
-  timerheapsize = 131072;
   halfopen_cache_max = 0;
   mss = {216, 1200, 1400, 1460};
   wscale = {0, 2, 4, 7};
