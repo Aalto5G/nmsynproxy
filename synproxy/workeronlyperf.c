@@ -219,6 +219,11 @@ int main(int argc, char **argv)
   //}
 
   threadcnt = conf.threadcount;
+  if (threadcnt <= 0 || threadcnt > (int)(sizeof(rx)/sizeof(*rx)))
+  {
+    printf("too many threads: %d\n", threadcnt);
+    exit(1);
+  }
 
   //worker_local_init(&local, &synproxy, 0, 0);
   worker_local_init(&local, &synproxy, 0, 1);

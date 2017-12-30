@@ -385,7 +385,7 @@ int main(int argc, char **argv)
   int num_rx;
   int max;
   num_rx = conf.threadcount;
-  if (num_rx > MAX_RX)
+  if (num_rx <= 0 || num_rx > MAX_RX)
   {
     printf("too many threads: %d\n", num_rx);
     exit(1);
