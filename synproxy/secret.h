@@ -15,6 +15,7 @@ struct secretinfo {
   struct secret secrets[2];
   int current_secret_index;
   struct chacha20_ctx chachactx;
+  pthread_rwlock_t lock;
 };
 
 void secret_init_deterministic(struct secretinfo *info);

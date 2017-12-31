@@ -292,6 +292,7 @@ int main(int argc, char **argv)
   sigset_t set;
   int pipefd[2];
   int sockfd;
+  struct timer_link timer;
 
   log_open("NETMAPPROXY1", LOG_LEVEL_DEBUG, LOG_LEVEL_INFO);
 
@@ -469,6 +470,10 @@ int main(int argc, char **argv)
   nm_my_inject(ulnmds[0], pktul, sizeof(pktul));
   ioctl(ulnmds[0]->fd, NIOCTXSYNC, NULL);
 
+  timer.time64 = gettime64() + 32*1000*1000;
+  timer.fn = revolve_secret;
+  timer.userdata = &local.info;
+  timer_linkheap_add(&local.timers, &timer);
 
   for (i = 0; i < num_rx; i++)
   {

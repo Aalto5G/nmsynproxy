@@ -9,6 +9,10 @@
 
 void secret_init_deterministic(struct secretinfo *info)
 {
+  if (pthread_rwlock_init(&info->lock, NULL) != 0)
+  {
+    abort();
+  }
   info->current_secret_index = 0;
   chacha20_init_deterministic(&info->chachactx);
   revolve_secret_impl(info);
@@ -17,6 +21,10 @@ void secret_init_deterministic(struct secretinfo *info)
 
 void secret_init_random(struct secretinfo *info)
 {
+  if (pthread_rwlock_init(&info->lock, NULL) != 0)
+  {
+    abort();
+  }
   info->current_secret_index = 0;
   chacha20_init_devrandom(&info->chachactx);
   revolve_secret_impl(info);
@@ -30,8 +38,18 @@ void revolve_secret_impl(struct secretinfo *info)
   char buf[64];
   chacha20_next_block(&info->chachactx, buf);
   memcpy(new_secret.data, buf, 16);
+  if (pthread_rwlock_wrlock(&info->lock) != 0)
+  {
+    abort();
+  }
   info->secrets[new_secret_index] = new_secret;
   info->current_secret_index = new_secret_index;
+  if (pthread_rwlock_unlock(&info->lock) != 0)
+  {
+    abort();
+  }
+  log_log(LOG_LEVEL_NOTICE, "SECRET",
+          "revolved secret, current is %d", new_secret_index);
 }
 
 void revolve_secret(
@@ -51,7 +69,7 @@ int verify_cookie(
 {
   struct conf *conf = synproxy->conf;
   int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits + 1;
-  struct secret secret1 = info->secrets[isn>>31];
+  struct secret secret1;
   uint16_t additional_bits = (isn>>(32-total_bits))&((1<<total_bits)-1);
   uint32_t bitmask = ((1<<(32-total_bits))-1);
   uint32_t mssmask = ((1<<(conf->msslist_bits))-1);
@@ -60,7 +78,16 @@ int verify_cookie(
   uint32_t hash;
   uint16_t *msstab = &DYNARR_GET(&conf->msslist, 0);
   uint8_t *wstab = &DYNARR_GET(&conf->wscalelist, 0);
+  if (pthread_rwlock_rdlock(&info->lock) != 0)
+  {
+    abort();
+  }
+  secret1 = info->secrets[isn>>31];
   siphash_init(&ctx, secret1.data);
+  if (pthread_rwlock_unlock(&info->lock) != 0)
+  {
+    abort();
+  }
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
@@ -96,8 +123,8 @@ uint32_t form_cookie(
   uint32_t mssbits;
   uint32_t additional_bits;
   int i;
-  int current_secret = info->current_secret_index;
-  struct secret secret1 = info->secrets[current_secret];
+  int current_secret;
+  struct secret secret1;
   struct siphash_ctx ctx;
   uint32_t hash;
   int wscnt = DYNARR_SIZE(&synproxy->conf->wscalelist);
@@ -131,7 +158,17 @@ uint32_t form_cookie(
       (sack_permitted<<(conf->wscalelist_bits+conf->msslist_bits))
     | (mssbits<<conf->wscalelist_bits)
     | wsbits;
+  if (pthread_rwlock_rdlock(&info->lock) != 0)
+  {
+    abort();
+  }
+  current_secret = info->current_secret_index;
+  secret1 = info->secrets[current_secret];
   siphash_init(&ctx, secret1.data);
+  if (pthread_rwlock_unlock(&info->lock) != 0)
+  {
+    abort();
+  }
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
@@ -147,7 +184,7 @@ int verify_timestamp(
   struct conf *conf = synproxy->conf;
   int total_bits =
     conf->ts_bits + conf->tsmsslist_bits + conf->tswscalelist_bits + 1;
-  struct secret secret1 = info->secrets[isn>>31];
+  struct secret secret1;
   uint16_t additional_bits = (isn>>(32-total_bits))&((1<<total_bits)-1);
   uint32_t bitmask = ((1<<(32-total_bits))-1);
   uint32_t mssmask = ((1<<(conf->msslist_bits))-1);
@@ -156,7 +193,16 @@ int verify_timestamp(
   uint32_t hash;
   uint16_t *msstab = &DYNARR_GET(&conf->tsmsslist, 0);
   uint8_t *wstab = &DYNARR_GET(&conf->tswscalelist, 0);
+  if (pthread_rwlock_rdlock(&info->lock) != 0)
+  {
+    abort();
+  }
+  secret1 = info->secrets[isn>>31];
   siphash_init(&ctx, secret1.data);
+  if (pthread_rwlock_unlock(&info->lock) != 0)
+  {
+    abort();
+  }
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
@@ -188,8 +234,8 @@ uint32_t form_timestamp(
   uint32_t mssbits;
   uint32_t additional_bits;
   int i;
-  int current_secret = info->current_secret_index;
-  struct secret secret1 = info->secrets[current_secret];
+  int current_secret;
+  struct secret secret1;
   struct siphash_ctx ctx;
   uint32_t hash;
   int wscnt = DYNARR_SIZE(&synproxy->conf->tswscalelist);
@@ -223,7 +269,17 @@ uint32_t form_timestamp(
       (ts<<(conf->tswscalelist_bits+conf->tsmsslist_bits))
     | (mssbits<<conf->tswscalelist_bits)
     | wsbits;
+  if (pthread_rwlock_rdlock(&info->lock) != 0)
+  {
+    abort();
+  }
+  current_secret = info->current_secret_index;
+  secret1 = info->secrets[current_secret];
   siphash_init(&ctx, secret1.data);
+  if (pthread_rwlock_unlock(&info->lock) != 0)
+  {
+    abort();
+  }
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
