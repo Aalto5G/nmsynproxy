@@ -491,7 +491,6 @@ int main(int argc, char **argv)
     }
   }
   sleep(1);
-  printf("slept\n");
   set_promisc_mode(sockfd, argv[optind + 0], 1);
   set_promisc_mode(sockfd, argv[optind + 1], 1);
   if (getuid() == 0 && conf.gid != 0)
