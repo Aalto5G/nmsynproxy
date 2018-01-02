@@ -59,6 +59,8 @@ struct conf {
   uint8_t mss_clamp_enabled;
   uint16_t mss_clamp;
   uint8_t own_sack;
+  uid_t uid;
+  gid_t gid;
 };
 
 #define CONF_INITIALIZER { \
@@ -87,6 +89,8 @@ struct conf {
   .ts_bits = 5, \
   .halfopen_cache_max = 0, \
   .threadcount = 1, \
+  .uid = 0, \
+  .gid = 0, \
 }
 
 static inline void conf_free(struct conf *conf)

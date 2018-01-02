@@ -400,7 +400,7 @@ int main(int argc, char **argv)
     nmr.nr_rx_rings = max;
     nmr.nr_flags = NR_REG_ONE_NIC;
     nmr.nr_ringid = i | NETMAP_NO_TX_POLL;
-#if 0
+#if 1
     nmr.nr_rx_slots = 256;
     nmr.nr_tx_slots = 64;
 #endif
@@ -424,7 +424,7 @@ int main(int argc, char **argv)
     nmr.nr_rx_rings = max;
     nmr.nr_flags = NR_REG_ONE_NIC;
     nmr.nr_ringid = i | NETMAP_NO_TX_POLL;
-#if 0
+#if 1
     nmr.nr_rx_slots = 256;
     nmr.nr_tx_slots = 64;
 #endif
@@ -479,14 +479,6 @@ int main(int argc, char **argv)
   {
     pthread_create(&rx[i], NULL, rx_func, &rx_args[i]);
   }
-  if (pipe(pipefd) != 0)
-  {
-    abort();
-  }
-  ctrl_args.piperd = pipefd[0];
-  ctrl_args.synproxy = &synproxy;
-  pthread_create(&ctrl, NULL, ctrl_func, &ctrl_args);
-  pthread_create(&sigthr, NULL, signal_handler_thr, NULL);
   int cpu = 0;
   if (num_rx <= sysconf(_SC_NPROCESSORS_ONLN))
   {
@@ -499,8 +491,34 @@ int main(int argc, char **argv)
     }
   }
   sleep(1);
+  printf("slept\n");
   set_promisc_mode(sockfd, argv[optind + 0], 1);
   set_promisc_mode(sockfd, argv[optind + 1], 1);
+  if (getuid() == 0 && conf.gid != 0)
+  {
+    if (setgid(conf.gid) != 0)
+    {
+      printf("setgid failed\n");
+    }
+    log_log(LOG_LEVEL_NOTICE, "NMPROXY", "dropped group privileges");
+  }
+  if (getuid() == 0 && conf.uid != 0)
+  {
+    if (setuid(conf.uid) != 0)
+    {
+      printf("setuid failed\n");
+    }
+    log_log(LOG_LEVEL_NOTICE, "NMPROXY", "dropped user privileges");
+  }
+  if (pipe(pipefd) != 0)
+  {
+    abort();
+  }
+  ctrl_args.piperd = pipefd[0];
+  ctrl_args.synproxy = &synproxy;
+  pthread_create(&ctrl, NULL, ctrl_func, &ctrl_args);
+  pthread_create(&sigthr, NULL, signal_handler_thr, NULL);
+  log_log(LOG_LEVEL_NOTICE, "NMPROXY", "fully running");
   for (i = 0; i < num_rx; i++)
   {
     pthread_join(rx[i], NULL);

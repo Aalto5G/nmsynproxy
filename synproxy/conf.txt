@@ -1,4 +1,6 @@
 synproxyconf = {
+  user = "root";
+  group = 0;
   sackmode = hashipport;
   sackconflict = remove;
   mssmode = hashipport;

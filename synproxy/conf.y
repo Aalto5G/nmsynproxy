@@ -4,6 +4,9 @@
 typedef void *yyscan_t;
 #endif
 #include "conf.h"
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 }
 
 %define api.prefix {confyy}
@@ -36,6 +39,10 @@ int confyywrap(yyscan_t scanner)
 %union {
   int i;
   char *s;
+  struct {
+    int i;
+    char *s;
+  } both;
 }
 
 %destructor { free ($$); } STRING_LITERAL
@@ -48,6 +55,7 @@ int confyywrap(yyscan_t scanner)
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
 %token NETWORK_PREFIX MSSMODE WSCALEMODE DEFAULT HALFOPEN_CACHE_MAX
+%token USER GROUP
 
 
 %type<i> sackhashval
@@ -57,6 +65,7 @@ int confyywrap(yyscan_t scanner)
 %type<i> own_sack
 %type<i> INT_LITERAL
 %type<s> STRING_LITERAL
+%type<both> intorstring
 
 %%
 
@@ -65,6 +74,19 @@ synproxyconf: SYNPROXYCONF EQUALS OPENBRACE conflist CLOSEBRACE SEMICOLON
 
 maybe_comma:
 | COMMA
+;
+
+intorstring:
+  INT_LITERAL
+{
+  $$.i = $1;
+  $$.s = NULL;
+}
+| STRING_LITERAL
+{
+  $$.i = 0;
+  $$.s = $1;
+}
 ;
 
 sackconflictval:
@@ -76,6 +98,7 @@ sackconflictval:
 {
   $$ = SACKCONFLICT_RETAIN;
 }
+;
 
 sackhashval:
   DEFAULT
@@ -249,7 +272,91 @@ tswscalelist_maybe:
 ;
 
 conflist_entry:
-MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
+USER EQUALS intorstring SEMICOLON
+{
+  uid_t uid;
+  if ($3.s != NULL)
+  {
+    char *buf;
+    char stbuf[1024];
+    size_t bufsize;
+    struct passwd pwd;
+    struct passwd *result;
+
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize <= 0)
+    {
+      bufsize = 16384;
+    }
+    buf = malloc(bufsize);
+    if (buf == NULL)
+    {
+      bufsize = sizeof(stbuf);
+      buf = stbuf;
+    }
+    if (getpwnam_r($3.s, &pwd, buf, bufsize, &result) != 0 || result == NULL)
+    {
+      fprintf(stderr, "invalid user: %s at line %d col %d\n",
+              $3.s, @3.first_line, @3.first_column);
+      YYABORT;
+    }
+    uid = result->pw_uid;
+    if (buf != stbuf)
+    {
+      free(buf);
+    }
+    free($3.s);
+    $3.s = NULL;
+  }
+  else
+  {
+    uid = $3.i;
+  }
+  conf->uid = uid;
+}
+| GROUP EQUALS intorstring SEMICOLON
+{
+  gid_t gid;
+  if ($3.s != NULL)
+  {
+    char *buf;
+    char stbuf[1024];
+    size_t bufsize;
+    struct group pwd;
+    struct group *result;
+
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize <= 0)
+    {
+      bufsize = 16384;
+    }
+    buf = malloc(bufsize);
+    if (buf == NULL)
+    {
+      bufsize = sizeof(stbuf);
+      buf = stbuf;
+    }
+    if (getgrnam_r($3.s, &pwd, buf, bufsize, &result) != 0 || result == NULL)
+    {
+      fprintf(stderr, "invalid group: %s at line %d col %d\n",
+              $3.s, @3.first_line, @3.first_column);
+      YYABORT;
+    }
+    gid = result->gr_gid;
+    if (buf != stbuf)
+    {
+      free(buf);
+    }
+    free($3.s);
+    $3.s = NULL;
+  }
+  else
+  {
+    gid = $3.i;
+  }
+  conf->gid = gid;
+}
+| MSS_CLAMP EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 <= 0 || $3 > 65535)
   {
