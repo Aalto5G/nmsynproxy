@@ -516,7 +516,13 @@ int main(int argc, char **argv)
   }
   ctrl_args.piperd = pipefd[0];
   ctrl_args.synproxy = &synproxy;
-  pthread_create(&ctrl, NULL, ctrl_func, &ctrl_args);
+  if (   conf.mssmode == HASHMODE_COMMANDED
+      || conf.sackmode == HASHMODE_COMMANDED
+      || conf.wscalemode == HASHMODE_COMMANDED)
+  {
+    pthread_create(&ctrl, NULL, ctrl_func, &ctrl_args);
+  }
+
   pthread_create(&sigthr, NULL, signal_handler_thr, NULL);
   log_log(LOG_LEVEL_NOTICE, "NMPROXY", "fully running");
   for (i = 0; i < num_rx; i++)
@@ -528,7 +534,12 @@ int main(int argc, char **argv)
   {
     printf("pipe write failed\n");
   }
-  pthread_join(ctrl, NULL);
+  if (   conf.mssmode == HASHMODE_COMMANDED
+      || conf.sackmode == HASHMODE_COMMANDED
+      || conf.wscalemode == HASHMODE_COMMANDED)
+  {
+    pthread_join(ctrl, NULL);
+  }
 
   for (i = 0; i < num_rx; i++)
   {
