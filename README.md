@@ -1,3 +1,23 @@
+# nmsynproxy
+
+nmsynproxy is a Linux user space TCP SYN proxy for IPv4 using netmap. IPv6 is
+not currently supported, but may be supported in the future.
+
+The SYN proxy makes hybrid use of SYN cookies and SYN cache. It also makes
+hybrid use of TCP sequence numbers and TCP timestamp option. The SYN cookie
+implementation is particularly modern, and is expected to lead to better
+performance, security and compatibility than most SYN cookie implementations
+out there. That's assuming SYN cookies are needed, as the SYN proxy uses also
+SYN cache, in contrast to the Linux iptables in-kernel SYN proxy that merely
+uses SYN cookies.
+
+Multithreading is supported, provided that the network interface card (NIC) has
+multiple queues. Actually, the NIC queue count needs to be adjusted to the same
+number as the number of threads before starting up nmsynproxy.
+
+Performance should be great. With any recent good CPU, even as few as three
+threads should achieve 40 Gbps link saturation when transferring large files.
+
 # Prerequisites
 
 You need to have flex and bison installed in order to compile this project.
@@ -70,8 +90,8 @@ You can try netmap with the following commands to be run in two terminal
 windows:
 
 ```
-./synproxy/nmsynproxy vale0:1{0 vale1:1
-taskset -c 3 ./synproxy/netmapsend vale0:1}0
+./synproxy/nmsynproxy vale0:1 vale1:1
+taskset -c 3 ./synproxy/netmapsend vale0:0
 ```
 
 # Netmap with full kernel sources
@@ -168,7 +188,7 @@ ethtool -A eth0 rx off tx off autoneg off
 ethtool -A eth1 rx off tx off autoneg off
 ```
 
-Then you must start netmapproxy:
+Then you must start nmsynproxy:
 ```
 ./synproxy/nmsynproxy netmap:eth0 netmap:eth1
 ```
