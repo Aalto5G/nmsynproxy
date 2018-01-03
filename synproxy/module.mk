@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c yyutils.c secret.c ctrl.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c netmapproxy1.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c
 
 SYNPROXY_LEX_LIB := conf.l
 SYNPROXY_LEX := $(SYNPROXY_LEX_LIB)
@@ -53,7 +53,7 @@ unit_$(LCSYNPROXY): unit_SYNPROXY
 SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof
 
 ifeq ($(WITH_NETMAP),yes)
-SYNPROXY: $(DIRSYNPROXY)/netmapproxy1 $(DIRSYNPROXY)/netmapsend
+SYNPROXY: $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend
 CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR)
 endif
 
@@ -69,7 +69,7 @@ $(DIRSYNPROXY)/libsynproxy.a: $(SYNPROXY_OBJ_LIB) $(SYNPROXY_OBJGEN_LIB) $(MAKEF
 $(DIRSYNPROXY)/workeronlyperf: $(DIRSYNPROXY)/workeronlyperf.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
-$(DIRSYNPROXY)/netmapproxy1: $(DIRSYNPROXY)/netmapproxy1.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+$(DIRSYNPROXY)/nmsynproxy: $(DIRSYNPROXY)/nmsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)

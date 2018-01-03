@@ -294,7 +294,7 @@ int main(int argc, char **argv)
   int sockfd;
   struct timer_link timer;
 
-  log_open("NETMAPPROXY1", LOG_LEVEL_DEBUG, LOG_LEVEL_INFO);
+  log_open("NMSYNPROXY", LOG_LEVEL_DEBUG, LOG_LEVEL_INFO);
 
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
   if (sockfd < 0)

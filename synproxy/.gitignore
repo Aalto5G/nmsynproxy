@@ -1,8 +1,7 @@
 /workerperf
 /workeronlyperf
 /netmapsend
-/netmapproxy
-/netmapproxy1
+/nmsynproxy
 /secrettest
 /conftest
 /pcapngworkeronly
