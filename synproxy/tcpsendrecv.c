@@ -6,6 +6,8 @@
 #include "ipcksum.h"
 #include "packet.h"
 #include "net/netmap_user.h"
+#include "mypcapng.h"
+#include "time64.h"
 #include <sys/poll.h>
 #include <stdatomic.h>
 
@@ -77,7 +79,7 @@ struct tcp_ctx {
   uint16_t port1;
   uint16_t port2;
   char pkt[1514];
-  char pktsmall[64];
+  char pktsmall[60];
 };
 
 static void init_uplink(struct tcp_ctx *ctx)
@@ -103,6 +105,7 @@ static void init_uplink(struct tcp_ctx *ctx)
   tcp_set_src_port(tcp, ctx->port1);
   tcp_set_dst_port(tcp, ctx->port2);
   tcp_set_ack_on(tcp);
+  tcp_set_window(tcp, 65535);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, ctx->seq1);
   tcp_set_ack_number(tcp, ctx->seq2);
@@ -116,7 +119,7 @@ static void init_uplink(struct tcp_ctx *ctx)
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
   ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(ctx->pktsmall) - 14);
+  ip_set_total_len(ip, 14+20+20 - 14);
   ip_set_dont_frag(ip, 1);
   ip_set_id(ip, 123);
   ip_set_ttl(ip, 64);
@@ -128,13 +131,14 @@ static void init_uplink(struct tcp_ctx *ctx)
   tcp_set_src_port(tcp, ctx->port2);
   tcp_set_dst_port(tcp, ctx->port1);
   tcp_set_ack_on(tcp);
+  tcp_set_window(tcp, 65535);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, ctx->seq2);
   tcp_set_ack_number(tcp, ctx->seq);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(ctx->pktsmall) - 14 - 20);
+  tcp_set_cksum_calc(ip, 20, tcp, 14+20+20 - 14 - 20);
 }
 
-static void run_uplink(int thr, struct tcp_ctx *ctx, unsigned pkts)
+static void run_uplink(int thr, struct tcp_ctx *ctx, unsigned pkts, struct pcapng_out_ctx *pcapctx)
 {
   void *ether, *ip, *tcp;
   uint16_t tcp_len;
@@ -145,33 +149,50 @@ static void run_uplink(int thr, struct tcp_ctx *ctx, unsigned pkts)
     ip = ether_payload(ether);
     tcp = ip_payload(ip);
     tcp_len = ip_total_len(ip) - ip_hdr_len(ip);
-    ctx->seq1 += sizeof(pkt) - 14 - 20 - 20;
-    ctx->seq += sizeof(pkt) - 14 - 20 - 20;
     tcp_set_seq_number_cksum_update(tcp, tcp_len, ctx->seq1);
     nm_my_inject(ulnmds[thr], ctx->pkt, sizeof(ctx->pkt));
-    ctx->seq1 += sizeof(pkt) - 14 - 20 - 20;
-    ctx->seq += sizeof(pkt) - 14 - 20 - 20;
+    //pcapng_out_ctx_write(pcapctx, ctx->pkt, sizeof(ctx->pkt), gettime64(), "ul");
+    ctx->seq1 += sizeof(ctx->pkt) - 14 - 20 - 20;
+    ctx->seq += sizeof(ctx->pkt) - 14 - 20 - 20;
     tcp_set_seq_number_cksum_update(tcp, tcp_len, ctx->seq1);
     nm_my_inject(ulnmds[thr], ctx->pkt, sizeof(ctx->pkt));
+    //pcapng_out_ctx_write(pcapctx, ctx->pkt, sizeof(ctx->pkt), gettime64(), "ul");
+    ioctl(ulnmds[thr]->fd, NIOCTXSYNC);
+    usleep(100);
+    ctx->seq1 += sizeof(ctx->pkt) - 14 - 20 - 20;
+    ctx->seq += sizeof(ctx->pkt) - 14 - 20 - 20;
     ether = ctx->pktsmall;
     ip = ether_payload(ether);
     tcp = ip_payload(ip);
     tcp_len = ip_total_len(ip) - ip_hdr_len(ip);
     tcp_set_ack_number_cksum_update(tcp, tcp_len, ctx->seq);
     nm_my_inject(dlnmds[thr], ctx->pktsmall, sizeof(ctx->pktsmall));
+    //pcapng_out_ctx_write(pcapctx, ctx->pktsmall, sizeof(ctx->pktsmall), gettime64(), "dl");
+    ioctl(dlnmds[thr]->fd, NIOCTXSYNC);
+    usleep(100);
   }
 }
 
 static void *thr(void *arg)
 {
   struct thr_arg *args = arg;
-  struct tcp_ctx ctx[90] = {};
+  struct tcp_ctx ctx[1] = {};
   void *ether;
   void *ip;
   void *tcp;
   int i;
   char pkt[14+20+20] = {0};
   int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
+  struct pcapng_out_ctx pcapctx;
+  char filebuf[256] = {0};
+  
+  snprintf(filebuf, sizeof(filebuf), "tcpsendrecv-%d.pcapng", args->idx);
+
+  //if (pcapng_out_ctx_init(&pcapctx, filebuf) != 0)
+  //{
+  //  abort();
+  //}
+
 
   for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
   {
@@ -204,9 +225,12 @@ static void *thr(void *arg)
     tcp_set_dst_port(tcp, ctx[i].port2);
     tcp_set_syn_on(tcp);
     tcp_set_data_offset(tcp, 20);
+    tcp_set_window(tcp, 65535);
     tcp_set_seq_number(tcp, ctx[i].seq1 - 1);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    //pcapng_out_ctx_write(&pcapctx, pkt, sizeof(pkt), gettime64(), "ul");
     nm_my_inject(ulnmds[args->idx], pkt, sizeof(pkt));
+    ioctl(ulnmds[args->idx]->fd, NIOCTXSYNC);
     usleep(1000);
 
     memset(pkt, 0, sizeof(pkt));
@@ -230,10 +254,13 @@ static void *thr(void *arg)
     tcp_set_syn_on(tcp);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
+    tcp_set_window(tcp, 65535);
     tcp_set_seq_number(tcp, ctx[i].seq2 - 1);
     tcp_set_ack_number(tcp, ctx[i].seq1);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    //pcapng_out_ctx_write(&pcapctx, pkt, sizeof(pkt), gettime64(), "dl");
     nm_my_inject(dlnmds[args->idx], pkt, sizeof(pkt));
+    ioctl(dlnmds[args->idx]->fd, NIOCTXSYNC);
     usleep(1000);
 
     memset(pkt, 0, sizeof(pkt));
@@ -256,18 +283,22 @@ static void *thr(void *arg)
     tcp_set_dst_port(tcp, ctx[i].port2);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
+    tcp_set_window(tcp, 65535);
     tcp_set_seq_number(tcp, ctx[i].seq1);
     tcp_set_ack_number(tcp, ctx[i].seq2);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    //pcapng_out_ctx_write(&pcapctx, pkt, sizeof(pkt), gettime64(), "ul");
     nm_my_inject(ulnmds[args->idx], pkt, sizeof(pkt));
+    ioctl(ulnmds[args->idx]->fd, NIOCTXSYNC);
     usleep(1000);
   }
+  printf("generatic traffic\n");
 
   while (!atomic_load(&exit_threads))
   {
     for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
     {
-      run_uplink(args->idx, &ctx[i], 32);
+      run_uplink(args->idx, &ctx[i], 32, &pcapctx);
     }
   }
 
