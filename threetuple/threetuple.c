@@ -98,8 +98,17 @@ int threetuplectx_modify(
       return 0;
     }
   }
+  struct threetupleentry *e = malloc(sizeof(*e));
+  e->ip = ip;
+  e->port = port;
+  e->proto = proto;
+  e->port_valid = port_valid;
+  e->proto_valid = proto_valid;
+  e->payload = *payload;
+  hash_table_add_nogrow_already_bucket_locked(
+    &ctx->tbl, &e->node, threetuple_hash(e));
   hash_table_unlock_bucket(&ctx->tbl, hashval);
-  return -ENOENT;
+  return 0;
 }
 
 int threetuplectx_find(
