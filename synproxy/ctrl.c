@@ -168,6 +168,60 @@ void *ctrl_func(void *userdata)
       }
        
     }
+    else if (operation & (1<<3))
+    {
+      log_log(
+             LOG_LEVEL_NOTICE, "CTRL",
+             "mod %d.%d.%d.%d:%d proto %d port_valid %d proto_valid %d"
+             " mss %d sack %d wscaleshift %d",
+             (uint8_t)(ip>>24),
+             (uint8_t)(ip>>16),
+             (uint8_t)(ip>>8),
+             (uint8_t)(ip>>0),
+             (uint16_t)port,
+             (uint8_t)proto,
+             !!(operation&(1<<1)),
+             !!(operation&(1<<2)),
+             payload.mss,
+             payload.sack_supported,
+             payload.wscaleshift);
+      if (threetuplectx_modify(&args->synproxy->threetuplectx, ip, port, proto,
+                               !!(operation & (1<<1)), !!(operation & (1<<2)),
+                               &payload) == 0)
+      {
+        if (write(fd2, "1\n", 2) != 2)
+        {
+          close(fd2);
+          log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+          fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+          if (fd2 < 0 && errno == EINTR)
+          {
+            log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+            return NULL;
+          }
+          set_nonblock(fd2);
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+          continue;
+        }
+      }
+      else
+      {
+        if (write(fd2, "0\n", 2) != 2)
+        {
+          close(fd2);
+          log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+          fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+          if (fd2 < 0 && errno == EINTR)
+          {
+            log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+            return NULL;
+          }
+          set_nonblock(fd2);
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+          continue;
+        }
+      }
+    }
     else
     {
       log_log(

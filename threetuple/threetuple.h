@@ -28,6 +28,11 @@ int threetuplectx_add(
   uint32_t ip, uint16_t port, uint8_t proto, int port_valid, int proto_valid,
   const struct threetuplepayload *payload);
 
+int threetuplectx_modify(
+  struct threetuplectx *ctx,
+  uint32_t ip, uint16_t port, uint8_t proto, int port_valid, int proto_valid,
+  const struct threetuplepayload *payload);
+
 int threetuplectx_delete(
   struct threetuplectx *ctx,
   uint32_t ip, uint16_t port, uint8_t proto, int port_valid, int proto_valid);

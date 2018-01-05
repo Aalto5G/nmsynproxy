@@ -68,6 +68,40 @@ int threetuplectx_add(
   return 0;
 }
 
+int threetuplectx_modify(
+  struct threetuplectx *ctx,
+  uint32_t ip, uint16_t port, uint8_t proto, int port_valid, int proto_valid,
+  const struct threetuplepayload *payload)
+{
+  uint32_t hashval = threetuple_iphash(ip);
+  struct hash_list_node *node;
+  port_valid = !!port_valid;
+  proto_valid = !!proto_valid;
+  if (!port_valid)
+  {
+    port = 0;
+  }
+  if (!proto_valid)
+  {
+    proto = 0;
+  }
+  hash_table_lock_bucket(&ctx->tbl, hashval);
+  HASH_TABLE_FOR_EACH_POSSIBLE(&ctx->tbl, node, hashval)
+  {
+    struct threetupleentry *e =
+      CONTAINER_OF(node, struct threetupleentry, node);
+    if (e->ip == ip && e->port == port && e->proto == proto &&
+        e->port_valid == port_valid && e->proto_valid == proto_valid)
+    {
+      e->payload = *payload;
+      hash_table_unlock_bucket(&ctx->tbl, hashval);
+      return 0;
+    }
+  }
+  hash_table_unlock_bucket(&ctx->tbl, hashval);
+  return -ENOENT;
+}
+
 int threetuplectx_find(
   struct threetuplectx *ctx,
   uint32_t ip, uint16_t port, uint8_t proto,
