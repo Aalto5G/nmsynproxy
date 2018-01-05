@@ -102,7 +102,7 @@ struct pcapng_out_ctx wanctx;
 #define POOL_SIZE 300
 #define CACHE_SIZE 100
 #define QUEUE_SIZE 512
-#define BLOCK_SIZE 1800
+#define BLOCK_SIZE 10240
 
 struct tx_args {
   struct queue *txq;
