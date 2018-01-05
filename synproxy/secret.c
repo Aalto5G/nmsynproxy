@@ -70,7 +70,7 @@ int verify_cookie(
   struct conf *conf = synproxy->conf;
   int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits + 1;
   struct secret secret1;
-  uint16_t additional_bits = (isn>>(32-total_bits))&((1<<total_bits)-1);
+  uint16_t additional_bits = (isn>>(32-total_bits))&((1<<(total_bits-1))-1);
   uint32_t bitmask = ((1<<(32-total_bits))-1);
   uint32_t mssmask = ((1<<(conf->msslist_bits))-1);
   uint32_t wsmask = ((1<<(conf->wscalelist_bits))-1);
@@ -185,7 +185,7 @@ int verify_timestamp(
   int total_bits =
     conf->ts_bits + conf->tsmsslist_bits + conf->tswscalelist_bits + 1;
   struct secret secret1;
-  uint16_t additional_bits = (isn>>(32-total_bits))&((1<<total_bits)-1);
+  uint16_t additional_bits = (isn>>(32-total_bits))&((1<<(total_bits-1))-1);
   uint32_t bitmask = ((1<<(32-total_bits))-1);
   uint32_t mssmask = ((1<<(conf->msslist_bits))-1);
   uint32_t wsmask = ((1<<(conf->wscalelist_bits))-1);
