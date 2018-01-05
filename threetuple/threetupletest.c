@@ -41,6 +41,14 @@ int main(int argc, char **argv)
   {
     abort();
   }
+  if (threetuplectx_modify(&ctx, (10<<24) | 1, 12345, 17, 1, 1, &payload) != 0)
+  {
+    abort();
+  }
+  if (threetuplectx_modify(&ctx, (10<<24) | 1, 12345, 17, 1, 1, &payload) != 0)
+  {
+    abort();
+  }
   threetuplectx_free(&ctx);
   return 0;
 }

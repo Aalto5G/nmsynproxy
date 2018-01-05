@@ -182,5 +182,13 @@ void threetuplectx_init(struct threetuplectx *ctx)
 
 void threetuplectx_free(struct threetuplectx *ctx)
 {
+  struct hash_list_node *node, *tmp;
+  unsigned bucket;
+  HASH_TABLE_FOR_EACH_SAFE(&ctx->tbl, bucket, node, tmp)
+  {
+    struct threetupleentry *e =
+      CONTAINER_OF(node, struct threetupleentry, node);
+    hash_table_delete(&ctx->tbl, node, threetuple_hash(e));
+  }
   hash_table_free(&ctx->tbl);
 }
