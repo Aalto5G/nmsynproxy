@@ -670,7 +670,6 @@ static void send_ack_only(
   tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
   tcp_set_window(tcp, entry->wan_max_window_unscaled);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(ack) - 14 - 20);
 
   tcpopts = &((unsigned char*)tcp)[20];
 
@@ -687,6 +686,8 @@ static void send_ack_only(
   {
     memset(&tcpopts[0], 0, 12);
   }
+
+  tcp_set_cksum_calc(ip, 20, tcp, sizeof(ack) - 14 - 20);
 
   pktstruct = ll_alloc_st(st, packet_size(sizeof(ack)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
