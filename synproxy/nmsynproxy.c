@@ -465,10 +465,16 @@ int main(int argc, char **argv)
   char pktdl[14] = {0x02,0,0,0,0,0x04, 0x02,0,0,0,0,0x01, 0, 0};
   char pktul[14] = {0x02,0,0,0,0,0x01, 0x02,0,0,0,0,0x04, 0, 0};
 
-  nm_my_inject(dlnmds[0], pktdl, sizeof(pktdl));
-  ioctl(dlnmds[0]->fd, NIOCTXSYNC, NULL);
-  nm_my_inject(ulnmds[0], pktul, sizeof(pktul));
-  ioctl(ulnmds[0]->fd, NIOCTXSYNC, NULL);
+  if (strncmp(argv[optind+0], "vale", 4) == 0)
+  {
+    nm_my_inject(dlnmds[0], pktdl, sizeof(pktdl));
+    ioctl(dlnmds[0]->fd, NIOCTXSYNC, NULL);
+  }
+  if (strncmp(argv[optind+1], "vale", 4) == 0)
+  {
+    nm_my_inject(ulnmds[0], pktul, sizeof(pktul));
+    ioctl(ulnmds[0]->fd, NIOCTXSYNC, NULL);
+  }
 
   timer.time64 = gettime64() + 32*1000*1000;
   timer.fn = revolve_secret;
