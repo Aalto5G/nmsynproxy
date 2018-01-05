@@ -1694,6 +1694,15 @@ int uplink(
         ((int)own_wscale) - ((int)tcpinfo.wscale);
       entry->seqoffset =
         entry->state_data.downlink_syn_sent.local_isn - tcp_seq_number(ippay);
+      if (tcpinfo.ts_present)
+      {
+        entry->tsoffset =
+          entry->state_data.downlink_syn_sent.local_timestamp - tcpinfo.ts;
+      }
+      else
+      {
+        entry->tsoffset = 0;
+      }
       entry->lan_wscale = tcpinfo.wscale;
       entry->lan_sent = tcp_seq_number(ippay) + 1 + entry->seqoffset;
       entry->lan_acked = tcp_ack_number(ippay);
