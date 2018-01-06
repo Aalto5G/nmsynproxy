@@ -452,9 +452,10 @@ int main(int argc, char **argv)
   link_wait(sockfd, argv[optind + 0]);
   link_wait(sockfd, argv[optind + 1]);
 
+  worker_local_init(&local, &synproxy, 0, 1);
+  if (conf.test_connections)
   {
     int j;
-    worker_local_init(&local, &synproxy, 0, 1);
     for (j = 0; j < 90*6; j++)
     {
       synproxy_hash_put_connected(

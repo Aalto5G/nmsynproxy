@@ -56,6 +56,7 @@ int confyywrap(yyscan_t scanner)
 %token MSS_CLAMP
 %token NETWORK_PREFIX MSSMODE WSCALEMODE DEFAULT HALFOPEN_CACHE_MAX
 %token USER GROUP
+%token TEST_CONNECTIONS
 
 
 %type<i> sackhashval
@@ -272,7 +273,11 @@ tswscalelist_maybe:
 ;
 
 conflist_entry:
-USER EQUALS intorstring SEMICOLON
+TEST_CONNECTIONS SEMICOLON
+{
+  conf->test_connections = 1;
+}
+| USER EQUALS intorstring SEMICOLON
 {
   uid_t uid;
   if ($3.s != NULL)

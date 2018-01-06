@@ -61,6 +61,7 @@ struct conf {
   uint8_t own_sack;
   uid_t uid;
   gid_t gid;
+  int test_connections;
 };
 
 #define CONF_INITIALIZER { \
@@ -91,6 +92,7 @@ struct conf {
   .threadcount = 1, \
   .uid = 0, \
   .gid = 0, \
+  .test_connections = 0, \
 }
 
 static inline void conf_free(struct conf *conf)
