@@ -534,6 +534,7 @@ int main(int argc, char **argv)
     snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[1], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
+    nmr.nr_rx_slots = 256;
     nmr.nr_tx_rings = NUM_THR;
     nmr.nr_rx_rings = NUM_THR;
     nmr.nr_flags = NR_REG_ONE_NIC;
@@ -550,6 +551,7 @@ int main(int argc, char **argv)
     snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[2], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
+    nmr.nr_rx_slots = 256;
     nmr.nr_tx_rings = NUM_THR;
     nmr.nr_rx_rings = NUM_THR;
     nmr.nr_flags = NR_REG_ONE_NIC;
