@@ -17,7 +17,7 @@
 #define QUEUE_SIZE 512
 #define BLOCK_SIZE 1800
 
-// FIXME won't work with 1 thread due to collecting ACKs
+// FIXME won't work with >1 thread due to collecting ACKs
 #define NUM_THR 1
 
 atomic_int exit_threads = 0;
