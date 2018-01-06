@@ -168,6 +168,8 @@ static void *rx_func(void *userdata)
     timeout = (expiry > time64 ? (999 + expiry - time64)/1000 : 0);
     if (timeout > 0)
     {
+      ioctl(dlnmds[args->idx]->fd, NIOCTXSYNC, NULL);
+      ioctl(ulnmds[args->idx]->fd, NIOCTXSYNC, NULL);
       poll(pfds, 2, timeout);
     }
 
