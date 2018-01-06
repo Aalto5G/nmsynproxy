@@ -125,6 +125,12 @@ static void *rx_func(void *userdata)
   ud.intf = &intf;
   ud.dlnmd = dlnmds[args->idx];
   ud.ulnmd = ulnmds[args->idx];
+  ud.lan = lan;
+  ud.wan = wan;
+  ud.out = out;
+  ud.lanctx = &lanctx;
+  ud.wanctx = &wanctx;
+  ud.outctx = &outctx;
   outport.portfunc = netmapfunc2;
   outport.userdata = &ud;
 
