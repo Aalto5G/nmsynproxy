@@ -8,6 +8,7 @@
 #include "net/netmap_user.h"
 #include "mypcapng.h"
 #include "time64.h"
+#include "murmur.h"
 #include <sys/poll.h>
 #include <stdatomic.h>
 
@@ -72,6 +73,7 @@ char cli_mac[6] = {0x3c,0xfd,0xfe,0xa5,0x41,0x48};
 char lan_mac[6] = {0x3c,0xfd,0xfe,0xa5,0x41,0x49};
 
 struct tcp_ctx {
+  struct hash_list_node node;
   uint32_t seq;
   uint32_t seq1;
   uint32_t seq2;
@@ -84,6 +86,34 @@ struct tcp_ctx {
   char pkt[1514];
   char pktsmall[60];
 };
+
+static inline uint32_t
+tcp_ctx_hash_separate(uint32_t ip1, uint32_t ip2,
+                      uint16_t port1, uint16_t port2)
+{
+#if 0
+  struct siphash_ctx ctx;
+  siphash_init(&ctx, hash_seed_get());
+  siphash_feed_u64(&ctx, (((uint64_t)ip1) << 32) | ip2);
+  siphash_feed_u64(&ctx, (((uint64_t)port1) << 32) | port2);
+  return siphash_get(&ctx);
+#endif
+  struct murmurctx ctx = MURMURCTX_INITER(0x12345678);
+  murmurctx_feed32(&ctx, ip1);
+  murmurctx_feed32(&ctx, ip2);
+  murmurctx_feed32(&ctx, ((uint32_t)port1) << 16 | port2);
+  return murmurctx_get(&ctx);
+}
+
+static inline uint32_t tcp_ctx_hash(struct tcp_ctx *ctx)
+{
+  return tcp_ctx_hash_separate(ctx->ip1, ctx->ip2, ctx->port1, ctx->port2);
+}
+
+static uint32_t tcp_ctx_hash_fn(struct hash_list_node *node, void *ud)
+{
+  return tcp_ctx_hash(CONTAINER_OF(node, struct tcp_ctx, node));
+}
 
 static void init_uplink(struct tcp_ctx *ctx)
 {
@@ -214,6 +244,7 @@ static void *thr(void *arg)
 {
   struct thr_arg *args = arg;
   struct tcp_ctx ctx[24] = {};
+  struct hash_table tbl = {};
   void *ether;
   void *ip;
   void *tcp;
@@ -222,6 +253,8 @@ static void *thr(void *arg)
   int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
   struct pcapng_out_ctx pcapctx;
   char filebuf[256] = {0};
+
+  hash_seed_init();
   
   snprintf(filebuf, sizeof(filebuf), "tcpsendrecv-%d.pcapng", args->idx);
 
@@ -230,6 +263,7 @@ static void *thr(void *arg)
   //  abort();
   //}
 
+  hash_table_init(&tbl, 3*sizeof(ctx)/sizeof(*ctx), tcp_ctx_hash_fn, NULL);
 
   for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
   {
@@ -242,6 +276,7 @@ static void *thr(void *arg)
     ctx[i].seq = 0x12345678;
     ctx[i].ack = 0x12345678;
     ctx[i].max_seen_seq = 0x12345678;
+    hash_table_add_nogrow(&tbl, &ctx[i].node, tcp_ctx_hash(&ctx[i]));
     init_uplink(&ctx[i]);
     ether = pkt;
     memset(pkt, 0, sizeof(pkt));
@@ -335,6 +370,7 @@ static void *thr(void *arg)
 
   while (!atomic_load(&exit_threads))
   {
+    struct hash_list_node *node;
     struct pollfd pfds[2];
     pfds[0].fd = ulnmds[args->idx]->fd;
     pfds[0].events = POLLIN;
@@ -375,9 +411,12 @@ static void *thr(void *arg)
         continue;
       }
       ctxptr = NULL;
-      for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+      uint32_t hashval =
+        tcp_ctx_hash_separate(ip_dst(ip), ip_src(ip),
+                              tcp_dst_port(tcp), tcp_src_port(tcp));
+      HASH_TABLE_FOR_EACH_POSSIBLE(&tbl, node, hashval)
       {
-        struct tcp_ctx *ctx2 = &ctx[i];
+        struct tcp_ctx *ctx2 = CONTAINER_OF(node, struct tcp_ctx, node);
         if (ip_src(ip) == ctx2->ip2 &&
             ip_dst(ip) == ctx2->ip1 &&
             tcp_src_port(tcp) == ctx2->port2 &&
@@ -430,9 +469,12 @@ static void *thr(void *arg)
         continue;
       }
       ctxptr = NULL;
-      for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+      uint32_t hashval =
+        tcp_ctx_hash_separate(ip_src(ip), ip_dst(ip),
+                              tcp_src_port(tcp), tcp_dst_port(tcp));
+      HASH_TABLE_FOR_EACH_POSSIBLE(&tbl, node, hashval)
       {
-        struct tcp_ctx *ctx2 = &ctx[i];
+        struct tcp_ctx *ctx2 = CONTAINER_OF(node, struct tcp_ctx, node);
         if (ip_src(ip) == ctx2->ip1 &&
             ip_dst(ip) == ctx2->ip2 &&
             tcp_src_port(tcp) == ctx2->port1 &&
