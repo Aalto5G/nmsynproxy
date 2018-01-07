@@ -162,7 +162,7 @@ int threetuplectx_delete(
     if (e->ip == ip && e->port == port && e->proto == proto &&
         e->port_valid == port_valid && e->proto_valid == proto_valid)
     {
-      hash_table_delete(&ctx->tbl, &e->node, threetuple_hash(e));
+      hash_table_delete_already_bucket_locked(&ctx->tbl, &e->node);
       hash_table_unlock_bucket(&ctx->tbl, hashval);
       free(e);
       return 0;
