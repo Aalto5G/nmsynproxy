@@ -38,7 +38,6 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
     if mode == 'flush':
         proto = 0
         port = 0
-        ipaddr = '0.0.0.0'
     # Pack IPv4 address
     msg += socket.inet_pton(socket.AF_INET, ipaddr)
     # Pack port number

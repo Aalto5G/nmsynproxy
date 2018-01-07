@@ -224,7 +224,14 @@ void *ctrl_func(void *userdata)
     }
     else if (operation & (1<<4))
     {
-      threetuplectx_flush(&args->synproxy->threetuplectx);
+      if (ip == 0)
+      {
+        threetuplectx_flush(&args->synproxy->threetuplectx);
+      }
+      else
+      {
+        threetuplectx_flush_ip(&args->synproxy->threetuplectx, ip);
+      }
       if (write(fd2, "1\n", 2) != 2)
       {
         close(fd2);

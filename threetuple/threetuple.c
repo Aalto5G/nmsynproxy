@@ -190,6 +190,24 @@ void threetuplectx_flush(struct threetuplectx *ctx)
   }
 }
 
+void threetuplectx_flush_ip(struct threetuplectx *ctx, uint32_t ip)
+{
+  uint32_t hashval = threetuple_iphash(ip);
+  struct hash_list_node *x, *n;
+  hash_table_lock_bucket(&ctx->tbl, hashval);
+  HASH_TABLE_FOR_EACH_POSSIBLE_SAFE(&ctx->tbl, n, x, hashval)
+  {
+    struct threetupleentry *e =
+      CONTAINER_OF(n, struct threetupleentry, node);
+    if (e->ip == ip)
+    {
+      hash_table_delete_already_bucket_locked(&ctx->tbl, n);
+      free(e);
+    }
+  }
+  hash_table_unlock_bucket(&ctx->tbl, hashval);
+}
+
 void threetuplectx_init(struct threetuplectx *ctx)
 {
   if (hash_table_init_locked(&ctx->tbl, 256, threetuple_hash_fn, NULL, 0))

@@ -44,6 +44,8 @@ int threetuplectx_find(
 
 void threetuplectx_flush(struct threetuplectx *ctx);
 
+void threetuplectx_flush_ip(struct threetuplectx *ctx, uint32_t ip);
+
 void threetuplectx_init(struct threetuplectx *ctx);
 
 void threetuplectx_free(struct threetuplectx *ctx);
