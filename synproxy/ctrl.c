@@ -226,10 +226,20 @@ void *ctrl_func(void *userdata)
     {
       if (ip == 0)
       {
+        log_log(
+               LOG_LEVEL_NOTICE, "CTRL",
+               "flush all");
         threetuplectx_flush(&args->synproxy->threetuplectx);
       }
       else
       {
+        log_log(
+               LOG_LEVEL_NOTICE, "CTRL",
+               "flush %d.%d.%d.%d",
+               (uint8_t)(ip>>24),
+               (uint8_t)(ip>>16),
+               (uint8_t)(ip>>8),
+               (uint8_t)(ip>>0));
         threetuplectx_flush_ip(&args->synproxy->threetuplectx, ip);
       }
       if (write(fd2, "1\n", 2) != 2)
