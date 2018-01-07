@@ -8,3 +8,4 @@ a.out
 perf.data
 perf.data.old
 /opts.mk
+/synproxy_controlplane
