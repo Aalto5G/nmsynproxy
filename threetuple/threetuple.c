@@ -172,6 +172,24 @@ int threetuplectx_delete(
   return -ENOENT;
 }
 
+void threetuplectx_flush(struct threetuplectx *ctx)
+{
+  unsigned bucket;
+  struct hash_list_node *x, *n;
+  for (bucket = 0; bucket < ctx->tbl.bucketcnt; bucket++)
+  {
+    hash_table_lock_bucket(&ctx->tbl, bucket);
+    HASH_TABLE_FOR_EACH_POSSIBLE_SAFE(&ctx->tbl, n, x, bucket)
+    {
+      struct threetupleentry *e =
+        CONTAINER_OF(n, struct threetupleentry, node);
+      hash_table_delete_already_bucket_locked(&ctx->tbl, n);
+      free(e);
+    }
+    hash_table_unlock_bucket(&ctx->tbl, bucket);
+  }
+}
+
 void threetuplectx_init(struct threetuplectx *ctx)
 {
   if (hash_table_init_locked(&ctx->tbl, 256, threetuple_hash_fn, NULL, 0))
@@ -189,6 +207,7 @@ void threetuplectx_free(struct threetuplectx *ctx)
     struct threetupleentry *e =
       CONTAINER_OF(node, struct threetupleentry, node);
     hash_table_delete(&ctx->tbl, node, threetuple_hash(e));
+    free(e);
   }
   hash_table_free(&ctx->tbl);
 }

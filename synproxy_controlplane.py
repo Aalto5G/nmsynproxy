@@ -35,6 +35,10 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
     """
     msg = b''
     proto = 6
+    if mode == 'flush':
+        proto = 0
+        port = 0
+        ipaddr = '0.0.0.0'
     # Pack IPv4 address
     msg += socket.inet_pton(socket.AF_INET, ipaddr)
     # Pack port number
@@ -43,7 +47,12 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
     msg += struct.pack('!B', proto)
     # Build flags
     flags = 0
-    if mode == 'add':
+    if mode == 'flush':
+        flags |= 0b0010000
+        tcpmss = 0
+        tcpsack = 0
+        tcpwscale = 0
+    elif mode == 'add':
         flags |= 0b0000000
     elif mode == 'mod':
         flags |= 0b0001000
@@ -129,7 +138,7 @@ def parse_arguments():
                         help='Dataplane IP address')
 
     # Operation mode
-    parser.add_argument('--mode', dest='mode', default='add', choices=['add', 'mod', 'del'])
+    parser.add_argument('--mode', dest='mode', default='add', choices=['add', 'mod', 'del', 'flush'])
 
     # n-tuple connection options
     parser.add_argument('--conn-dstaddr', type=str, default='0.0.0.0',

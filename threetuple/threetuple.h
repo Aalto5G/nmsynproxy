@@ -42,6 +42,8 @@ int threetuplectx_find(
   uint32_t ip, uint16_t port, uint8_t proto,
   struct threetuplepayload *payload);
 
+void threetuplectx_flush(struct threetuplectx *ctx);
+
 void threetuplectx_init(struct threetuplectx *ctx);
 
 void threetuplectx_free(struct threetuplectx *ctx);

@@ -222,6 +222,24 @@ void *ctrl_func(void *userdata)
         }
       }
     }
+    else if (operation & (1<<4))
+    {
+      threetuplectx_flush(&args->synproxy->threetuplectx);
+      if (write(fd2, "1\n", 2) != 2)
+      {
+        close(fd2);
+        log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+        fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+        if (fd2 < 0 && errno == EINTR)
+        {
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+          return NULL;
+        }
+        set_nonblock(fd2);
+        log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+        continue;
+      }
+    }
     else
     {
       log_log(
