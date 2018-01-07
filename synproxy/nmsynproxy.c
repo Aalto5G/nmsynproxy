@@ -70,14 +70,14 @@ static void periodic_fn(
   ud->last_ulpkts = ud->ulpkts;
   ud->last_dlpkts = ud->dlpkts;
   worker_local_rdlock(ud->args->local);
-  printf("worker/%d %g MPPS %g Gbps ul %g MPPS %g Gbps dl"
-         " %u conns synproxied %u conns not\n",
+  log_log(LOG_LEVEL_INFO, "NMPROXY",
+         "worker/%d %g MPPS %g Gbps ul %g MPPS %g Gbps dl"
+         " %u conns synproxied %u conns not",
          ud->args->idx,
          ulpdiff/diff/1e6, 8*ulbdiff/diff/1e9,
          dlpdiff/diff/1e6, 8*dlbdiff/diff/1e9,
          ud->args->local->synproxied_connections,
          ud->args->local->direct_connections);
-  fflush(stdout);
   worker_local_rdunlock(ud->args->local);
   ud->last_time64 = time64;
   ud->next_time64 += 2*1000*1000;
@@ -222,7 +222,7 @@ static void *rx_func(void *userdata)
       {
         if (pcapng_out_ctx_write(&inctx, pkt, hdr.len, gettime64(), "out"))
         {
-          printf("can't record packet\n");
+          log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't record packet");
           exit(1);
         }
       }
@@ -230,7 +230,7 @@ static void *rx_func(void *userdata)
       {
         if (pcapng_out_ctx_write(&lanctx, pkt, hdr.len, gettime64(), "in"))
         {
-          printf("can't record packet\n");
+          log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't record packet");
           exit(1);
         }
       }
@@ -261,7 +261,7 @@ static void *rx_func(void *userdata)
       {
         if (pcapng_out_ctx_write(&inctx, pkt, hdr.len, gettime64(), "in"))
         {
-          printf("can't record packet\n");
+          log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't record packet");
           exit(1);
         }
       }
@@ -269,7 +269,7 @@ static void *rx_func(void *userdata)
       {
         if (pcapng_out_ctx_write(&wanctx, pkt, hdr.len, gettime64(), "in"))
         {
-          printf("can't record packet\n");
+          log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't record packet");
           exit(1);
         }
       }
@@ -358,7 +358,7 @@ int main(int argc, char **argv)
   {
     if (pcapng_out_ctx_init(&inctx, inname) != 0)
     {
-      printf("can't open file for storing input\n");
+      log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't open pcap output file");
       exit(1);
     }
     in = 1;
@@ -367,7 +367,7 @@ int main(int argc, char **argv)
   {
     if (pcapng_out_ctx_init(&outctx, outname) != 0)
     {
-      printf("can't open file for storing output\n");
+      log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't open pcap output file");
       exit(1);
     }
     out = 1;
@@ -376,7 +376,7 @@ int main(int argc, char **argv)
   {
     if (pcapng_out_ctx_init(&lanctx, lanname) != 0)
     {
-      printf("can't open file for storing LAN traffic\n");
+      log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't open pcap output file");
       exit(1);
     }
     lan = 1;
@@ -385,7 +385,7 @@ int main(int argc, char **argv)
   {
     if (pcapng_out_ctx_init(&wanctx, wanname) != 0)
     {
-      printf("can't open file for storing WAN traffic\n");
+      log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't open pcap output file");
       exit(1);
     }
     wan = 1;
@@ -396,7 +396,7 @@ int main(int argc, char **argv)
   num_rx = conf.threadcount;
   if (num_rx <= 0 || num_rx > MAX_RX)
   {
-    printf("too many threads: %d\n", num_rx);
+    log_log(LOG_LEVEL_CRIT, "NMPROXY", "too many threads: %d", num_rx);
     exit(1);
   }
   max = num_rx;
@@ -512,7 +512,7 @@ int main(int argc, char **argv)
   {
     if (setgid(conf.gid) != 0)
     {
-      printf("setgid failed\n");
+      log_log(LOG_LEVEL_WARNING, "NMPROXY", "setgid failed");
     }
     log_log(LOG_LEVEL_NOTICE, "NMPROXY", "dropped group privileges");
   }
@@ -520,7 +520,7 @@ int main(int argc, char **argv)
   {
     if (setuid(conf.uid) != 0)
     {
-      printf("setuid failed\n");
+      log_log(LOG_LEVEL_WARNING, "NMPROXY", "setuid failed");
     }
     log_log(LOG_LEVEL_NOTICE, "NMPROXY", "dropped user privileges");
   }
@@ -546,7 +546,7 @@ int main(int argc, char **argv)
   pthread_join(sigthr, NULL);
   if (write(pipefd[1], "X", 1) != 1)
   {
-    printf("pipe write failed\n");
+    log_log(LOG_LEVEL_WARNING, "NMPROXY", "pipe write failed");
   }
   if (   conf.mssmode == HASHMODE_COMMANDED
       || conf.sackmode == HASHMODE_COMMANDED
