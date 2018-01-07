@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <errno.h>
 #include "dynarr.h"
+#include "log.h"
 
 enum sackmode {
   SACKMODE_ENABLE,
@@ -110,22 +111,22 @@ static inline int conf_postprocess(struct conf *conf)
   {
     if (!DYNARR_PUSH_BACK(&conf->wscalelist, 0))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->wscalelist, 2))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->wscalelist, 4))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->wscalelist, 7))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     conf->wscalelist_present = 1;
@@ -134,42 +135,42 @@ static inline int conf_postprocess(struct conf *conf)
   {
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 0))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 1))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 3))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 5))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 6))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 8))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 9))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tswscalelist, 10))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     conf->tswscalelist_present = 1;
@@ -178,22 +179,22 @@ static inline int conf_postprocess(struct conf *conf)
   {
     if (!DYNARR_PUSH_BACK(&conf->msslist, 216))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->msslist, 1200))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->msslist, 1400))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->msslist, 1460))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     conf->msslist_present = 1;
@@ -202,42 +203,42 @@ static inline int conf_postprocess(struct conf *conf)
   {
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 216))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 344))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 536))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 712))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 940))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 1360))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 1440))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     if (!DYNARR_PUSH_BACK(&conf->tsmsslist, 1452))
     {
-      fprintf(stderr, "out of memory\n");
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "out of memory");
       return -ENOMEM;
     }
     conf->tsmsslist_present = 1;
@@ -280,22 +281,26 @@ static inline int conf_postprocess(struct conf *conf)
   }
   if (conf->msslist_bits + conf->wscalelist_bits + 1 > 12)
   {
-    fprintf(stderr, "too long lists, too little cryptographic security\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "too long lists, too little cryptographic security");
     return -EINVAL;
   }
   if (conf->tsmsslist_bits + conf->tswscalelist_bits + conf->ts_bits > 12)
   {
-    fprintf(stderr, "too long lists, too little TS cryptographic security\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "too long lists, too little TS cryptographic security");
     return -EINVAL;
   }
   if (DYNARR_GET(&conf->wscalelist, 0) != 0)
   {
-    fprintf(stderr, "first element of wscale list must be 0\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "first element of wscale list must be 0");
     return -EINVAL;
   }
   if (DYNARR_GET(&conf->tswscalelist, 0) != 0)
   {
-    fprintf(stderr, "first element of ts wscale list must be 0\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "first element of ts wscale list must be 0");
     return -EINVAL;
   }
   return 0;

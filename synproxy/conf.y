@@ -14,13 +14,14 @@ typedef void *yyscan_t;
 %{
 
 #include "conf.h"
+#include "log.h"
 #include "yyutils.h"
 #include "conf.tab.h"
 #include "conf.lex.h"
 
 void confyyerror(YYLTYPE *yylloc, yyscan_t scanner, struct conf *conf, const char *str)
 {
-        fprintf(stderr,"error: %s at line %d col %d\n",str, yylloc->first_line, yylloc->first_column);
+        log_log(LOG_LEVEL_CRIT, "CONFPARSER", "error: %s at line %d col %d",str, yylloc->first_line, yylloc->first_column);
 }
 
 int confyywrap(yyscan_t scanner)
@@ -172,13 +173,15 @@ msslist_entry: INT_LITERAL
 {
   if ($1 > 65535)
   {
-    fprintf(stderr, "invalid MSS list entry: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid MSS list entry: %d at line %d col %d",
             $1, @1.first_line, @1.first_column);
     YYABORT;
   }
   if (!DYNARR_PUSH_BACK(&conf->msslist, $1))
   {
-    fprintf(stderr, "out of memory at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "out of memory at line %d col %d",
             @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -189,13 +192,15 @@ wscalelist_entry: INT_LITERAL
 {
   if ($1 > 255)
   {
-    fprintf(stderr, "invalid wscale list entry: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid wscale list entry: %d at line %d col %d",
             $1, @1.first_line, @1.first_column);
     YYABORT;
   }
   if (!DYNARR_PUSH_BACK(&conf->wscalelist, $1))
   {
-    fprintf(stderr, "out of memory at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "out of memory at line %d col %d",
             @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -206,13 +211,15 @@ tsmsslist_entry: INT_LITERAL
 {
   if ($1 > 65535)
   {
-    fprintf(stderr, "invalid TS MSS list entry: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid TS MSS list entry: %d at line %d col %d",
             $1, @1.first_line, @1.first_column);
     YYABORT;
   }
   if (!DYNARR_PUSH_BACK(&conf->tsmsslist, $1))
   {
-    fprintf(stderr, "out of memory at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "out of memory at line %d col %d",
             @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -223,13 +230,15 @@ tswscalelist_entry: INT_LITERAL
 {
   if ($1 > 255)
   {
-    fprintf(stderr, "invalid TS wscale list entry: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid TS wscale list entry: %d at line %d col %d",
             $1, @1.first_line, @1.first_column);
     YYABORT;
   }
   if (!DYNARR_PUSH_BACK(&conf->tswscalelist, $1))
   {
-    fprintf(stderr, "out of memory at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "out of memory at line %d col %d",
             @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -301,7 +310,8 @@ TEST_CONNECTIONS SEMICOLON
     }
     if (getpwnam_r($3.s, &pwd, buf, bufsize, &result) != 0 || result == NULL)
     {
-      fprintf(stderr, "invalid user: %s at line %d col %d\n",
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+              "invalid user: %s at line %d col %d",
               $3.s, @3.first_line, @3.first_column);
       YYABORT;
     }
@@ -343,7 +353,8 @@ TEST_CONNECTIONS SEMICOLON
     }
     if (getgrnam_r($3.s, &pwd, buf, bufsize, &result) != 0 || result == NULL)
     {
-      fprintf(stderr, "invalid group: %s at line %d col %d\n",
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+              "invalid group: %s at line %d col %d",
               $3.s, @3.first_line, @3.first_column);
       YYABORT;
     }
@@ -365,7 +376,8 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 <= 0 || $3 > 65535)
   {
-    fprintf(stderr, "invalid mss_clamp: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid mss_clamp: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -378,7 +390,8 @@ TEST_CONNECTIONS SEMICOLON
   size_t i;
   if ((len & (len-1)) != 0 || len == 0)
   {
-    fprintf(stderr, "mss list not power of 2 in size: %zu at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "mss list not power of 2 in size: %zu at line %d col %d",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -386,7 +399,8 @@ TEST_CONNECTIONS SEMICOLON
   {
     if (DYNARR_GET(&conf->msslist, i) < DYNARR_GET(&conf->msslist, i-1))
     {
-      fprintf(stderr, "mss list not increasing at line %d col %d\n",
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+              "mss list not increasing at line %d col %d",
               @1.first_line, @1.first_column);
       YYABORT;
     }
@@ -399,7 +413,8 @@ TEST_CONNECTIONS SEMICOLON
   size_t i;
   if ((len & (len-1)) != 0 || len == 0)
   {
-    fprintf(stderr, "tsmss list not power of 2 in size: %zu at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "tsmss list not power of 2 in size: %zu at line %d col %d\n",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -407,7 +422,8 @@ TEST_CONNECTIONS SEMICOLON
   {
     if (DYNARR_GET(&conf->tsmsslist, i) < DYNARR_GET(&conf->tsmsslist, i-1))
     {
-      fprintf(stderr, "tsmss list not increasing at line %d col %d\n",
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+              "tsmss list not increasing at line %d col %d",
               @1.first_line, @1.first_column);
       YYABORT;
     }
@@ -420,13 +436,15 @@ TEST_CONNECTIONS SEMICOLON
   size_t i;
   if ((len & (len-1)) != 0 || len == 0)
   {
-    fprintf(stderr, "wscale list not power of 2 in size: %zu at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "wscale list not power of 2 in size: %zu at line %d col %d",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
   if (DYNARR_GET(&conf->wscalelist, 0) != 0)
   {
-    fprintf(stderr, "wscale list must begin with 0: %zu at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "wscale list must begin with 0: %zu at line %d col %d",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -434,7 +452,8 @@ TEST_CONNECTIONS SEMICOLON
   {
     if (DYNARR_GET(&conf->wscalelist, i) < DYNARR_GET(&conf->wscalelist, i-1))
     {
-      fprintf(stderr, "wscale list not increasing at line %d col %d\n",
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+              "wscale list not increasing at line %d col %d",
               @1.first_line, @1.first_column);
       YYABORT;
     }
@@ -447,13 +466,15 @@ TEST_CONNECTIONS SEMICOLON
   size_t i;
   if ((len & (len-1)) != 0 || len == 0)
   {
-    fprintf(stderr, "tswscale list not power of 2 in size: %zu at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "tswscale list not power of 2 in size: %zu at line %d col %d",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
   if (DYNARR_GET(&conf->tswscalelist, 0) != 0)
   {
-    fprintf(stderr, "tswscale list must begin with 0: %zu at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "tswscale list must begin with 0: %zu at line %d col %d",
             len, @1.first_line, @1.first_column);
     YYABORT;
   }
@@ -461,7 +482,8 @@ TEST_CONNECTIONS SEMICOLON
   {
     if (DYNARR_GET(&conf->tswscalelist, i) < DYNARR_GET(&conf->tswscalelist, i-1))
     {
-      fprintf(stderr, "tswscale list not increasing at line %d col %d\n",
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+              "tswscale list not increasing at line %d col %d",
               @1.first_line, @1.first_column);
       YYABORT;
     }
@@ -476,7 +498,8 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 <= 0 || $3 > 65535)
   {
-    fprintf(stderr, "invalid own_mss: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid own_mss: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -486,7 +509,8 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 < 0 || $3 > 14)
   {
-    fprintf(stderr, "invalid own_wscale: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid own_wscale: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -512,13 +536,15 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid learnhash size: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid learnhash size: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
   if (($3 & ($3-1)) != 0)
   {
-    fprintf(stderr, "learnhash size not power of 2: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "learnhash size not power of 2: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -528,13 +554,15 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid conn table size: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid conn table size: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
   if (($3 & ($3-1)) != 0)
   {
-    fprintf(stderr, "conn table size not power of 2: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "conn table size not power of 2: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -544,7 +572,8 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid thread count: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid thread count: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -554,13 +583,15 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 < 0)
   {
-    fprintf(stderr, "invalid ts bits: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ts bits: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
   if ($3 > 12)
   {
-    fprintf(stderr, "invalid ts bits: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ts bits: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -570,7 +601,8 @@ TEST_CONNECTIONS SEMICOLON
 {
   if ($3 < 0)
   {
-    fprintf(stderr, "invalid halfopen_cache_max: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid halfopen_cache_max: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -584,13 +616,15 @@ SIZE EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid ratehash size: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ratehash size: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
   if (($3 & ($3-1)) != 0)
   {
-    fprintf(stderr, "ratehash size not power of 2: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "ratehash size not power of 2: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -600,7 +634,8 @@ SIZE EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid ratehash timer period: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ratehash timer period: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -610,7 +645,8 @@ SIZE EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid ratehash timer addition: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ratehash timer addition: %d at line %d col %d\n",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -620,7 +656,8 @@ SIZE EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 <= 0)
   {
-    fprintf(stderr, "invalid ratehash initial tokens: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ratehash initial tokens: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }
@@ -630,7 +667,8 @@ SIZE EQUALS INT_LITERAL SEMICOLON
 {
   if ($3 < 0 || $3 > 32)
   {
-    fprintf(stderr, "invalid ratehash network prefix: %d at line %d col %d\n",
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ratehash network prefix: %d at line %d col %d",
             $3, @3.first_line, @3.first_column);
     YYABORT;
   }

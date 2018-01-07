@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <libgen.h>
 #include "conf.h"
+#include "log.h"
 #include "yyutils.h"
 
 typedef void *yyscan_t;
@@ -18,13 +19,13 @@ void confyydoparse(FILE *filein, struct conf *conf)
   confyyset_in(filein, scanner);
   if (confyyparse(scanner, conf) != 0)
   {
-    fprintf(stderr, "parsing failed\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER", "parsing failed");
     exit(1);
   }
   confyylex_destroy(scanner);
   if (!feof(filein))
   {
-    fprintf(stderr,"error: additional data at end of config\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER", "error: additional data at end of config");
     exit(1);
   }
 }
@@ -35,13 +36,13 @@ void confyydomemparse(char *filedata, size_t filesize, struct conf *conf)
   myfile = fmemopen(filedata, filesize, "r");
   if (myfile == NULL)
   {
-    printf("can't open memory file\n");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER", "can't open memory file");
     exit(1);
   }
   confyydoparse(myfile, conf);
   if (fclose(myfile) != 0)
   {
-    fprintf(stderr, "can't close memory file");
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER", "can't close memory file");
     exit(1);
   }
 }
@@ -103,7 +104,7 @@ void confyynameparse(const char *fname, struct conf *conf, int require)
   {
     if (require)
     {
-      fprintf(stderr, "File %s cannot be opened\n", fname);
+      log_log(LOG_LEVEL_CRIT, "CONFPARSER", "File %s cannot be opened", fname);
       exit(1);
     }
     if (conf_postprocess(conf) != 0)

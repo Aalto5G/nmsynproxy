@@ -343,7 +343,7 @@ int main(int argc, char **argv)
         wanname = optarg;
         break;
       default:
-        printf("usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] vale0:1 vale1:1\n", argv[0]);
+        log_log(LOG_LEVEL_CRIT, "NMPROXY", "usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] vale0:1 vale1:1", argv[0]);
         exit(1);
         break;
     }
@@ -351,7 +351,7 @@ int main(int argc, char **argv)
 
   if (argc != optind + 2)
   {
-    printf("usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] vale0:1 vale1:1\n", argv[0]);
+    log_log(LOG_LEVEL_CRIT, "NMPROXY", "usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] vale0:1 vale1:1", argv[0]);
     exit(1);
   }
   if (inname != NULL)
@@ -416,14 +416,17 @@ int main(int argc, char **argv)
     dlnmds[i] = nm_open(nmifnamebuf, &nmr, 0, NULL);
     if (dlnmds[i] == NULL)
     {
-      printf("cannot open %s\n", argv[optind+0]);
+      log_log(LOG_LEVEL_CRIT, "NMPROXY", 
+              "cannot open %s", argv[optind+0]);
       exit(1);
     }
+#if 0
     printf("Downlink interface:\n");
     printf("RX rings: %u %u\n", dlnmds[i]->last_rx_ring, dlnmds[i]->first_rx_ring + 1);
     printf("TX rings: %u %u\n", dlnmds[i]->last_tx_ring, dlnmds[i]->first_tx_ring + 1);
     printf("RX rings: %u\n", dlnmds[i]->last_rx_ring - dlnmds[i]->first_rx_ring + 1);
     printf("TX rings: %u\n", dlnmds[i]->last_tx_ring - dlnmds[i]->first_tx_ring + 1);
+#endif
   }
   for (i = 0; i < max; i++)
   {
@@ -440,14 +443,17 @@ int main(int argc, char **argv)
     ulnmds[i] = nm_open(nmifnamebuf, &nmr, 0, NULL);
     if (ulnmds[i] == NULL)
     {
-      printf("cannot open %s\n", argv[optind+1]);
+      log_log(LOG_LEVEL_CRIT, "NMPROXY", 
+              "cannot open %s", argv[optind+1]);
       exit(1);
     }
+#if 0
     printf("Uplink interface:\n");
     printf("RX rings: %u %u\n", ulnmds[i]->last_rx_ring, ulnmds[i]->first_rx_ring + 1);
     printf("TX rings: %u %u\n", ulnmds[i]->last_tx_ring, ulnmds[i]->first_tx_ring + 1);
     printf("RX rings: %u\n", ulnmds[i]->last_rx_ring - ulnmds[i]->first_rx_ring + 1);
     printf("TX rings: %u\n", ulnmds[i]->last_tx_ring - ulnmds[i]->first_tx_ring + 1);
+#endif
   }
   link_wait(sockfd, argv[optind + 0]);
   link_wait(sockfd, argv[optind + 1]);
