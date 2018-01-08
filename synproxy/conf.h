@@ -63,6 +63,7 @@ struct conf {
   uid_t uid;
   gid_t gid;
   int test_connections;
+  uint16_t port;
 };
 
 #define CONF_INITIALIZER { \
@@ -94,6 +95,7 @@ struct conf {
   .uid = 0, \
   .gid = 0, \
   .test_connections = 0, \
+  .port = 12345, \
 }
 
 static inline void conf_free(struct conf *conf)

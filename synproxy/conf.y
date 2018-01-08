@@ -58,6 +58,7 @@ int confyywrap(yyscan_t scanner)
 %token NETWORK_PREFIX MSSMODE WSCALEMODE DEFAULT HALFOPEN_CACHE_MAX
 %token USER GROUP
 %token TEST_CONNECTIONS
+%token PORT
 
 
 %type<i> sackhashval
@@ -285,6 +286,17 @@ conflist_entry:
 TEST_CONNECTIONS SEMICOLON
 {
   conf->test_connections = 1;
+}
+| PORT EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 <= 0 || $3 > 65535)
+  {
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid port: %d at line %d col %d",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->port = $3;
 }
 | USER EQUALS intorstring SEMICOLON
 {

@@ -38,7 +38,7 @@ void *ctrl_func(void *userdata)
   }
   sin.sin_family = AF_INET;
   sin.sin_addr.s_addr = htonl(INADDR_ANY);
-  sin.sin_port = htons(12345);
+  sin.sin_port = htons(args->synproxy->conf->port);
   if (bind(fd, (struct sockaddr*)&sin, sizeof(sin)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "CTRL", "can't bind");
