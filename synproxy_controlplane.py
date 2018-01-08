@@ -33,17 +33,7 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
       - 8  bits: TCP SACK value [0,1]
       - 8  bits: TCP window scaling value [0-14]
     """
-    msg = b''
     proto = 6
-    if mode == 'flush':
-        proto = 0
-        port = 0
-    # Pack IPv4 address
-    msg += socket.inet_pton(socket.AF_INET, ipaddr)
-    # Pack port number
-    msg += struct.pack('!H', port)
-    # Pack protocol number
-    msg += struct.pack('!B', proto)
     # Build flags
     flags = 0
     if mode == 'flush':
@@ -51,6 +41,8 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
         tcpmss = 0
         tcpsack = 0
         tcpwscale = 0
+        port = 0
+        proto = 0
     elif mode == 'add':
         flags |= 0b0000000
     elif mode == 'mod':
@@ -64,10 +56,8 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
         flags |= 0b0000010
     if proto != 0:
         flags |= 0b0000100
-    # Pack flags
-    msg += struct.pack('!B', flags)
-    # Pack TCP options
-    msg += struct.pack('!HBB', tcpmss, tcpsack, tcpwscale)
+    # Pack message
+    msg = socket.inet_pton(socket.AF_INET, ipaddr) + struct.pack('!HBBHBB', port, proto, flags, tcpmss, tcpsack, tcpwscale)
     # Return built message
     return msg
 
@@ -88,6 +78,7 @@ def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_tcpmss, c
     yield from loop.sock_sendall(sock, msg)
     logger.info('Waiting for response...')
     data = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=5)
+    sock.close()
     logger.info('Received response <{}>'.format(data))
 
 
