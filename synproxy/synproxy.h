@@ -226,9 +226,7 @@ static inline void worker_local_free(struct worker_local *local)
     struct synproxy_hash_entry *e;
     e = CONTAINER_OF(n, struct synproxy_hash_entry, node);
     hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
-#if 0
-    timer_heap_remove(&local->timers, &e->timer);
-#endif
+    timer_linkheap_remove(&local->timers, &e->timer);
     free(e);
   }
   hash_table_free(&local->hash);
@@ -328,9 +326,7 @@ static inline void synproxy_hash_del(
   struct synproxy_hash_entry *e)
 {
   hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
-#if 0
-  timer_heap_remove(&local->timers, &e->timer);
-#endif
+  timer_linkheap_remove(&local->timers, &e->timer);
   if (e->was_synproxied)
   {
     local->synproxied_connections--;
