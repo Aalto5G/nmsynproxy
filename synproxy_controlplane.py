@@ -68,7 +68,7 @@ def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, co
     yield from loop.sock_connect(sock, (ipaddr, port))
     logger.debug('Connected to <{}:{}>'.format(ipaddr, port))
     # Build control message
-    msg = synproxy_build_message(mode, conn_ipaddr, conn_proto, conn_port, conn_tcpmss, conn_tcpsack, conn_tcpwscale)
+    msg = synproxy_build_message(mode, conn_ipaddr, conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale)
     logger.debug('Sending control message <{}>'.format(msg))
     yield from loop.sock_sendall(sock, msg)
     logger.debug('Waiting for response...')
