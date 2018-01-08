@@ -20,26 +20,21 @@ func pack(mode string, ipaddr net.IP, port uint16, tcpmss uint16, tcpsack uint8,
         var tcpsack8 uint8 = tcpsack
         var tcpwscale8 uint8 = tcpwscale
         if mode == "flush" {
-            flags8 |= (1<<4)
+            flags8 |= (1<<0)
             tcpmss16 = 0
             tcpsack8 = 0
             tcpwscale8 = 0
             proto8 = 0
             port16 = 0
         } else if mode == "add" {
+            flags8 |= (1<<1)
         } else if mode == "mod" {
-            flags8 |= (1<<3)
+            flags8 |= (1<<2)
         } else if mode == "del" {
-            flags8 |= (1<<0)
+            flags8 |= (1<<3)
             tcpmss16 = 0
             tcpsack8 = 0
             tcpwscale8 = 0
-        }
-        if port16 != 0 {
-            flags8 |= (1<<1)
-        }
-        if proto8 != 0 {
-            flags8 |= (1<<2)
         }
         binary.Write(buf, binary.BigEndian, port16)
         binary.Write(buf, binary.BigEndian, proto8)

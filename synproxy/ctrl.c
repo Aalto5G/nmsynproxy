@@ -117,7 +117,7 @@ void *ctrl_func(void *userdata)
     {
       abort();
     }
-    if (operation & (1<<0))
+    if (operation == (1<<3))
     {
       log_log(
              LOG_LEVEL_NOTICE, "CTRL",
@@ -128,10 +128,10 @@ void *ctrl_func(void *userdata)
              (uint8_t)(ip>>0),
              (uint16_t)port,
              (uint8_t)proto,
-             !!(operation&(1<<1)),
-             !!(operation&(1<<2)));
+             port != 0,
+             proto != 0);
       if (threetuplectx_delete(&args->synproxy->threetuplectx, ip, port, proto,
-                               !!(operation & (1<<1)), !!(operation & (1<<2)))
+                               (port != 0), (proto != 0))
           == 0)
       {
         if (write(fd2, "1\n", 2) != 2)
@@ -168,7 +168,7 @@ void *ctrl_func(void *userdata)
       }
        
     }
-    else if (operation & (1<<3))
+    else if (operation == (1<<2))
     {
       log_log(
              LOG_LEVEL_NOTICE, "CTRL",
@@ -180,13 +180,13 @@ void *ctrl_func(void *userdata)
              (uint8_t)(ip>>0),
              (uint16_t)port,
              (uint8_t)proto,
-             !!(operation&(1<<1)),
-             !!(operation&(1<<2)),
+             port != 0,
+             proto != 0,
              payload.mss,
              payload.sack_supported,
              payload.wscaleshift);
       if (threetuplectx_modify(&args->synproxy->threetuplectx, ip, port, proto,
-                               !!(operation & (1<<1)), !!(operation & (1<<2)),
+                               (port != 0), (proto != 0),
                                &payload) == 0)
       {
         if (write(fd2, "1\n", 2) != 2)
@@ -222,7 +222,7 @@ void *ctrl_func(void *userdata)
         }
       }
     }
-    else if (operation & (1<<4))
+    else if (operation == (1<<0))
     {
       if (ip == 0)
       {
@@ -257,7 +257,7 @@ void *ctrl_func(void *userdata)
         continue;
       }
     }
-    else
+    else if (operation == (1<<1))
     {
       log_log(
              LOG_LEVEL_NOTICE, "CTRL",
@@ -269,13 +269,13 @@ void *ctrl_func(void *userdata)
              (uint8_t)(ip>>0),
              (uint16_t)port,
              (uint8_t)proto,
-             !!(operation&(1<<1)),
-             !!(operation&(1<<2)),
+             port != 0,
+             proto != 0,
              payload.mss,
              payload.sack_supported,
              payload.wscaleshift);
       if (threetuplectx_add(&args->synproxy->threetuplectx, ip, port, proto,
-                            !!(operation & (1<<1)), !!(operation & (1<<2)),
+                            (port != 0), (proto != 0),
                             &payload) == 0)
       {
         if (write(fd2, "1\n", 2) != 2)
@@ -309,6 +309,38 @@ void *ctrl_func(void *userdata)
           log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
           continue;
         }
+      }
+    }
+    else
+    {
+      log_log(
+             LOG_LEVEL_NOTICE, "CTRL",
+             "invalid %d.%d.%d.%d:%d proto %d port_valid %d proto_valid %d"
+             " mss %d sack %d wscaleshift %d",
+             (uint8_t)(ip>>24),
+             (uint8_t)(ip>>16),
+             (uint8_t)(ip>>8),
+             (uint8_t)(ip>>0),
+             (uint16_t)port,
+             (uint8_t)proto,
+             port != 0,
+             proto != 0,
+             payload.mss,
+             payload.sack_supported,
+             payload.wscaleshift);
+      if (write(fd2, "0\n", 2) != 2)
+      {
+        close(fd2);
+        log_log(LOG_LEVEL_ERR, "CTRL", "can't write, reopening connection");
+        fd2 = accept_interrupt(fd, NULL, NULL, args->piperd);
+        if (fd2 < 0 && errno == EINTR)
+        {
+          log_log(LOG_LEVEL_NOTICE, "CTRL", "exiting");
+          return NULL;
+        }
+        set_nonblock(fd2);
+        log_log(LOG_LEVEL_NOTICE, "CTRL", "accepted");
+        continue;
       }
     }
   }

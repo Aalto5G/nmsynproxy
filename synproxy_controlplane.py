@@ -20,7 +20,7 @@ import struct
 import sys
 
 
-def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
+def synproxy_build_message(mode, ipaddr, port, proto, tcpmss, tcpsack, tcpwscale):
     """
     Build and return synchronization message
 
@@ -33,29 +33,24 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
       - 8  bits: TCP SACK value [0,1]
       - 8  bits: TCP window scaling value [0-14]
     """
-    proto = 6
     # Build flags
     flags = 0
     if mode == 'flush':
-        flags |= 0b0010000
+        flags |= 0b0000001
         tcpmss = 0
         tcpsack = 0
         tcpwscale = 0
         port = 0
         proto = 0
     elif mode == 'add':
-        flags |= 0b0000000
+        flags |= 0b0000010
     elif mode == 'mod':
-        flags |= 0b0001000
+        flags |= 0b0000100
     elif mode == 'del':
-        flags |= 0b0000001
+        flags |= 0b0001000
         tcpmss = 0
         tcpsack = 0
         tcpwscale = 0
-    if port != 0:
-        flags |= 0b0000010
-    if proto != 0:
-        flags |= 0b0000100
     # Pack message
     msg = socket.inet_pton(socket.AF_INET, ipaddr) + struct.pack('!HBBHBB', port, proto, flags, tcpmss, tcpsack, tcpwscale)
     # Return built message
@@ -63,7 +58,7 @@ def synproxy_build_message(mode, ipaddr, port, tcpmss, tcpsack, tcpwscale):
 
 
 @asyncio.coroutine
-def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_tcpmss, conn_tcpsack, conn_tcpwscale):
+def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_proto, conn_tcpmss, conn_tcpsack, conn_tcpwscale):
     # Create TCP socket
     sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -71,12 +66,12 @@ def synproxy_sendrecv(ipaddr, port, mode, conn_ipaddr, conn_port, conn_tcpmss, c
     # Connect TCP socket
     logger.info('Initiating connection to <{}:{}>'.format(ipaddr, port))
     yield from loop.sock_connect(sock, (ipaddr, port))
-    logger.info('Connected to <{}:{}>'.format(ipaddr, port))
+    logger.debug('Connected to <{}:{}>'.format(ipaddr, port))
     # Build control message
-    msg = synproxy_build_message(mode, conn_ipaddr, conn_port, conn_tcpmss, conn_tcpsack, conn_tcpwscale)
-    logger.info('Sending control message <{}>'.format(msg))
+    msg = synproxy_build_message(mode, conn_ipaddr, conn_proto, conn_port, conn_tcpmss, conn_tcpsack, conn_tcpwscale)
+    logger.debug('Sending control message <{}>'.format(msg))
     yield from loop.sock_sendall(sock, msg)
-    logger.info('Waiting for response...')
+    logger.debug('Waiting for response...')
     data = yield from asyncio.wait_for(loop.sock_recv(sock, 1024), timeout=5)
     sock.close()
     logger.info('Received response <{}>'.format(data))
@@ -158,15 +153,22 @@ def parse_arguments():
 loop = asyncio.get_event_loop()
 # Get logger instance
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('TCP SYNProxy ControlPlane')
-# Parse arguments
-args = parse_arguments()
-# Prepare coroutine with parameters for execution
-coro = synproxy_sendrecv(args.ipaddr, args.port, args.mode,
-                         args.conn_dstaddr, args.conn_dstport,
-                         args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale)
-loop.run_until_complete(coro)
+logger = logging.getLogger('')
 
-logger.warning('Bye!')
-loop.stop()
-sys.exit(0)
+if __name__ == '__main__':
+    # Parse arguments
+    args = parse_arguments()
+    logger.info('Creating connection to @{}:{}'.format(args.ipaddr, args.port))
+
+    # Prepare coroutine with parameters for execution
+    coro = synproxy_sendrecv(args.ipaddr, args.port, args.mode,
+                             args.conn_dstaddr, args.conn_dstport, 6,
+                             args.conn_tcpmss, args.conn_tcpsack, args.conn_tcpwscale)
+    try:
+        loop.run_until_complete(coro)
+    except KeyboardInterrupt:
+        pass
+
+    logger.warning('Bye!')
+    loop.close()
+    sys.exit(0)
