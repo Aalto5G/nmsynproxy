@@ -216,11 +216,16 @@ static inline void worker_local_init(
   linked_list_head_init(&local->half_open_list);
 }
 
+/*
+ * Somewhere in this fucntion, there is an "Aborted" bug. Thus the logging.
+ */
 static inline void worker_local_free(struct worker_local *local)
 {
   struct hash_list_node *x, *n;
   size_t bucket;
+  log_log(LOG_LEVEL_NOTICE, "SYNPROXY", "freeing IP hash");
   ip_hash_free(&local->ratelimit, &local->timers);
+  log_log(LOG_LEVEL_NOTICE, "SYNPROXY", "iterating hash");
   HASH_TABLE_FOR_EACH_SAFE(&local->hash, bucket, n, x)
   {
     struct synproxy_hash_entry *e;
@@ -229,8 +234,11 @@ static inline void worker_local_free(struct worker_local *local)
     timer_linkheap_remove(&local->timers, &e->timer);
     free(e);
   }
+  log_log(LOG_LEVEL_NOTICE, "SYNPROXY", "iterated hash, freeing hash table");
   hash_table_free(&local->hash);
+  log_log(LOG_LEVEL_NOTICE, "SYNPROXY", "freed hash table, freeing link heap");
   timer_linkheap_free(&local->timers);
+  log_log(LOG_LEVEL_NOTICE, "SYNPROXY", "freed link heap");
 }
 
 struct synproxy_hash_ctx {
