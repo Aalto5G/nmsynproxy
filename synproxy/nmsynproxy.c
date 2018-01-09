@@ -561,12 +561,9 @@ int main(int argc, char **argv)
     pthread_join(ctrl, NULL);
   }
 
-  log_log(LOG_LEVEL_NOTICE, "NMPROXY", "closing nmds");
   for (i = 0; i < num_rx; i++)
   {
-    log_log(LOG_LEVEL_NOTICE, "NMPROXY", "closing ulnmd %d", i);
     nm_close(ulnmds[i]);
-    log_log(LOG_LEVEL_NOTICE, "NMPROXY", "closing dlnmd %d", i);
     nm_close(dlnmds[i]);
   }
   close(pipefd[0]);
@@ -575,11 +572,8 @@ int main(int argc, char **argv)
   set_promisc_mode(sockfd, argv[optind + 1], 0);
   close(sockfd);
 
-  log_log(LOG_LEVEL_NOTICE, "NMPROXY", "freeing worker local");
   worker_local_free(&local);
-  log_log(LOG_LEVEL_NOTICE, "NMPROXY", "freeing SYN proxy");
   synproxy_free(&synproxy);
-  log_log(LOG_LEVEL_NOTICE, "NMPROXY", "freeing conf");
   conf_free(&conf);
   log_log(LOG_LEVEL_NOTICE, "NMPROXY", "closing log");
   log_close();
