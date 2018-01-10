@@ -216,9 +216,6 @@ static inline void worker_local_init(
   linked_list_head_init(&local->half_open_list);
 }
 
-/*
- * Somewhere in this fucntion, there is an "Aborted" bug. Thus the logging.
- */
 static inline void worker_local_free(struct worker_local *local)
 {
   struct hash_list_node *x, *n;

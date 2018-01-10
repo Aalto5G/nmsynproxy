@@ -572,6 +572,7 @@ int main(int argc, char **argv)
   set_promisc_mode(sockfd, argv[optind + 1], 0);
   close(sockfd);
 
+  timer_linkheap_remove(&local.timers, &timer);
   worker_local_free(&local);
   synproxy_free(&synproxy);
   conf_free(&conf);
