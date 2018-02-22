@@ -25,6 +25,13 @@ Also, needless to say, compiler tools and GNU make must be available. To
 actually communicate with real network interfaces, you also need netmap, but
 more on that later.
 
+Also, pptk submodule must be initialized and updated.
+
+```
+git submodule init
+git submodule update
+```
+
 # Git history
 
 The git history has been edited to remove some proprietary code. Thus,

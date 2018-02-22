@@ -50,10 +50,10 @@ clean_$(LCSYNPROXY): clean_SYNPROXY
 distclean_$(LCSYNPROXY): distclean_SYNPROXY
 unit_$(LCSYNPROXY): unit_SYNPROXY
 
-SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1 $(DIRSYNPROXY)/ctrlperf
+SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof $(DIRSYNPROXY)/ctrlperf
 
 ifeq ($(WITH_NETMAP),yes)
-SYNPROXY: $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend
+SYNPROXY: $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1
 CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR)
 endif
 
