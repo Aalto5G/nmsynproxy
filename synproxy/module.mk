@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c yyutils.c secret.c ctrl.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c tcpsendrecv.c tcpsendrecv1.c ctrlperf.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c tcpsendrecv.c tcpsendrecv1.c ctrlperf.c odpsynproxy.c
 
 SYNPROXY_LEX_LIB := conf.l
 SYNPROXY_LEX := $(SYNPROXY_LEX_LIB)
@@ -56,6 +56,11 @@ ifeq ($(WITH_NETMAP),yes)
 SYNPROXY: $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1
 CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR)
 endif
+ifeq ($(WITH_ODP),yes)
+SYNPROXY: $(DIRSYNPROXY)/odpsynproxy
+CFLAGS_SYNPROXY += -I$(ODP_DIR)/include
+LIBS_SYNPROXY += $(ODP_DIR)/lib/libodp-linux.a $(LIBS_ODPDEP)
+endif
 
 unit_SYNPROXY: $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/unittest
 	$(DIRSYNPROXY)/workeronlyperf
@@ -71,6 +76,9 @@ $(DIRSYNPROXY)/workeronlyperf: $(DIRSYNPROXY)/workeronlyperf.o $(DIRSYNPROXY)/li
 
 $(DIRSYNPROXY)/nmsynproxy: $(DIRSYNPROXY)/nmsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
+
+$(DIRSYNPROXY)/odpsynproxy: $(DIRSYNPROXY)/odpsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread -lrt -ldl
 
 $(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread

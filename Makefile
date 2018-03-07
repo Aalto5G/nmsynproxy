@@ -88,6 +88,9 @@ MAKEFILES_COMMON := Makefile opts.mk
 
 WITH_NETMAP=no
 NETMAP_INCDIR=
+WITH_ODP=no
+ODP_DIR=/usr/local
+LIBS_ODPDEP=/usr/lib/x86_64-linux-gnu/libssl.a /usr/lib/x86_64-linux-gnu/libcrypto.a
 include opts.mk
 
 $(foreach module,$(MODULES),$(eval \
