@@ -373,6 +373,7 @@ static void delete_closing_already_bucket_locked(
 {
   int ok = 0;
   if (entry->flag_state == FLAG_STATE_RESETED ||
+      entry->flag_state == FLAG_STATE_TIME_WAIT ||
       ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
        (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
   {
@@ -611,6 +612,7 @@ static void send_synack(
     if (e2)
     {
       if (e2->flag_state == FLAG_STATE_RESETED ||
+          e2->flag_state == FLAG_STATE_TIME_WAIT ||
           ((e2->flag_state & FLAG_STATE_UPLINK_FIN) &&
            (e2->flag_state & FLAG_STATE_DOWNLINK_FIN)))
       {
@@ -1345,6 +1347,7 @@ int downlink(
     return 1;
   }
   if (entry == NULL || entry->flag_state == FLAG_STATE_RESETED ||
+      entry->flag_state == FLAG_STATE_TIME_WAIT ||
       ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
        (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
   {
@@ -1883,6 +1886,7 @@ int uplink(
       if (entry != NULL)
       {
         if (entry->flag_state == FLAG_STATE_RESETED ||
+            entry->flag_state == FLAG_STATE_TIME_WAIT ||
             ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
              (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
         {
