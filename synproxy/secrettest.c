@@ -22,9 +22,9 @@ int main(int argc, char **argv)
   synproxy_init(&synproxy, &conf);
 
   secret_init_deterministic(&info);
-  cookie = form_cookie(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale, 1);
+  cookie = form_cookie(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale, 1, 123456789);
   ts = form_timestamp(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale);
-  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL))
+  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL, 123456789))
   {
     abort();
   }
@@ -33,9 +33,9 @@ int main(int argc, char **argv)
     abort();
   }
   revolve_secret_impl(&info);
-  cookie_secret_1 = form_cookie(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale, 1);
+  cookie_secret_1 = form_cookie(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale, 1, 123456789);
   ts_secret_1 = form_timestamp(&info, &synproxy, ip1, ip2, port1, port2, mss, wscale);
-  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL))
+  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL, 123456789))
   {
     abort();
   }
@@ -43,7 +43,7 @@ int main(int argc, char **argv)
   {
     abort();
   }
-  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie_secret_1, NULL, NULL, NULL))
+  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie_secret_1, NULL, NULL, NULL, 123456789))
   {
     abort();
   }
@@ -52,7 +52,7 @@ int main(int argc, char **argv)
     abort();
   }
   revolve_secret_impl(&info);
-  if (verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL))
+  if (verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie, NULL, NULL, NULL, 123456789))
   {
     abort();
   }
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
   {
     abort();
   }
-  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie_secret_1, NULL, NULL, NULL))
+  if (!verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie_secret_1, NULL, NULL, NULL, 123456789))
   {
     abort();
   }
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     abort();
   }
   revolve_secret_impl(&info);
-  if (verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie_secret_1, NULL, NULL, NULL))
+  if (verify_cookie(&info, &synproxy, ip1, ip2, port1, port2, cookie_secret_1, NULL, NULL, NULL, 123456789))
   {
     abort();
   }

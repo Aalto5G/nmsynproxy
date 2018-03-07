@@ -65,7 +65,8 @@ int verify_cookie(
   struct secretinfo *info,
   struct synproxy *synproxy,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
-  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted)
+  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted,
+  uint32_t other_isn)
 {
   struct conf *conf = synproxy->conf;
   int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits + 1;
@@ -90,6 +91,7 @@ int verify_cookie(
   }
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
+  siphash_feed_u64(&ctx, other_isn);
   hash = siphash_get(&ctx) & bitmask;
   if (hash == (isn & bitmask))
   {
@@ -115,7 +117,8 @@ uint32_t form_cookie(
   struct secretinfo *info,
   struct synproxy *synproxy,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
-  uint16_t mss, uint8_t wscale, uint8_t sack_permitted)
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
+  uint32_t other_isn)
 {
   struct conf *conf = synproxy->conf;
   int total_bits = 1 + conf->msslist_bits + conf->wscalelist_bits + 1;
@@ -171,6 +174,7 @@ uint32_t form_cookie(
   }
   siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
+  siphash_feed_u64(&ctx, other_isn);
   hash = siphash_get(&ctx) & bitmask;
   return (current_secret<<31) | (additional_bits<<(32-total_bits)) | hash;
 }

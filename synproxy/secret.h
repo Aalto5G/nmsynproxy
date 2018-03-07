@@ -31,13 +31,15 @@ int verify_cookie(
   struct secretinfo *info,
   struct synproxy *synproxy,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
-  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted);
+  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted,
+  uint32_t other_isn);
 
 uint32_t form_cookie(
   struct secretinfo *info,
   struct synproxy *synproxy,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
-  uint16_t mss, uint8_t wscale, uint8_t sack_permitted);
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
+  uint32_t other_isn);
 
 int verify_timestamp(
   struct secretinfo *info,

@@ -434,7 +434,8 @@ static void send_synack(
   syn_cookie = form_cookie(
     &local->info, synproxy, ip_dst(origip), ip_src(origip),
     tcp_dst_port(origtcp), tcp_src_port(origtcp),
-    tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted);
+    tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted,
+    tcp_seq_number(origtcp));
   ts = form_timestamp(
     &local->info, synproxy, ip_dst(origip), ip_src(origip),
     tcp_dst_port(origtcp), tcp_src_port(origtcp),
@@ -1387,6 +1388,7 @@ int downlink(
                wan_min, last_seq, entry->lan_max+1))))
     {
       uint32_t ack_num = tcp_ack_number(ippay);
+      uint32_t other_seq = tcp_seq_number(ippay);
       uint16_t mss;
       uint16_t tsmss;
       uint8_t tswscale;
@@ -1408,7 +1410,7 @@ int downlink(
       ok = verify_cookie(
         &local->info, synproxy, ip_dst(ip), ip_src(ip),
         tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
-        &mss, &wscale, &sack_permitted);
+        &mss, &wscale, &sack_permitted, other_seq - 1);
       tcp_parse_options(ippay, &tcpinfo); // XXX send_syn reparses
       if (tcpinfo.options_valid && tcpinfo.ts_present)
       {
