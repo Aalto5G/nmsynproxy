@@ -369,6 +369,16 @@ int main(int argc, char **argv)
 
   log_open("NMSYNPROXY", LOG_LEVEL_DEBUG, LOG_LEVEL_INFO);
 
+  sigemptyset(&set);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGPIPE);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGTERM);
+  sigaddset(&set, SIGUSR1);
+  sigaddset(&set, SIGUSR2);
+  sigaddset(&set, SIGALRM);
+  pthread_sigmask(SIG_BLOCK, &set, NULL);
+
   if (odp_init_global(&instance, NULL, NULL))
   {
     log_log(LOG_LEVEL_CRIT, "NMPROXY", "can't init ODP global");
@@ -399,16 +409,6 @@ int main(int argc, char **argv)
   {
     abort();
   }
-
-  sigemptyset(&set);
-  sigaddset(&set, SIGINT);
-  sigaddset(&set, SIGPIPE);
-  sigaddset(&set, SIGHUP);
-  sigaddset(&set, SIGTERM);
-  sigaddset(&set, SIGUSR1);
-  sigaddset(&set, SIGUSR2);
-  sigaddset(&set, SIGALRM);
-  pthread_sigmask(SIG_BLOCK, &set, NULL);
 
   confyydirparse(argv[0], "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
