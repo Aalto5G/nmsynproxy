@@ -1140,7 +1140,40 @@ int downlink(
       ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
        (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
   {
-    if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
+    first_seq = tcp_seq_number(ippay);
+    data_len =
+      ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
+    if (data_len < 0)
+    {
+      // This can occur in fragmented packets. We don't then know the true
+      // data length, and can therefore drop packets that would otherwise be
+      // valid.
+      data_len = 0;
+    }
+    last_seq = first_seq + data_len - 1;
+    if (entry != NULL)
+    {
+      wan_min =
+        entry->wan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
+    }
+
+    /*
+     * If entry is NULL, it can only be ACK of a SYN+ACK so we verify cookie
+     * If entry is non-NULL, it can be ACK of FIN or ACK of SYN+ACK
+     * In the latter case, we verify whether the SEQ/ACK numbers look fine.
+     * If either SEQ or ACK number is invalid, it has to be ACK of SYN+ACK
+     */
+    if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay)
+        && (entry == NULL ||
+            !between(
+              entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
+              tcp_ack_number(ippay),
+              entry->lan_sent + 1 + MAX_FRAG) ||
+            (!between(
+               wan_min, first_seq, entry->lan_max+1)
+             &&
+             !between(
+               wan_min, last_seq, entry->lan_max+1))))
     {
       uint32_t ack_num = tcp_ack_number(ippay);
       uint16_t mss;
