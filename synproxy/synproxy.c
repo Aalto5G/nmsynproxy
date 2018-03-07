@@ -161,6 +161,40 @@ uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata)
   return synproxy_hash(CONTAINER_OF(node, struct synproxy_hash_entry, node));
 }
 
+static void delete_closing_already_bucket_locked(
+  struct synproxy *synproxy, struct worker_local *local,
+  struct synproxy_hash_entry *entry)
+{
+  int ok = 0;
+  if (entry->flag_state == FLAG_STATE_RESETED ||
+      ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+       (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
+  {
+    ok = 1;
+  }
+  if (!ok)
+  {
+    abort();
+  }
+  log_log(LOG_LEVEL_NOTICE, "SYNPROXY",
+          "deleting closing connection to make room for new");
+  timer_linkheap_remove(&local->timers, &entry->timer);
+  hash_table_delete_already_bucket_locked(&local->hash, &entry->node);
+  worker_local_wrlock(local);
+  if (entry->was_synproxied)
+  {
+    local->synproxied_connections--;
+  }
+  else
+  {
+    local->direct_connections--;
+  }
+  worker_local_wrunlock(local);
+  free(entry);
+  entry = NULL;
+}
+
+
 // Caller must hold worker_local mutex lock
 static void send_synack(
   void *orig, struct worker_local *local, struct synproxy *synproxy,
@@ -363,13 +397,25 @@ static void send_synack(
   if (synproxy->conf->halfopen_cache_max)
   {
     struct synproxy_hash_entry *e;
+    struct synproxy_hash_entry *e2;
     struct synproxy_hash_ctx ctx;
     ctx.locked = 0;
-    if (synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port,
-                          &ctx))
+    e2 = synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port,
+                           &ctx);
+    if (e2)
     {
-      synproxy_hash_unlock(local, &ctx);
-      return; // duplicate SYN
+      if (e2->flag_state == FLAG_STATE_RESETED ||
+          ((e2->flag_state & FLAG_STATE_UPLINK_FIN) &&
+           (e2->flag_state & FLAG_STATE_DOWNLINK_FIN)))
+      {
+        delete_closing_already_bucket_locked(synproxy, local, e2);
+        e2 = NULL;
+      }
+      else
+      {
+        synproxy_hash_unlock(local, &ctx);
+        return; // duplicate SYN
+      }
     }
     worker_local_wrlock(local);
     if (local->half_open_connections >= synproxy->conf->halfopen_cache_max)
@@ -1090,7 +1136,9 @@ int downlink(
     synproxy_hash_unlock(local, &ctx);
     return 1;
   }
-  if (entry == NULL)
+  if (entry == NULL || entry->flag_state == FLAG_STATE_RESETED ||
+      ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+       (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
   {
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
     {
@@ -1149,13 +1197,21 @@ int downlink(
       worker_local_wrunlock(local);
       log_log(
         LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN");
+      if (entry != NULL)
+      {
+        delete_closing_already_bucket_locked(synproxy, local, entry);
+        entry = NULL;
+      }
       send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL, time64);
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
-    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found");
-    synproxy_hash_unlock(local, &ctx);
-    return 1;
+    if (entry == NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "entry not found");
+      synproxy_hash_unlock(local, &ctx);
+      return 1;
+    }
   }
   if (unlikely(tcp_rst(ippay)))
   {
@@ -1560,9 +1616,19 @@ int uplink(
       }
       if (entry != NULL)
       {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "S/SA but entry exists");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
+        if (entry->flag_state == FLAG_STATE_RESETED ||
+            ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+             (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
+        {
+          delete_closing_already_bucket_locked(synproxy, local, entry);
+          entry = NULL;
+        }
+        else
+        {
+          log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "S/SA but entry exists");
+          synproxy_hash_unlock(local, &ctx);
+          return 1;
+        }
       }
       entry = synproxy_hash_put(
         local, lan_ip, lan_port, remote_ip, remote_port, 0, time64);
