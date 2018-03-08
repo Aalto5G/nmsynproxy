@@ -236,7 +236,7 @@ static inline void worker_local_free(struct worker_local *local)
 struct synproxy_hash_ctx {
   int locked;
   uint32_t hashval;
-  struct synproxy_hash_entry *entry;
+  //struct synproxy_hash_entry *entry;
 };
 
 static inline void synproxy_hash_unlock(
@@ -269,7 +269,7 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
         && entry->remote_ip == remote_ip
         && entry->remote_port == remote_port)
     {
-      ctx->entry = entry;
+      //ctx->entry = entry;
       return entry;
     }
   }
