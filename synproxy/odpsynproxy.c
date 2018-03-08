@@ -226,7 +226,7 @@ static void *rx_func(void *userdata)
       pktstruct->sz = sz;
       memcpy(packet_data(pktstruct), pkt, sz);
 
-      if (from + inqidx == 1)
+      if (from + inqidx != 1)
       {
         pktstruct->direction = PACKET_DIRECTION_UPLINK;
         if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
