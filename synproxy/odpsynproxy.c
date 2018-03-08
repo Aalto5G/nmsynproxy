@@ -114,13 +114,15 @@ struct tx_args {
   int idx;
 };
 
+#define PKTCNT 1000
+
 static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
   struct ll_alloc_st st;
   int i;
   struct port outport;
-  struct odpfunc2_userdata ud;
+  struct odpfunc3_userdata ud;
   struct timeval tv1;
   struct periodic_userdata periodic = {};
   struct allocif intf = {.ops = &ll_allocif_ops_st, .userdata = &st};
@@ -146,7 +148,9 @@ static void *rx_func(void *userdata)
   ud.lanctx = &lanctx;
   ud.wanctx = &wanctx;
   ud.outctx = &outctx;
-  outport.portfunc = odpfunc2;
+  ud.dloutcnt = 0;
+  ud.uloutcnt = 0;
+  outport.portfunc = odpfunc3;
   outport.userdata = &ud;
 
   if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
@@ -164,7 +168,7 @@ static void *rx_func(void *userdata)
     uint64_t expiry;
     int try;
     unsigned from;
-    odp_packet_t packets[100];
+    odp_packet_t packets[PKTCNT];
     uint64_t wait;
     int num_rcvd;
 
@@ -173,6 +177,9 @@ static void *rx_func(void *userdata)
     {
       inqidx = 0;
     }
+
+    odpfunc3flushdl(&ud);
+    odpfunc3flushul(&ud);
 
     worker_local_rdlock(args->local);
     expiry = timer_linkheap_next_expiry_time(&args->local->timers);
@@ -191,7 +198,7 @@ static void *rx_func(void *userdata)
     {
       wait = odp_pktin_wait_time((expiry - time64)*1000);
     }
-    num_rcvd = odp_pktin_recv_mq_tmo(&inqs[inqidx], 2, &from, packets, 100, wait);
+    num_rcvd = odp_pktin_recv_mq_tmo(&inqs[inqidx], 2, &from, packets, PKTCNT, wait);
 
     time64 = gettime64();
     worker_local_rdlock(args->local);
