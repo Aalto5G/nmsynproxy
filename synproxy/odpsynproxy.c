@@ -114,7 +114,7 @@ struct tx_args {
   int idx;
 };
 
-#define PKTCNT 1000
+#define PKTCNT 64
 
 static void *rx_func(void *userdata)
 {
