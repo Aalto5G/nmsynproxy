@@ -1411,21 +1411,24 @@ int downlink(
         &local->info, synproxy, ip_dst(ip), ip_src(ip),
         tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
         &mss, &wscale, &sack_permitted, other_seq - 1);
-      tcp_parse_options(ippay, &tcpinfo); // XXX send_syn reparses
-      if (tcpinfo.options_valid && tcpinfo.ts_present)
+      if (ok)
       {
-        if (verify_timestamp(
-          &local->info, synproxy, ip_dst(ip), ip_src(ip),
-          tcp_dst_port(ippay), tcp_src_port(ippay), tcpinfo.tsecho,
-          &tsmss, &tswscale))
+        tcp_parse_options(ippay, &tcpinfo); // XXX send_syn reparses
+        if (tcpinfo.options_valid && tcpinfo.ts_present)
         {
-          if (tsmss > mss)
+          if (verify_timestamp(
+            &local->info, synproxy, ip_dst(ip), ip_src(ip),
+            tcp_dst_port(ippay), tcp_src_port(ippay), tcpinfo.tsecho,
+            &tsmss, &tswscale))
           {
-            mss = tsmss;
-          }
-          if (tswscale > wscale)
-          {
-            wscale = tswscale;
+            if (tsmss > mss)
+            {
+              mss = tsmss;
+            }
+            if (tswscale > wscale)
+            {
+              wscale = tswscale;
+            }
           }
         }
       }
