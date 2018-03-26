@@ -1326,7 +1326,8 @@ static void synproxy_handshake_impl(
   struct worker_local *local, struct ll_alloc_st *loc,
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
   uint32_t *isn,
-  unsigned transsyn, unsigned transack, unsigned transsynack)
+  unsigned transsyn, unsigned transack, unsigned transsynack,
+  int keepalive)
 {
   struct port outport;
   uint64_t time64;
@@ -1482,7 +1483,7 @@ static void synproxy_handshake_impl(
     tcp_set_dst_port(tcp, port1);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
-    tcp_set_seq_number(tcp, isn2 + 1);
+    tcp_set_seq_number(tcp, isn2 + 1 - (!!keepalive));
     tcp_set_ack_number(tcp, (*isn) + 1);
     tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
   
@@ -2402,7 +2403,7 @@ static void syn_proxy_rst_uplink(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321,
-    &isn, 1, 1, 1);
+    &isn, 1, 1, 1, 0);
 
   e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
@@ -2531,7 +2532,7 @@ static void syn_proxy_rst_downlink(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321,
-    &isn, 1, 1, 1);
+    &isn, 1, 1, 1, 0);
 
   e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
@@ -2753,7 +2754,7 @@ static void syn_proxy_handshake(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 1, 1, 1);
+    &isn, 1, 1, 1, 0);
   four_way_fin_seq_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     isn1, isn2, isn,
@@ -2788,7 +2789,7 @@ static void syn_proxy_uplink(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 1, 1, 1);
+    &isn, 1, 1, 1, 0);
   ctx.ip1 = (10<<24)|18;
   ctx.ip2 = (11<<24)|17;
   ctx.port1 = 12345;
@@ -2831,7 +2832,7 @@ static void syn_proxy_downlink(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 1, 1, 1);
+    &isn, 1, 1, 1, 0);
   ctx.ip1 = (10<<24)|18;
   ctx.ip2 = (11<<24)|17;
   ctx.port1 = 12345;
@@ -2875,7 +2876,7 @@ static void syn_proxy_uplink_downlink(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 1, 1, 1);
+    &isn, 1, 1, 1, 0);
   ctx.ip1 = (10<<24)|18;
   ctx.ip2 = (11<<24)|17;
   ctx.port1 = 12345;
@@ -2949,7 +2950,7 @@ static void syn_proxy_handshake_2_1_1(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 2, 1, 1);
+    &isn, 2, 1, 1, 0);
   four_way_fin_seq_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     isn1, isn2, isn,
@@ -2983,7 +2984,7 @@ static void syn_proxy_handshake_1_2_1(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 1, 2, 1);
+    &isn, 1, 2, 1, 0);
   four_way_fin_seq_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     isn1, isn2, isn,
@@ -3017,7 +3018,41 @@ static void syn_proxy_handshake_1_1_2(void)
 
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
-    &isn, 1, 1, 2);
+    &isn, 1, 1, 2, 0);
+  four_way_fin_seq_impl(
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    isn1, isn2, isn,
+    1, 1);
+
+  ll_alloc_st_free(&st);
+  worker_local_free(&local);
+  conf_free(&conf);
+  synproxy_free(&synproxy);
+}
+
+static void syn_proxy_handshake_1_1_1_keepalive(void)
+{
+  struct synproxy synproxy;
+  struct ll_alloc_st st;
+  struct worker_local local;
+  uint32_t isn;
+  uint32_t isn1 = 0x12345678;
+  uint32_t isn2 = 0x87654321;
+  struct conf conf = CONF_INITIALIZER;
+
+  confyydirparse(argv0, "conf.txt", &conf, 0);
+  synproxy_init(&synproxy, &conf);
+
+  if (ll_alloc_st_init(&st, POOL_SIZE, BLOCK_SIZE) != 0)
+  {
+    abort();
+  }
+
+  worker_local_init(&local, &synproxy, 1, 0);
+
+  synproxy_handshake_impl(
+    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &isn, 1, 1, 2, 1);
   four_way_fin_seq_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     isn1, isn2, isn,
@@ -3059,6 +3094,8 @@ int main(int argc, char **argv)
   syn_proxy_handshake_1_2_1();
 
   syn_proxy_handshake_1_1_2();
+
+  syn_proxy_handshake_1_1_1_keepalive();
 
   syn_proxy_closed_port();
 

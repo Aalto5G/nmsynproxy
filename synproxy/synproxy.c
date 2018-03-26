@@ -836,7 +836,7 @@ static void send_syn(
   struct ll_alloc_st *st,
   uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
   struct synproxy_hash_entry *entry,
-  uint64_t time64)
+  uint64_t time64, int was_keepalive)
 {
   void *origip;
   void *origtcp;
@@ -869,7 +869,7 @@ static void send_syn(
   }
 
   entry->wan_wscale = wscale;
-  entry->wan_sent = tcp_seq_number(origtcp);
+  entry->wan_sent = tcp_seq_number(origtcp) + (!!was_keepalive);
   entry->wan_acked = tcp_ack_number(origtcp);
   entry->wan_max =
     tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
@@ -880,7 +880,7 @@ static void send_syn(
     entry->wan_max_window_unscaled = 1;
   }
   entry->state_data.downlink_syn_sent.local_isn = tcp_ack_number(origtcp) - 1;
-  entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1;
+  entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1 + (!!was_keepalive);
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
@@ -1339,7 +1339,7 @@ int downlink(
         ether, local, port, st,
         entry->state_data.downlink_half_open.mss,
         entry->state_data.downlink_half_open.wscale,
-        entry->state_data.downlink_half_open.sack_permitted, entry, time64);
+        entry->state_data.downlink_half_open.sack_permitted, entry, time64, 0);
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
@@ -1394,6 +1394,7 @@ int downlink(
       uint8_t tswscale;
       uint8_t wscale, sack_permitted;
       int ok;
+      int was_keepalive = 0;
       struct tcp_information tcpinfo;
       if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
       {
@@ -1411,6 +1412,23 @@ int downlink(
         &local->info, synproxy, ip_dst(ip), ip_src(ip),
         tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
         &mss, &wscale, &sack_permitted, other_seq - 1);
+      if (!ok)
+      {
+        other_seq++;
+        ok = verify_cookie(
+          &local->info, synproxy, ip_dst(ip), ip_src(ip),
+          tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
+          &mss, &wscale, &sack_permitted, other_seq - 1);
+        if (ok)
+        {
+          synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ip, ippay);
+          log_log(
+            LOG_LEVEL_NOTICE, "WORKERDOWNLINK",
+            "SYN proxy detected keepalive packet opening connection: %s",
+            packetbuf);
+          was_keepalive = 1;
+        }
+      }
       if (ok)
       {
         tcp_parse_options(ippay, &tcpinfo); // XXX send_syn reparses
@@ -1465,7 +1483,7 @@ int downlink(
         delete_closing_already_bucket_locked(synproxy, local, entry);
         entry = NULL;
       }
-      send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL, time64);
+      send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL, time64, was_keepalive);
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
