@@ -61,10 +61,24 @@ void revolve_secret(
   timer_linkheap_add(heap, timer);
 }
 
-int verify_cookie(
+struct addr46 {
+  int is6;
+  union {
+    struct {
+      uint32_t ip1;
+      uint32_t ip2;
+    } u4;
+    struct {
+      const void *ip1;
+      const void *ip2;
+    } u6;
+  } u;
+};
+
+static int verify_cookie46(
   struct secretinfo *info,
   struct synproxy *synproxy,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  struct addr46 *a46, uint16_t port1, uint16_t port2, uint32_t isn,
   uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted,
   uint32_t other_isn)
 {
@@ -89,7 +103,21 @@ int verify_cookie(
   {
     abort();
   }
-  siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  if (a46->is6)
+  {
+    const char *ip1 = a46->u.u6.ip1;
+    const char *ip2 = a46->u.u6.ip2;
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[8]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[8]));
+  }
+  else
+  {
+    uint32_t ip1 = a46->u.u4.ip1;
+    uint32_t ip2 = a46->u.u4.ip2;
+    siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  }
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   siphash_feed_u64(&ctx, other_isn);
   hash = siphash_get(&ctx) & bitmask;
@@ -113,10 +141,40 @@ int verify_cookie(
   return 0;
 }
 
-uint32_t form_cookie(
+int verify_cookie(
   struct secretinfo *info,
   struct synproxy *synproxy,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted,
+  uint32_t other_isn)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 0;
+  a46.u.u4.ip1 = ip1;
+  a46.u.u4.ip2 = ip2;
+  return verify_cookie46(info, synproxy, &a46, port1, port2, isn, mss, wscale,
+                         sack_permitted, other_isn);
+}
+
+int verify_cookie6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted,
+  uint32_t other_isn)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 1;
+  a46.u.u6.ip1 = ip1;
+  a46.u.u6.ip2 = ip2;
+  return verify_cookie46(info, synproxy, &a46, port1, port2, isn, mss, wscale,
+                         sack_permitted, other_isn);
+}
+
+static uint32_t form_cookie46(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  struct addr46 *a46, uint16_t port1, uint16_t port2,
   uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
   uint32_t other_isn)
 {
@@ -172,17 +230,63 @@ uint32_t form_cookie(
   {
     abort();
   }
-  siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  if (a46->is6)
+  {
+    const char *ip1 = a46->u.u6.ip1;
+    const char *ip2 = a46->u.u6.ip2;
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[8]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[8]));
+  }
+  else
+  {
+    uint32_t ip1 = a46->u.u4.ip1;
+    uint32_t ip2 = a46->u.u4.ip2;
+    siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  }
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   siphash_feed_u64(&ctx, other_isn);
   hash = siphash_get(&ctx) & bitmask;
   return (current_secret<<31) | (additional_bits<<(32-total_bits)) | hash;
 }
 
-int verify_timestamp(
+uint32_t form_cookie(
   struct secretinfo *info,
   struct synproxy *synproxy,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
+  uint32_t other_isn)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 0;
+  a46.u.u4.ip1 = ip1;
+  a46.u.u4.ip2 = ip2;
+  return form_cookie46(info, synproxy, &a46, port1, port2, mss, wscale,
+                       sack_permitted, other_isn);
+}
+
+uint32_t form_cookie6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
+  uint32_t other_isn)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 1;
+  a46.u.u6.ip1 = ip1;
+  a46.u.u6.ip2 = ip2;
+  return form_cookie46(info, synproxy, &a46, port1, port2, mss, wscale,
+                       sack_permitted, other_isn);
+}
+
+
+
+static int verify_timestamp46(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  struct addr46 *a46, uint16_t port1, uint16_t port2, uint32_t isn,
   uint16_t *mss, uint8_t *wscale)
 {
   struct conf *conf = synproxy->conf;
@@ -207,7 +311,21 @@ int verify_timestamp(
   {
     abort();
   }
-  siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  if (a46->is6)
+  {
+    const char *ip1 = a46->u.u6.ip1;
+    const char *ip2 = a46->u.u6.ip2;
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[8]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[8]));
+  }
+  else
+  {
+    uint32_t ip1 = a46->u.u4.ip1;
+    uint32_t ip2 = a46->u.u4.ip2;
+    siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  }
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
   if (hash == (isn & bitmask))
@@ -225,10 +343,36 @@ int verify_timestamp(
   return 0;
 }
 
-uint32_t form_timestamp(
+int verify_timestamp(
   struct secretinfo *info,
   struct synproxy *synproxy,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 0;
+  a46.u.u4.ip1 = ip1;
+  a46.u.u4.ip2 = ip2;
+  return verify_timestamp46(info, synproxy, &a46, port1, port2, isn, mss, wscale);
+}
+
+int verify_timestamp6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 1;
+  a46.u.u6.ip1 = ip1;
+  a46.u.u6.ip2 = ip2;
+  return verify_timestamp46(info, synproxy, &a46, port1, port2, isn, mss, wscale);
+}
+
+static uint32_t form_timestamp46(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  struct addr46 *a46, uint16_t port1, uint16_t port2,
   uint16_t mss, uint8_t wscale)
 {
   struct conf *conf = synproxy->conf;
@@ -284,8 +428,48 @@ uint32_t form_timestamp(
   {
     abort();
   }
-  siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  if (a46->is6)
+  {
+    const char *ip1 = a46->u.u6.ip1;
+    const char *ip2 = a46->u.u6.ip2;
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip1[8]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[0]));
+    siphash_feed_u64(&ctx, hdr_get64h(&ip2[8]));
+  }
+  else
+  {
+    uint32_t ip1 = a46->u.u4.ip1;
+    uint32_t ip2 = a46->u.u4.ip2;
+    siphash_feed_u64(&ctx, (((uint64_t)ip1)<<32) | ip2);
+  }
   siphash_feed_u64(&ctx, (((uint64_t)port1)<<48) | (((uint64_t)port2)<<32) | additional_bits);
   hash = siphash_get(&ctx) & bitmask;
   return (current_secret<<31) | (additional_bits<<(32-total_bits)) | hash;
+}
+
+uint32_t form_timestamp(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 0;
+  a46.u.u4.ip1 = ip1;
+  a46.u.u4.ip2 = ip2;
+  return form_timestamp46(info, synproxy, &a46, port1, port2, mss, wscale);
+}
+
+uint32_t form_timestamp6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale)
+{
+  struct addr46 a46 = {};
+  a46.is6 = 1;
+  a46.u.u6.ip1 = ip1;
+  a46.u.u6.ip2 = ip2;
+  return form_timestamp46(info, synproxy, &a46, port1, port2, mss, wscale);
 }

@@ -53,4 +53,30 @@ uint32_t form_timestamp(
   uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
   uint16_t mss, uint8_t wscale);
 
+int verify_cookie6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale, uint8_t *sack_permitted,
+  uint32_t other_isn);
+
+uint32_t form_cookie6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale, uint8_t sack_permitted,
+  uint32_t other_isn);
+
+int verify_timestamp6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2, uint32_t isn,
+  uint16_t *mss, uint8_t *wscale);
+
+uint32_t form_timestamp6(
+  struct secretinfo *info,
+  struct synproxy *synproxy,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
+  uint16_t mss, uint8_t wscale);
+
 #endif
