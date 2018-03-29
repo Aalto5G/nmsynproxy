@@ -19,7 +19,7 @@ int main(int argc, char **argv)
   {
     abort();
   }
-  if (sack_ip_port_hash_get(&hash, 0, 0, &data2))
+  if (sack_ip_port_hash_get4(&hash, 0, 0, &data2))
   {
     abort();
   }
@@ -28,7 +28,11 @@ int main(int argc, char **argv)
     uint32_t randval = rand();
     uint32_t ip = randval&0xFFF;
     uint16_t port = 128 | ((randval>>16)&0xF);
-    if (sack_ip_port_hash_add(&hash, ip, port, &data) != 0)
+    if (sack_ip_port_hash_add4(&hash, ip, port, &data) != 0)
+    {
+      abort();
+    }
+    if (sack_ip_port_hash_get4(&hash, ip, port, &data) == 0)
     {
       abort();
     }

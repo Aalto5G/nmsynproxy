@@ -455,7 +455,7 @@ static void send_synack(
   if (   synproxy->conf->mssmode == HASHMODE_HASHIPPORT
       || synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
   {
-    if (sack_ip_port_hash_get(&synproxy->autolearn, ip_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
+    if (sack_ip_port_hash_get4(&synproxy->autolearn, ip_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
     {
       ipportentry.sack_supported = synproxy->conf->own_sack;
       ipportentry.mss = synproxy->conf->own_mss;
@@ -464,7 +464,7 @@ static void send_synack(
   if (   synproxy->conf->mssmode == HASHMODE_HASHIP
       || synproxy->conf->sackmode == HASHMODE_HASHIP)
   {
-    if (sack_ip_port_hash_get(&synproxy->autolearn, ip_dst(origip), 0, &ipentry) == 0)
+    if (sack_ip_port_hash_get4(&synproxy->autolearn, ip_dst(origip), 0, &ipentry) == 0)
     {
       ipentry.sack_supported = synproxy->conf->own_sack;
       ipentry.mss = synproxy->conf->own_mss;
@@ -2034,13 +2034,13 @@ int uplink(
       if (   synproxy->conf->sackmode == HASHMODE_HASHIPPORT
           || synproxy->conf->mssmode == HASHMODE_HASHIPPORT)
       {
-        sack_ip_port_hash_add(
+        sack_ip_port_hash_add4(
           &synproxy->autolearn, ip_src(ip), tcp_src_port(ippay), &sackdata);
       }
       if (   synproxy->conf->sackmode == HASHMODE_HASHIP
           || synproxy->conf->mssmode == HASHMODE_HASHIP)
       {
-        sack_ip_port_hash_add(
+        sack_ip_port_hash_add4(
           &synproxy->autolearn, ip_src(ip), 0, &sackdata);
       }
       if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
