@@ -2,6 +2,7 @@
 #include "ipcksum.h"
 #include "branchpredict.h"
 #include <sys/time.h>
+#include <arpa/inet.h>
 #include "time64.h"
 
 #define MAX_FRAG 65535
@@ -221,9 +222,59 @@ static size_t synproxy_packet_to_str(
     off += snprintf(str + off, bufsiz - off, "ack=%u", tcp_ack_number(ippay));
     return off;
   }
+  else if (ether_type(ether) == ETHER_TYPE_IPV6)
+  {
+    uint8_t proto;
+    struct in6_addr in6src, in6dst;
+    char str6src[INET6_ADDRSTRLEN] = {0};
+    char str6dst[INET6_ADDRSTRLEN] = {0};
+    ippay = ipv6_const_proto_hdr(ip, &proto);
+    if (ippay == NULL || proto != 6)
+    {
+      off += snprintf(str + off, bufsiz - off, "unknown protocol");
+      return off;
+    }
+    memcpy(in6src.s6_addr, ipv6_const_src(ip), 16);
+    memcpy(in6dst.s6_addr, ipv6_const_dst(ip), 16);
+    if (inet_ntop(AF_INET6, &in6src, str6src, sizeof(str6src)) == NULL)
+    {
+      strncpy(str6src, "UNKNOWN", sizeof(str6src));
+    }
+    if (inet_ntop(AF_INET6, &in6dst, str6dst, sizeof(str6dst)) == NULL)
+    {
+      strncpy(str6dst, "UNKNOWN", sizeof(str6dst));
+    }
+    src_port = tcp_src_port(ippay);
+    dst_port = tcp_dst_port(ippay);
+    off += snprintf(str + off, bufsiz - off, "src_end=[%s]", str6src);
+    off += snprintf(str + off, bufsiz - off, ", ");
+    off += snprintf(str + off, bufsiz - off, "dst_end=[%s]", str6dst);
+    off += snprintf(str + off, bufsiz - off, ", flags=");
+    if (tcp_syn(ippay))
+    {
+      off += snprintf(str + off, bufsiz - off, "S");
+    }
+    if (tcp_ack(ippay))
+    {
+      off += snprintf(str + off, bufsiz - off, "A");
+    }
+    if (tcp_fin(ippay))
+    {
+      off += snprintf(str + off, bufsiz - off, "F");
+    }
+    if (tcp_rst(ippay))
+    {
+      off += snprintf(str + off, bufsiz - off, "R");
+    }
+    off += snprintf(str + off, bufsiz - off, ", ");
+    off += snprintf(str + off, bufsiz - off, "seq=%u", tcp_seq_number(ippay));
+    off += snprintf(str + off, bufsiz - off, ", ");
+    off += snprintf(str + off, bufsiz - off, "ack=%u", tcp_ack_number(ippay));
+    return off;
+  }
   else
   {
-    off += snprintf(str + off, bufsiz - off, "unknown protoocl");
+    off += snprintf(str + off, bufsiz - off, "unknown protocol");
     return off;
   }
 }
