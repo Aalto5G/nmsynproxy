@@ -524,7 +524,8 @@ struct synproxy_hash_ctx hashctx = {
 static void synproxy_closed_port_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  int version,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
   uint32_t *isn,
   unsigned transsyn, unsigned transack, unsigned transrst)
 {
@@ -533,7 +534,7 @@ static void synproxy_closed_port_impl(
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -541,6 +542,7 @@ static void synproxy_closed_port_impl(
   uint32_t isn2 = 0x87654321;
   struct synproxy_hash_entry *e = NULL;
   unsigned i;
+  size_t sz = (version == 4) ? sizeof(pkt) - 20 : sizeof(pkt);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -555,17 +557,17 @@ static void synproxy_closed_port_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip2);
-    ip_set_dst(ip, ip1);
+    ip46_set_src(ip, ip2);
+    ip46_set_dst(ip, ip1);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
@@ -575,10 +577,10 @@ static void synproxy_closed_port_impl(
     tcp_set_seq_number(tcp, isn2);
     tcp46_set_cksum_calc(ip);
   
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct = ll_alloc_st(loc, packet_size(sz));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    pktstruct->sz = sz;
+    memcpy(packet_data(pktstruct), pkt, sz);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -590,7 +592,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz < 14+20+20)
+    if (pktstruct->sz < ((version == 4) ? 14+20+20 : 14+40+20))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -601,12 +603,12 @@ static void synproxy_closed_port_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ip1)
+    if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ip2)
+    if (memcmp(ip46_dst(ip), ip2, version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
@@ -651,7 +653,7 @@ static void synproxy_closed_port_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
     if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
@@ -665,17 +667,17 @@ static void synproxy_closed_port_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
     ip46_set_total_len(ip, sizeof(pkt) - 14);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip2);
-    ip_set_dst(ip, ip1);
+    ip46_set_src(ip, ip2);
+    ip46_set_dst(ip, ip1);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
@@ -714,12 +716,12 @@ static void synproxy_closed_port_impl(
         exit(1);
       }
       ip = ether_payload(packet_data(pktstruct));
-      if (ip_src(ip) != ip2)
+      if (memcmp(ip46_src(ip), ip2, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
         exit(1);
       }
-      if (ip_dst(ip) != ip1)
+      if (memcmp(ip46_dst(ip), ip1, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
@@ -763,7 +765,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -782,17 +784,17 @@ static void synproxy_closed_port_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), lan_mac, 6);
     memcpy(ether_src(ether), cli_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
     ip46_set_total_len(ip, sizeof(pkt) - 14);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip1);
-    ip_set_dst(ip, ip2);
+    ip46_set_src(ip, ip1);
+    ip46_set_dst(ip, ip2);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
@@ -832,12 +834,12 @@ static void synproxy_closed_port_impl(
         exit(1);
       }
       ip = ether_payload(packet_data(pktstruct));
-      if (ip_src(ip) != ip1)
+      if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 : 16))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
         exit(1);
       }
-      if (ip_dst(ip) != ip2)
+      if (memcmp(ip46_dst(ip), ip2, version == 4 ? 4 : 16))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
@@ -891,7 +893,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "entry not found");
@@ -905,14 +907,14 @@ static void synproxy_closed_port_impl(
   }
 }
 
-static void closed_port(void)
+static void closed_port(int version)
 {
   struct port outport;
   uint64_t time64;
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -923,6 +925,23 @@ static void closed_port(void)
   struct worker_local local;
   struct synproxy_hash_entry *e;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -945,17 +964,17 @@ static void closed_port(void)
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), lan_mac, 6);
   memcpy(ether_src(ether), cli_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|8);
-  ip_set_dst(ip, (11<<24)|7);
+  ip46_set_src(ip, src);
+  ip46_set_dst(ip, dst);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 12345);
@@ -1003,7 +1022,7 @@ static void closed_port(void)
     exit(1);
   }
 
-  e = synproxy_hash_get4(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1019,17 +1038,17 @@ static void closed_port(void)
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), cli_mac, 6);
   memcpy(ether_src(ether), lan_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, (11<<24)|7);
-  ip_set_dst(ip, (10<<24)|8);
+  ip46_set_src(ip, dst);
+  ip46_set_dst(ip, src);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 54321);
@@ -1078,7 +1097,7 @@ static void closed_port(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get4(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1099,7 +1118,8 @@ static void closed_port(void)
 static void three_way_handshake_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  int version,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
   unsigned transcli, unsigned transsrv)
 {
   struct port outport;
@@ -1107,7 +1127,7 @@ static void three_way_handshake_impl(
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -1115,6 +1135,7 @@ static void three_way_handshake_impl(
   uint32_t isn2 = 0x87654321;
   struct synproxy_hash_entry *e = NULL;
   unsigned i;
+  size_t sz = ((version == 4) ? (sizeof(pkt) - 20) : sizeof(pkt));
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -1129,17 +1150,17 @@ static void three_way_handshake_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), lan_mac, 6);
     memcpy(ether_src(ether), cli_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip1);
-    ip_set_dst(ip, ip2);
+    ip46_set_src(ip, ip1);
+    ip46_set_dst(ip, ip2);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
@@ -1149,10 +1170,10 @@ static void three_way_handshake_impl(
     tcp_set_seq_number(tcp, isn1);
     tcp46_set_cksum_calc(ip);
   
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct = ll_alloc_st(loc, packet_size(sz));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
-    pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    pktstruct->sz = sz;
+    memcpy(packet_data(pktstruct), pkt, sz);
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1164,7 +1185,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz != sizeof(pkt))
+    if (pktstruct->sz != sz)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -1174,7 +1195,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+    if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -1187,7 +1208,7 @@ static void three_way_handshake_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1206,17 +1227,17 @@ static void three_way_handshake_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip2);
-    ip_set_dst(ip, ip1);
+    ip46_set_src(ip, ip2);
+    ip46_set_dst(ip, ip1);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
@@ -1228,10 +1249,10 @@ static void three_way_handshake_impl(
     tcp_set_ack_number(tcp, isn1 + 1);
     tcp46_set_cksum_calc(ip);
   
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct = ll_alloc_st(loc, packet_size(sz));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    pktstruct->sz = sz;
+    memcpy(packet_data(pktstruct), pkt, sz);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1243,7 +1264,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz != sizeof(pkt))
+    if (pktstruct->sz != sz)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -1253,7 +1274,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+    if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -1276,17 +1297,17 @@ static void three_way_handshake_impl(
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), lan_mac, 6);
   memcpy(ether_src(ether), cli_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, ip1);
-  ip_set_dst(ip, ip2);
+  ip46_set_src(ip, ip1);
+  ip46_set_dst(ip, ip2);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, port1);
@@ -1297,10 +1318,10 @@ static void three_way_handshake_impl(
   tcp_set_ack_number(tcp, isn2 + 1);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(loc, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
@@ -1312,7 +1333,7 @@ static void three_way_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -1322,7 +1343,7 @@ static void three_way_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -1344,7 +1365,8 @@ static void three_way_handshake_impl(
 static void synproxy_handshake_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  int version,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
   uint32_t *isn,
   unsigned transsyn, unsigned transack, unsigned transsynack,
   int keepalive, int one_byte_payload)
@@ -1354,7 +1376,7 @@ static void synproxy_handshake_impl(
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20+1] = {0};
+  char pkt[14+40+20+1] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -1362,6 +1384,8 @@ static void synproxy_handshake_impl(
   uint32_t isn2 = 0x87654321;
   struct synproxy_hash_entry *e = NULL;
   unsigned i;
+  size_t sz;
+  sz = version == 4 ? sizeof(pkt) - 20 : sizeof(pkt);
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -1376,17 +1400,17 @@ static void synproxy_handshake_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14 - 1);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip2);
-    ip_set_dst(ip, ip1);
+    ip46_set_src(ip, ip2);
+    ip46_set_dst(ip, ip1);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
@@ -1395,11 +1419,11 @@ static void synproxy_handshake_impl(
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2);
     tcp46_set_cksum_calc(ip);
-  
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt) - 1));
+    
+    pktstruct = ll_alloc_st(loc, packet_size(sz - 1));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = sizeof(pkt) - 1;
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt) - 1);
+    pktstruct->sz = sz - 1;
+    memcpy(packet_data(pktstruct), pkt, sz - 1);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1411,7 +1435,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz < 14+20+20)
+    if (pktstruct->sz < (uint32_t)(version == 4 ? 14+20+20 : 14+40+20))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -1422,12 +1446,12 @@ static void synproxy_handshake_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ip1)
+    if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 :16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ip2)
+    if (memcmp(ip46_dst(ip), ip2, version == 4 ? 4 :16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
@@ -1472,7 +1496,7 @@ static void synproxy_handshake_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
     if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
@@ -1486,17 +1510,17 @@ static void synproxy_handshake_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14 - 1 + (!!one_byte_payload));
+    ip46_set_payload_len(ip, 20 + (!!one_byte_payload));
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip2);
-    ip_set_dst(ip, ip1);
+    ip46_set_src(ip, ip2);
+    ip46_set_dst(ip, ip1);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
@@ -1507,10 +1531,10 @@ static void synproxy_handshake_impl(
     tcp_set_ack_number(tcp, (*isn) + 1);
     tcp46_set_cksum_calc(ip);
   
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt) - 1 + (!!one_byte_payload)));
+    pktstruct = ll_alloc_st(loc, packet_size(sz - 1 + (!!one_byte_payload)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = sizeof(pkt) - 1 + (!!one_byte_payload);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt) - 1 + (!!one_byte_payload));
+    pktstruct->sz = sz - 1 + (!!one_byte_payload);
+    memcpy(packet_data(pktstruct), pkt, sz - 1 + (!!one_byte_payload));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1524,7 +1548,7 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
         exit(1);
       }
-      if (pktstruct->sz < 14+20+20)
+      if (pktstruct->sz < (uint32_t)(version == 4 ? 14+20+20 : 14+40+20))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
         exit(1);
@@ -1535,12 +1559,12 @@ static void synproxy_handshake_impl(
         exit(1);
       }
       ip = ether_payload(packet_data(pktstruct));
-      if (ip_src(ip) != ip2)
+      if (memcmp(ip46_src(ip), ip2, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
         exit(1);
       }
-      if (ip_dst(ip) != ip1)
+      if (memcmp(ip46_dst(ip), ip1, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
@@ -1584,7 +1608,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1603,17 +1627,17 @@ static void synproxy_handshake_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), lan_mac, 6);
     memcpy(ether_src(ether), cli_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14 - 1);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip1);
-    ip_set_dst(ip, ip2);
+    ip46_set_src(ip, ip1);
+    ip46_set_dst(ip, ip2);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
@@ -1652,12 +1676,12 @@ static void synproxy_handshake_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ip2)
+    if (memcmp(ip46_src(ip), ip2, version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ip1)
+    if (memcmp(ip46_dst(ip), ip1, version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
@@ -1713,12 +1737,12 @@ static void synproxy_handshake_impl(
         exit(1);
       }
       ip = ether_payload(packet_data(pktstruct));
-      if (ip_src(ip) != ip1)
+      if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
         exit(1);
       }
-      if (ip_dst(ip) != ip2)
+      if (memcmp(ip46_dst(ip), ip2, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
@@ -1773,7 +1797,8 @@ static void synproxy_handshake_impl(
 static void four_way_fin_seq_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  int version,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
   uint32_t isn1, uint32_t isn2, uint32_t isn,
   unsigned transcli, unsigned transsrv)
 {
@@ -1782,12 +1807,13 @@ static void four_way_fin_seq_impl(
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
   struct synproxy_hash_entry *e;
   unsigned i;
+  size_t sz = (version == 4) ? 14+20+20 : 14+40+20;
 
   linked_list_head_init(&head);
   ud.head = &head;
@@ -1796,7 +1822,7 @@ static void four_way_fin_seq_impl(
 
   time64 = gettime64();
 
-  e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
+  e = synproxy_hash_get(local, version, ip1, port1, ip2, port2, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1809,17 +1835,17 @@ static void four_way_fin_seq_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), lan_mac, 6);
     memcpy(ether_src(ether), cli_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip1);
-    ip_set_dst(ip, ip2);
+    ip46_set_src(ip, ip1);
+    ip46_set_dst(ip, ip2);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
@@ -1831,10 +1857,10 @@ static void four_way_fin_seq_impl(
     tcp_set_ack_number(tcp, isn2 + 1);
     tcp46_set_cksum_calc(ip);
   
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct = ll_alloc_st(loc, packet_size(sz));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
-    pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    pktstruct->sz = sz;
+    memcpy(packet_data(pktstruct), pkt, sz);
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1846,7 +1872,7 @@ static void four_way_fin_seq_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz != sizeof(pkt))
+    if (pktstruct->sz != sz)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -1858,7 +1884,7 @@ static void four_way_fin_seq_impl(
     }
     tcp_set_seq_number(tcp, isn1 + 1);
     tcp46_set_cksum_calc(ip);
-    if (memcmp(packet_data(pktstruct), pkt, 14+20) != 0)
+    if (memcmp(packet_data(pktstruct), pkt, version == 4 ? 14+20 : 14+40) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -1881,17 +1907,17 @@ static void four_way_fin_seq_impl(
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), cli_mac, 6);
   memcpy(ether_src(ether), lan_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, ip2);
-  ip_set_dst(ip, ip1);
+  ip46_set_src(ip, ip2);
+  ip46_set_dst(ip, ip1);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, port2);
@@ -1902,10 +1928,10 @@ static void four_way_fin_seq_impl(
   tcp_set_ack_number(tcp, isn + 2);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(loc, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
@@ -1917,7 +1943,7 @@ static void four_way_fin_seq_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -1929,7 +1955,7 @@ static void four_way_fin_seq_impl(
   }
   tcp_set_ack_number(tcp, isn1 + 2);
   tcp46_set_cksum_calc(ip);
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -1953,17 +1979,17 @@ static void four_way_fin_seq_impl(
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, version);
     ip46_set_min_hdr_len(ip);
-    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
     ip46_set_id(ip, 0);
     ip46_set_ttl(ip, 64);
     ip46_set_proto(ip, 6);
-    ip_set_src(ip, ip2);
-    ip_set_dst(ip, ip1);
+    ip46_set_src(ip, ip2);
+    ip46_set_dst(ip, ip1);
     ip46_set_hdr_cksum_calc(ip);
     tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
@@ -1975,10 +2001,10 @@ static void four_way_fin_seq_impl(
     tcp_set_ack_number(tcp, isn + 2);
     tcp46_set_cksum_calc(ip);
   
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct = ll_alloc_st(loc, packet_size(sz));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    pktstruct->sz = sz;
+    memcpy(packet_data(pktstruct), pkt, sz);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1990,7 +2016,7 @@ static void four_way_fin_seq_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz != sizeof(pkt))
+    if (pktstruct->sz != sz)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -2002,7 +2028,7 @@ static void four_way_fin_seq_impl(
     }
     tcp_set_ack_number(tcp, isn1 + 2);
     tcp46_set_cksum_calc(ip);
-    if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+    if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -2025,17 +2051,17 @@ static void four_way_fin_seq_impl(
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), lan_mac, 6);
   memcpy(ether_src(ether), cli_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, ip1);
-  ip_set_dst(ip, ip2);
+  ip46_set_src(ip, ip1);
+  ip46_set_dst(ip, ip2);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, port1);
@@ -2046,10 +2072,10 @@ static void four_way_fin_seq_impl(
   tcp_set_ack_number(tcp, isn2 + 2);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(loc, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
@@ -2061,7 +2087,7 @@ static void four_way_fin_seq_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -2073,7 +2099,7 @@ static void four_way_fin_seq_impl(
   }
   tcp_set_seq_number(tcp, isn + 2);
   tcp46_set_cksum_calc(ip);
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2088,6 +2114,7 @@ static void four_way_fin_seq_impl(
   if (e->flag_state != FLAG_STATE_TIME_WAIT)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "invalid flag state");
+    abort();
     exit(1);
   }
 }
@@ -2095,23 +2122,41 @@ static void four_way_fin_seq_impl(
 static void four_way_fin_impl(
   struct synproxy *synproxy,
   struct worker_local *local, struct ll_alloc_st *loc,
-  uint32_t ip1, uint32_t ip2, uint16_t port1, uint16_t port2,
+  int version,
+  const void *ip1, const void *ip2, uint16_t port1, uint16_t port2,
   unsigned transcli, unsigned transsrv)
 {
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   four_way_fin_seq_impl(
-    synproxy, local, loc,
+    synproxy, local, loc, version,
     ip1, ip2, port1, port2, isn1, isn2, isn1,
     transcli, transsrv);
 }
 
-static void three_way_handshake_four_way_fin(void)
+static void three_way_handshake_four_way_fin(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2124,9 +2169,9 @@ static void three_way_handshake_four_way_fin(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
   four_way_fin_impl(
-    &synproxy, &local, &st, (10<<24)|2, (11<<24)|1, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
@@ -2134,14 +2179,14 @@ static void three_way_handshake_four_way_fin(void)
   synproxy_free(&synproxy);
 }
 
-static void established_rst_uplink(void)
+static void established_rst_uplink(int version)
 {
   struct port outport;
   uint64_t time64;
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -2152,6 +2197,24 @@ static void established_rst_uplink(void)
   struct worker_local local;
   struct synproxy_hash_entry *e;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  size_t sz = (version == 4) ? 14+20+20 : 14+40+20;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2171,9 +2234,9 @@ static void established_rst_uplink(void)
   time64 = gettime64();
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
 
-  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2186,15 +2249,15 @@ static void established_rst_uplink(void)
   memcpy(ether_src(ether), cli_mac, 6);
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|4);
-  ip_set_dst(ip, (11<<24)|3);
+  ip46_set_src(ip, src);
+  ip46_set_dst(ip, dst);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 12345);
@@ -2204,10 +2267,10 @@ static void established_rst_uplink(void)
   tcp_set_seq_number(tcp, isn1 + 1);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(&st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2219,7 +2282,7 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -2229,7 +2292,7 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2241,7 +2304,7 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2259,14 +2322,14 @@ static void established_rst_uplink(void)
   synproxy_free(&synproxy);
 }
 
-static void established_rst_downlink(void)
+static void established_rst_downlink(int version)
 {
   struct port outport;
   uint64_t time64;
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -2277,6 +2340,24 @@ static void established_rst_downlink(void)
   struct worker_local local;
   struct synproxy_hash_entry *e;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  size_t sz = (version == 4) ? 14+20+20 : 14+40+20;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2296,9 +2377,9 @@ static void established_rst_downlink(void)
   time64 = gettime64();
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
 
-  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2311,15 +2392,15 @@ static void established_rst_downlink(void)
   memcpy(ether_src(ether), lan_mac, 6);
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, (11<<24)|5);
-  ip_set_dst(ip, (10<<24)|6);
+  ip46_set_src(ip, dst);
+  ip46_set_dst(ip, src);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 54321);
@@ -2329,10 +2410,10 @@ static void established_rst_downlink(void)
   tcp_set_seq_number(tcp, isn2 + 1);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(&st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2344,7 +2425,7 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -2354,7 +2435,7 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2366,7 +2447,7 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2384,14 +2465,14 @@ static void established_rst_downlink(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_rst_uplink(void)
+static void syn_proxy_rst_uplink(int version)
 {
   struct port outport;
   uint64_t time64;
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -2403,6 +2484,24 @@ static void syn_proxy_rst_uplink(void)
   struct worker_local local;
   struct synproxy_hash_entry *e;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  size_t sz = (version == 4) ? 14+20+20 : 14+40+20;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2422,10 +2521,10 @@ static void syn_proxy_rst_uplink(void)
   time64 = gettime64();
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
 
-  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2436,17 +2535,17 @@ static void syn_proxy_rst_uplink(void)
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), lan_mac, 6);
   memcpy(ether_src(ether), cli_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, (10<<24)|4);
-  ip_set_dst(ip, (11<<24)|3);
+  ip46_set_src(ip, src);
+  ip46_set_dst(ip, dst);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 12345);
@@ -2456,10 +2555,10 @@ static void syn_proxy_rst_uplink(void)
   tcp_set_seq_number(tcp, isn1 + 1);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(&st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2471,7 +2570,7 @@ static void syn_proxy_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -2483,7 +2582,7 @@ static void syn_proxy_rst_uplink(void)
   }
   tcp_set_seq_number(tcp, isn + 1);
   tcp46_set_cksum_calc(ip);
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2495,7 +2594,7 @@ static void syn_proxy_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2513,14 +2612,14 @@ static void syn_proxy_rst_uplink(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_rst_downlink(void)
+static void syn_proxy_rst_downlink(int version)
 {
   struct port outport;
   uint64_t time64;
   struct packet *pktstruct;
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
-  char pkt[14+20+20] = {0};
+  char pkt[14+40+20] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -2532,6 +2631,24 @@ static void syn_proxy_rst_downlink(void)
   struct worker_local local;
   struct synproxy_hash_entry *e;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  size_t sz = (version == 4) ? 14+20+20 : 14+40+20;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2551,10 +2668,10 @@ static void syn_proxy_rst_downlink(void)
   time64 = gettime64();
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
 
-  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2565,17 +2682,17 @@ static void syn_proxy_rst_downlink(void)
   memset(pkt, 0, sizeof(pkt));
   memcpy(ether_dst(ether), cli_mac, 6);
   memcpy(ether_src(ether), lan_mac, 6);
-  ether_set_type(ether, ETHER_TYPE_IP);
+  ether_set_type(ether, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ether);
-  ip_set_version(ip, 4);
+  ip_set_version(ip, version);
   ip46_set_min_hdr_len(ip);
-  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_payload_len(ip, 20);
   ip46_set_dont_frag(ip, 1);
   ip46_set_id(ip, 0);
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip_set_src(ip, (11<<24)|5);
-  ip_set_dst(ip, (10<<24)|6);
+  ip46_set_src(ip, dst);
+  ip46_set_dst(ip, src);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 54321);
@@ -2585,10 +2702,10 @@ static void syn_proxy_rst_downlink(void)
   tcp_set_seq_number(tcp, isn2 + 1);
   tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
+  pktstruct = ll_alloc_st(&st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-  pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), pkt, sz);
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2600,7 +2717,7 @@ static void syn_proxy_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
     exit(1);
   }
-  if (pktstruct->sz != sizeof(pkt))
+  if (pktstruct->sz != sz)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
     exit(1);
@@ -2610,7 +2727,7 @@ static void syn_proxy_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2622,7 +2739,7 @@ static void syn_proxy_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get(&local, version, src, 12345, dst, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2640,12 +2757,29 @@ static void syn_proxy_rst_downlink(void)
   synproxy_free(&synproxy);
 }
 
-static void three_way_handshake_ulretransmit(void)
+static void three_way_handshake_ulretransmit(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2658,9 +2792,9 @@ static void three_way_handshake_ulretransmit(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 2, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 2, 1);
   four_way_fin_impl(
-    &synproxy, &local, &st, (10<<24)|10, (11<<24)|9, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
@@ -2668,12 +2802,29 @@ static void three_way_handshake_ulretransmit(void)
   synproxy_free(&synproxy);
 }
 
-static void three_way_handshake_dlretransmit(void)
+static void three_way_handshake_dlretransmit(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2686,9 +2837,9 @@ static void three_way_handshake_dlretransmit(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 2);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 2);
   four_way_fin_impl(
-    &synproxy, &local, &st, (10<<24)|12, (11<<24)|11, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
@@ -2696,12 +2847,29 @@ static void three_way_handshake_dlretransmit(void)
   synproxy_free(&synproxy);
 }
 
-static void three_way_handshake_findlretransmit(void)
+static void three_way_handshake_findlretransmit(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2714,9 +2882,9 @@ static void three_way_handshake_findlretransmit(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
   four_way_fin_impl(
-    &synproxy, &local, &st, (10<<24)|14, (11<<24)|13, 12345, 54321, 1, 2);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 2);
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
@@ -2724,12 +2892,29 @@ static void three_way_handshake_findlretransmit(void)
   synproxy_free(&synproxy);
 }
 
-static void three_way_handshake_finulretransmit(void)
+static void three_way_handshake_finulretransmit(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2742,9 +2927,9 @@ static void three_way_handshake_finulretransmit(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   three_way_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 1, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 1, 1);
   four_way_fin_impl(
-    &synproxy, &local, &st, (10<<24)|16, (11<<24)|15, 12345, 54321, 2, 1);
+    &synproxy, &local, &st, version, src, dst, 12345, 54321, 2, 1);
 
   ll_alloc_st_free(&st);
   worker_local_free(&local);
@@ -2752,7 +2937,7 @@ static void three_way_handshake_finulretransmit(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_handshake(void)
+static void syn_proxy_handshake(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -2761,6 +2946,23 @@ static void syn_proxy_handshake(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2773,10 +2975,10 @@ static void syn_proxy_handshake(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     isn1, isn2, isn,
     1, 1);
 
@@ -2786,7 +2988,7 @@ static void syn_proxy_handshake(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_uplink(void)
+static void syn_proxy_uplink(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -2796,6 +2998,23 @@ static void syn_proxy_uplink(void)
   uint32_t isn2 = 0x87654321;
   struct tcp_ctx ctx;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2808,13 +3027,13 @@ static void syn_proxy_uplink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2822,7 +3041,7 @@ static void syn_proxy_uplink(void)
   ctx.seq = isn + 1;
   uplink_impl(&synproxy, &local, &st, &ctx, 10000);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -2842,13 +3061,13 @@ static void syn_proxy_uplink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 1, 0);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2856,7 +3075,7 @@ static void syn_proxy_uplink(void)
   ctx.seq = isn + 1;
   uplink_impl(&synproxy, &local, &st, &ctx, 10000);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -2876,13 +3095,13 @@ static void syn_proxy_uplink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 1);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2890,7 +3109,7 @@ static void syn_proxy_uplink(void)
   ctx.seq = isn + 1;
   uplink_impl(&synproxy, &local, &st, &ctx, 10000);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -2900,7 +3119,7 @@ static void syn_proxy_uplink(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_downlink(void)
+static void syn_proxy_downlink(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -2910,6 +3129,23 @@ static void syn_proxy_downlink(void)
   uint32_t isn2 = 0x87654321;
   struct tcp_ctx ctx;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -2922,13 +3158,13 @@ static void syn_proxy_downlink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2936,7 +3172,7 @@ static void syn_proxy_downlink(void)
   ctx.seq = isn + 1;
   downlink_impl(&synproxy, &local, &st, &ctx, 10000);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -2956,13 +3192,13 @@ static void syn_proxy_downlink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 1, 0);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2970,7 +3206,7 @@ static void syn_proxy_downlink(void)
   ctx.seq = isn + 1;
   downlink_impl(&synproxy, &local, &st, &ctx, 10000);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -2990,13 +3226,13 @@ static void syn_proxy_downlink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 1);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -3004,7 +3240,7 @@ static void syn_proxy_downlink(void)
   ctx.seq = isn + 1;
   downlink_impl(&synproxy, &local, &st, &ctx, 10000);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -3014,7 +3250,7 @@ static void syn_proxy_downlink(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_uplink_downlink(void)
+static void syn_proxy_uplink_downlink(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -3025,6 +3261,23 @@ static void syn_proxy_uplink_downlink(void)
   struct tcp_ctx ctx;
   int i;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3037,13 +3290,13 @@ static void syn_proxy_uplink_downlink(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
-  ctx.version = 4;
+  ctx.version = version;
   ctx.ulflowlabel = 0;
   ctx.dlflowlabel = 0;
-  ctx.ip1.ipv4 = htonl((10<<24)|18);
-  ctx.ip2.ipv4 = htonl((11<<24)|17);
+  memcpy(&ctx.ip1, src, version == 4 ? 4 : 16);
+  memcpy(&ctx.ip2, dst, version == 4 ? 4 : 16);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -3055,7 +3308,7 @@ static void syn_proxy_uplink_downlink(void)
     downlink_impl(&synproxy, &local, &st, &ctx, 100);
   }
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     ctx.seq1 - 1, ctx.seq2 - 1, ctx.seq - 1,
     1, 1);
 
@@ -3065,13 +3318,30 @@ static void syn_proxy_uplink_downlink(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_closed_port(void)
+static void syn_proxy_closed_port(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
   struct worker_local local;
   uint32_t isn;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3084,7 +3354,7 @@ static void syn_proxy_closed_port(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_closed_port_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 1);
 
   ll_alloc_st_free(&st);
@@ -3093,7 +3363,7 @@ static void syn_proxy_closed_port(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_handshake_2_1_1(void)
+static void syn_proxy_handshake_2_1_1(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -3102,6 +3372,23 @@ static void syn_proxy_handshake_2_1_1(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3114,10 +3401,10 @@ static void syn_proxy_handshake_2_1_1(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 2, 1, 1, 0, 0);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     isn1, isn2, isn,
     1, 1);
 
@@ -3127,7 +3414,7 @@ static void syn_proxy_handshake_2_1_1(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_handshake_1_2_1(void)
+static void syn_proxy_handshake_1_2_1(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -3136,6 +3423,23 @@ static void syn_proxy_handshake_1_2_1(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3148,10 +3452,10 @@ static void syn_proxy_handshake_1_2_1(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 2, 1, 0, 0);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     isn1, isn2, isn,
     1, 1);
 
@@ -3161,7 +3465,7 @@ static void syn_proxy_handshake_1_2_1(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_handshake_1_1_2(void)
+static void syn_proxy_handshake_1_1_2(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -3170,6 +3474,23 @@ static void syn_proxy_handshake_1_1_2(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3182,10 +3503,10 @@ static void syn_proxy_handshake_1_1_2(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 2, 0, 0);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     isn1, isn2, isn,
     1, 1);
 
@@ -3195,7 +3516,7 @@ static void syn_proxy_handshake_1_1_2(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_handshake_1_1_1_keepalive(void)
+static void syn_proxy_handshake_1_1_1_keepalive(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -3204,6 +3525,23 @@ static void syn_proxy_handshake_1_1_1_keepalive(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3216,10 +3554,10 @@ static void syn_proxy_handshake_1_1_1_keepalive(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 2, 1, 0);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     isn1, isn2, isn,
     1, 1);
 
@@ -3229,7 +3567,7 @@ static void syn_proxy_handshake_1_1_1_keepalive(void)
   synproxy_free(&synproxy);
 }
 
-static void syn_proxy_handshake_1_1_1_zerowindowprobe(void)
+static void syn_proxy_handshake_1_1_1_zerowindowprobe(int version)
 {
   struct synproxy synproxy;
   struct ll_alloc_st st;
@@ -3238,6 +3576,23 @@ static void syn_proxy_handshake_1_1_1_zerowindowprobe(void)
   uint32_t isn1 = 0x12345678;
   uint32_t isn2 = 0x87654321;
   struct conf conf = CONF_INITIALIZER;
+  uint32_t src4 = htonl((10<<24)|8);
+  uint32_t dst4 = htonl((11<<24)|7);
+  char src6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01};
+  char dst6[16] = {0xfd,0x80,0x00,0x00,0x00,0x00,0x00,0x00,
+                   0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02};
+  void *src, *dst;
+  if (version == 4)
+  {
+    src = &src4;
+    dst = &dst4;
+  }
+  else
+  {
+    src = src6;
+    dst = dst6;
+  }
 
   confyydirparse(argv0, "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);
@@ -3250,10 +3605,10 @@ static void syn_proxy_handshake_1_1_1_zerowindowprobe(void)
   worker_local_init(&local, &synproxy, 1, 0);
 
   synproxy_handshake_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     &isn, 1, 1, 2, 0, 1);
   four_way_fin_seq_impl(
-    &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
+    &synproxy, &local, &st, version, src, dst, 12345, 54321,
     isn1, isn2, isn,
     1, 1);
 
@@ -3270,45 +3625,67 @@ int main(int argc, char **argv)
   hash_seed_init();
   setlinebuf(stdout);
 
-  three_way_handshake_four_way_fin();
+  three_way_handshake_four_way_fin(4);
+  three_way_handshake_four_way_fin(6);
 
-  established_rst_uplink();
+  established_rst_uplink(4);
+  established_rst_uplink(6);
 
-  established_rst_downlink();
+  established_rst_downlink(4);
+  established_rst_downlink(6);
 
-  closed_port();
+  closed_port(4);
+  closed_port(6);
 
-  three_way_handshake_ulretransmit();
+  three_way_handshake_ulretransmit(4);
+  three_way_handshake_ulretransmit(6);
 
-  three_way_handshake_dlretransmit();
+  three_way_handshake_dlretransmit(4);
+  three_way_handshake_dlretransmit(6);
 
-  three_way_handshake_finulretransmit();
+  three_way_handshake_finulretransmit(4);
+  three_way_handshake_finulretransmit(6);
 
-  three_way_handshake_findlretransmit();
+  three_way_handshake_findlretransmit(4);
+  three_way_handshake_findlretransmit(6);
 
-  syn_proxy_handshake();
+  syn_proxy_handshake(4);
+  syn_proxy_handshake(6);
 
-  syn_proxy_handshake_2_1_1();
+  syn_proxy_handshake_2_1_1(4);
+  syn_proxy_handshake_2_1_1(6);
 
-  syn_proxy_handshake_1_2_1();
+  syn_proxy_handshake_1_2_1(4);
+  syn_proxy_handshake_1_2_1(6);
 
-  syn_proxy_handshake_1_1_2();
+  syn_proxy_handshake_1_1_2(4);
+  syn_proxy_handshake_1_1_2(6);
 
-  syn_proxy_handshake_1_1_1_keepalive();
+  syn_proxy_handshake_1_1_1_keepalive(4);
+  syn_proxy_handshake_1_1_1_keepalive(6);
 
-  syn_proxy_handshake_1_1_1_zerowindowprobe();
+  syn_proxy_handshake_1_1_1_zerowindowprobe(4);
+  syn_proxy_handshake_1_1_1_zerowindowprobe(6);
 
-  syn_proxy_closed_port();
+  syn_proxy_closed_port(4);
+  syn_proxy_closed_port(6);
 
-  syn_proxy_uplink();
+  syn_proxy_uplink(4);
+  syn_proxy_uplink(6);
 
-  syn_proxy_downlink();
+  syn_proxy_downlink(4);
+  syn_proxy_downlink(6);
 
-  syn_proxy_uplink_downlink();
+  syn_proxy_uplink_downlink(4);
+  syn_proxy_uplink_downlink(6);
 
-  syn_proxy_rst_uplink();
+  syn_proxy_rst_uplink(4);
+  syn_proxy_rst_uplink(6);
 
-  syn_proxy_rst_downlink();
+  syn_proxy_rst_downlink(4);
+  syn_proxy_rst_downlink(6);
+
+  printf("UNIT TEST SUCCESSFUL!\n");
 
   return 0;
 }
