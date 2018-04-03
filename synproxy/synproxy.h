@@ -28,17 +28,23 @@ struct synproxy {
 struct synproxy_hash_entry {
   struct hash_list_node node;
   struct timer_link timer;
-  uint32_t local_ip;
-  uint32_t remote_ip;
+  union {
+    uint32_t ipv4;
+    char ipv6[16];
+  } local_ip;
+  union {
+    uint32_t ipv4;
+    char ipv6[16];
+  } remote_ip;
   uint16_t local_port;
   uint16_t remote_port;
   uint16_t flag_state;
+  uint8_t version; // 4 or 6, IPv4 or IPv6
   int8_t wscalediff;
   uint8_t lan_wscale;
   uint8_t wan_wscale;
   uint8_t was_synproxied;
   uint8_t lan_sack_was_supported;
-  // 8-bit hole here! Place new 8-bit variable here.
   uint32_t seqoffset;
   uint32_t tsoffset;
   uint32_t lan_sent; // what LAN has sent plus 1
@@ -105,7 +111,7 @@ static inline int synproxy_is_connected(struct synproxy_hash_entry *e)
   return (e->flag_state & FLAG_STATE_ESTABLISHED) == FLAG_STATE_ESTABLISHED;
 }
 
-static inline uint32_t synproxy_hash_separate(
+static inline uint32_t synproxy_hash_separate4(
   uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port)
 {
   struct siphash_ctx ctx;
@@ -115,9 +121,27 @@ static inline uint32_t synproxy_hash_separate(
   return siphash_get(&ctx);
 }
 
+static inline uint32_t synproxy_hash_separate6(
+  const void *local_ip, uint16_t local_port, const void *remote_ip, uint16_t remote_port)
+{
+  struct siphash_ctx ctx;
+  siphash_init(&ctx, hash_seed_get());
+  siphash_feed_buf(&ctx, local_ip, 16);
+  siphash_feed_buf(&ctx, remote_ip, 16);
+  siphash_feed_u64(&ctx, (((uint64_t)local_port) << 32) | remote_port);
+  return siphash_get(&ctx);
+}
+
 static inline uint32_t synproxy_hash(struct synproxy_hash_entry *e)
 {
-  return synproxy_hash_separate(e->local_ip, e->local_port, e->remote_ip, e->remote_port);
+  if (e->version == 4)
+  {
+    return synproxy_hash_separate4(ntohl(e->local_ip.ipv4), e->local_port, ntohl(e->remote_ip.ipv4), e->remote_port);
+  }
+  else
+  {
+    return synproxy_hash_separate6(&e->local_ip, e->local_port, &e->remote_ip, e->remote_port);
+  }
 }
 
 uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata);
@@ -250,11 +274,18 @@ static inline void synproxy_hash_unlock(
 }
 
 static inline struct synproxy_hash_entry *synproxy_hash_get(
-  struct worker_local *local,
-  uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
+  struct worker_local *local, int version,
+  const void *local_ip, uint16_t local_port, const void *remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
 {
   struct hash_list_node *node;
-  ctx->hashval = synproxy_hash_separate(local_ip, local_port, remote_ip, remote_port);
+  if (version == 4)
+  {
+    ctx->hashval = synproxy_hash_separate4(hdr_get32n(local_ip), local_port, hdr_get32n(remote_ip), remote_port);
+  }
+  else
+  {
+    ctx->hashval = synproxy_hash_separate6(local_ip, local_port, remote_ip, remote_port);
+  }
   if (!ctx->locked)
   {
     hash_table_lock_bucket(&local->hash, ctx->hashval);
@@ -264,9 +295,10 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
   {
     struct synproxy_hash_entry *entry;
     entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
-    if (   entry->local_ip == local_ip
+    if (   entry->version == version
+        && memcmp(&entry->local_ip, local_ip, (version == 4) ? 4 : 16) == 0
         && entry->local_port == local_port
-        && entry->remote_ip == remote_ip
+        && memcmp(&entry->remote_ip, remote_ip, (version == 4) ? 4 : 16) == 0
         && entry->remote_port == remote_port)
     {
       //ctx->entry = entry;
@@ -276,26 +308,37 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
   return NULL;
 }
 
+static inline struct synproxy_hash_entry *synproxy_hash_get4(
+  struct worker_local *local,
+  uint32_t local_ip, uint16_t local_port, uint32_t remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
+{
+  local_ip = htonl(local_ip);
+  remote_ip = htonl(remote_ip);
+  return synproxy_hash_get(local, 4, &local_ip, local_port, &remote_ip, remote_port, ctx);
+}
+
 struct synproxy_hash_entry *synproxy_hash_put(
   struct worker_local *local,
-  uint32_t local_ip,
+  int version,
+  const void *local_ip,
   uint16_t local_port,
-  uint32_t remote_ip,
+  const void *remote_ip,
   uint16_t remote_port,
   uint8_t was_synproxied,
   uint64_t time64);
 
 static inline void synproxy_hash_put_connected(
   struct worker_local *local,
-  uint32_t local_ip,
+  int version,
+  const void *local_ip,
   uint16_t local_port,
-  uint32_t remote_ip,
+  const void *remote_ip,
   uint16_t remote_port,
   uint64_t time64)
 {
   struct synproxy_hash_entry *e;
   e = synproxy_hash_put(
-    local, local_ip, local_port, remote_ip, remote_port, 0, time64);
+    local, version, local_ip, local_port, remote_ip, remote_port, 0, time64);
   e->flag_state = FLAG_STATE_ESTABLISHED;
   e->lan_max = 32768;
   e->lan_sent = 0;

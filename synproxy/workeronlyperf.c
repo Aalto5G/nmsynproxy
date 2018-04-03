@@ -231,8 +231,10 @@ int main(int argc, char **argv)
   //  &local, (10<<24)|2, 12345, (11<<24)|1, 54321, gettime64());
   for (j = 0; j < 90*threadcnt; j++)
   {
+    uint32_t src = htonl((10<<24)|(2*j+2));
+    uint32_t dst = htonl((11<<24)|(2*j+1));
     synproxy_hash_put_connected(
-      &local, (10<<24)|(2*j+2), 12345, (11<<24)|(2*j+1), 54321,
+      &local, 4, &src, 12345, &dst, 54321,
       gettime64());
   }
 

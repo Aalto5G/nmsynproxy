@@ -651,7 +651,7 @@ static void synproxy_closed_port_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
     if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
@@ -763,7 +763,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -891,7 +891,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "entry not found");
@@ -1003,7 +1003,7 @@ static void closed_port(void)
     exit(1);
   }
 
-  e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1078,7 +1078,7 @@ static void closed_port(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|8, 12345, (11<<24)|7, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1187,7 +1187,7 @@ static void three_way_handshake_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1472,7 +1472,7 @@ static void synproxy_handshake_impl(
       exit(1);
     }
   
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
     if (e != NULL && synproxy->conf->halfopen_cache_max == 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry found");
@@ -1584,7 +1584,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
       exit(1);
     }
-    e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+    e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
     if (e == NULL)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -1796,7 +1796,7 @@ static void four_way_fin_seq_impl(
 
   time64 = gettime64();
 
-  e = synproxy_hash_get(local, ip1, port1, ip2, port2, &hashctx);
+  e = synproxy_hash_get4(local, ip1, port1, ip2, port2, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2173,7 +2173,7 @@ static void established_rst_uplink(void)
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321, 1, 1);
 
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2241,7 +2241,7 @@ static void established_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2298,7 +2298,7 @@ static void established_rst_downlink(void)
   three_way_handshake_impl(
     &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321, 1, 1);
 
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2366,7 +2366,7 @@ static void established_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2425,7 +2425,7 @@ static void syn_proxy_rst_uplink(void)
     &synproxy, &local, &st, (10<<24)|4, (11<<24)|3, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
 
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2495,7 +2495,7 @@ static void syn_proxy_rst_uplink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|4, 12345, (11<<24)|3, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2554,7 +2554,7 @@ static void syn_proxy_rst_downlink(void)
     &synproxy, &local, &st, (10<<24)|6, (11<<24)|5, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
 
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");
@@ -2622,7 +2622,7 @@ static void syn_proxy_rst_downlink(void)
     log_log(LOG_LEVEL_ERR, "UNIT", "extra packet out");
     exit(1);
   }
-  e = synproxy_hash_get(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
+  e = synproxy_hash_get4(&local, (10<<24)|6, 12345, (11<<24)|5, 54321, &hashctx);
   if (e == NULL)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "state entry not found");

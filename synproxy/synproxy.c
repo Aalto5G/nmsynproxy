@@ -122,19 +122,43 @@ static size_t synproxy_entry_to_str(
   size_t off = 0;
   off += synproxy_state_to_str(str + off, bufsiz - off, e);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "local_end=%d.%d.%d.%d:%d",
-                  (e->local_ip>>24)&0xFF,
-                  (e->local_ip>>16)&0xFF,
-                  (e->local_ip>>8)&0xFF,
-                  (e->local_ip>>0)&0xFF,
-                  e->local_port);
-  off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "remote_end=%d.%d.%d.%d:%d",
-                  (e->remote_ip>>24)&0xFF,
-                  (e->remote_ip>>16)&0xFF,
-                  (e->remote_ip>>8)&0xFF,
-                  (e->remote_ip>>0)&0xFF,
-                  e->remote_port);
+  if (e->version == 4)
+  {
+    off += snprintf(str + off, bufsiz - off, "local_end=%d.%d.%d.%d:%d",
+                    (ntohl(e->local_ip.ipv4)>>24)&0xFF,
+                    (ntohl(e->local_ip.ipv4)>>16)&0xFF,
+                    (ntohl(e->local_ip.ipv4)>>8)&0xFF,
+                    (ntohl(e->local_ip.ipv4)>>0)&0xFF,
+                    e->local_port);
+    off += snprintf(str + off, bufsiz - off, ", ");
+    off += snprintf(str + off, bufsiz - off, "remote_end=%d.%d.%d.%d:%d",
+                    (ntohl(e->remote_ip.ipv4)>>24)&0xFF,
+                    (ntohl(e->remote_ip.ipv4)>>16)&0xFF,
+                    (ntohl(e->remote_ip.ipv4)>>8)&0xFF,
+                    (ntohl(e->remote_ip.ipv4)>>0)&0xFF,
+                    e->remote_port);
+  }
+  else
+  {
+    struct in6_addr in6loc, in6rem;
+    char str6loc[INET6_ADDRSTRLEN] = {0};
+    char str6rem[INET6_ADDRSTRLEN] = {0};
+    memcpy(in6loc.s6_addr, &e->local_ip, 16);
+    memcpy(in6rem.s6_addr, &e->remote_ip, 16);
+    if (inet_ntop(AF_INET6, &in6loc, str6loc, sizeof(str6loc)) == NULL)
+    {
+      strncpy(str6loc, "UNKNOWN", sizeof(str6loc));
+    }
+    if (inet_ntop(AF_INET6, &in6rem, str6rem, sizeof(str6rem)) == NULL)
+    {
+      strncpy(str6rem, "UNKNOWN", sizeof(str6rem));
+    }
+    off += snprintf(str + off, bufsiz - off, "local_end=[%s]:%d",
+                    str6loc, e->local_port);
+    off += snprintf(str + off, bufsiz - off, ", ");
+    off += snprintf(str + off, bufsiz - off, "remote_end=[%s]:%d",
+                    str6rem, e->remote_port);
+  }
   off += snprintf(str + off, bufsiz - off, ", ");
   off += snprintf(str + off, bufsiz - off, "wscalediff=%d", e->wscalediff);
   off += snprintf(str + off, bufsiz - off, ", ");
@@ -179,7 +203,7 @@ static size_t synproxy_packet_to_str(
   uint16_t src_port;
   uint16_t dst_port;
 
-  if (ether_type(ether) == ETHER_TYPE_IP)
+  if (ip_version(ip) == 4)
   {
     ippay = ip_const_payload(ip);
     src_ip = ip_src(ip);
@@ -222,7 +246,7 @@ static size_t synproxy_packet_to_str(
     off += snprintf(str + off, bufsiz - off, "ack=%u", tcp_ack_number(ippay));
     return off;
   }
-  else if (ether_type(ether) == ETHER_TYPE_IPV6)
+  else if (ip_version(ip) == 6)
   {
     uint8_t proto;
     struct in6_addr in6src, in6dst;
@@ -384,9 +408,10 @@ static inline uint32_t between(uint32_t a, uint32_t x, uint32_t b)
 
 struct synproxy_hash_entry *synproxy_hash_put(
   struct worker_local *local,
-  uint32_t local_ip,
+  int version,
+  const void *local_ip,
   uint16_t local_port,
-  uint32_t remote_ip,
+  const void *remote_ip,
   uint16_t remote_port,
   uint8_t was_synproxied,
   uint64_t time64)
@@ -394,7 +419,7 @@ struct synproxy_hash_entry *synproxy_hash_put(
   struct synproxy_hash_entry *e;
   struct synproxy_hash_ctx ctx;
   ctx.locked = 1;
-  if (synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port, &ctx))
+  if (synproxy_hash_get(local, version, local_ip, local_port, remote_ip, remote_port, &ctx))
   {
     return NULL;
   }
@@ -404,9 +429,10 @@ struct synproxy_hash_entry *synproxy_hash_put(
     return NULL;
   }
   memset(e, 0, sizeof(*e));
-  e->local_ip = local_ip;
+  e->version = version;
+  memcpy(&e->local_ip, local_ip, (version == 4) ? 4 : 16);
+  memcpy(&e->remote_ip, remote_ip, (version == 4) ? 4 : 16);
   e->local_port = local_port;
-  e->remote_ip = remote_ip;
   e->remote_port = remote_port;
   e->was_synproxied = was_synproxied;
   e->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
@@ -474,7 +500,7 @@ static void send_synack(
   void *orig, struct worker_local *local, struct synproxy *synproxy,
   struct port *port, struct ll_alloc_st *st, uint64_t time64)
 {
-  char synack[14+20+20+12+12] = {0};
+  char synack[14+40+20+12+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   unsigned char *tcpopts;
@@ -485,56 +511,109 @@ static void send_synack(
   uint16_t own_mss;
   uint8_t own_sack;
   uint32_t ts;
-  uint32_t local_ip, remote_ip;
+  const void *local_ip, *remote_ip;
   uint16_t local_port, remote_port;
   uint8_t own_wscale;
   struct threetuplepayload threetuplepayload;
+  int version;
+  size_t sz;
 
   origip = ether_payload(orig);
-  origtcp = ip_payload(origip);
+  version = ip_version(origip);
+  sz = ((version == 4) ? (sizeof(synack) - 20) : sizeof(synack));
+  origtcp = ip46_payload(origip);
   tcp_parse_options(origtcp, &tcpinfo);
   if (!tcpinfo.options_valid)
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "options in TCP SYN invalid");
     return;
   }
-  syn_cookie = form_cookie(
-    &local->info, synproxy, ip_dst(origip), ip_src(origip),
-    tcp_dst_port(origtcp), tcp_src_port(origtcp),
-    tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted,
-    tcp_seq_number(origtcp));
-  ts = form_timestamp(
-    &local->info, synproxy, ip_dst(origip), ip_src(origip),
-    tcp_dst_port(origtcp), tcp_src_port(origtcp),
-    tcpinfo.mss, tcpinfo.wscale);
+  if (version == 4)
+  {
+    syn_cookie = form_cookie(
+      &local->info, synproxy, ip_dst(origip), ip_src(origip),
+      tcp_dst_port(origtcp), tcp_src_port(origtcp),
+      tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted,
+      tcp_seq_number(origtcp));
+    ts = form_timestamp(
+      &local->info, synproxy, ip_dst(origip), ip_src(origip),
+      tcp_dst_port(origtcp), tcp_src_port(origtcp),
+      tcpinfo.mss, tcpinfo.wscale);
+  }
+  else
+  {
+    syn_cookie = form_cookie6(
+      &local->info, synproxy, ipv6_dst(origip), ipv6_src(origip),
+      tcp_dst_port(origtcp), tcp_src_port(origtcp),
+      tcpinfo.mss, tcpinfo.wscale, tcpinfo.sack_permitted,
+      tcp_seq_number(origtcp));
+    ts = form_timestamp6(
+      &local->info, synproxy, ipv6_dst(origip), ipv6_src(origip),
+      tcp_dst_port(origtcp), tcp_src_port(origtcp),
+      tcpinfo.mss, tcpinfo.wscale);
+  }
 
   if (   synproxy->conf->mssmode == HASHMODE_COMMANDED
       || synproxy->conf->sackmode == HASHMODE_COMMANDED
       || synproxy->conf->wscalemode == HASHMODE_COMMANDED)
   {
-    if (threetuplectx_find(&synproxy->threetuplectx, ip_dst(origip), tcp_dst_port(origtcp), 6, &threetuplepayload) != 0)
+    if (version == 4)
     {
-      threetuplepayload.sack_supported = synproxy->conf->own_sack;
-      threetuplepayload.mss = synproxy->conf->own_mss;
-      threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+      if (threetuplectx_find(&synproxy->threetuplectx, ip_dst(origip), tcp_dst_port(origtcp), 6, &threetuplepayload) != 0)
+      {
+        threetuplepayload.sack_supported = synproxy->conf->own_sack;
+        threetuplepayload.mss = synproxy->conf->own_mss;
+        threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+      }
+    }
+    else
+    {
+      if (threetuplectx_find6(&synproxy->threetuplectx, ipv6_dst(origip), tcp_dst_port(origtcp), 6, &threetuplepayload) != 0)
+      {
+        threetuplepayload.sack_supported = synproxy->conf->own_sack;
+        threetuplepayload.mss = synproxy->conf->own_mss;
+        threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+      }
     }
   }
   if (   synproxy->conf->mssmode == HASHMODE_HASHIPPORT
       || synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
   {
-    if (sack_ip_port_hash_get4(&synproxy->autolearn, ip_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
+    if (version == 4)
     {
-      ipportentry.sack_supported = synproxy->conf->own_sack;
-      ipportentry.mss = synproxy->conf->own_mss;
+      if (sack_ip_port_hash_get4(&synproxy->autolearn, ip_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
+      {
+        ipportentry.sack_supported = synproxy->conf->own_sack;
+        ipportentry.mss = synproxy->conf->own_mss;
+      }
+    }
+    else
+    {
+      if (sack_ip_port_hash_get6(&synproxy->autolearn, ipv6_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
+      {
+        ipportentry.sack_supported = synproxy->conf->own_sack;
+        ipportentry.mss = synproxy->conf->own_mss;
+      }
     }
   }
   if (   synproxy->conf->mssmode == HASHMODE_HASHIP
       || synproxy->conf->sackmode == HASHMODE_HASHIP)
   {
-    if (sack_ip_port_hash_get4(&synproxy->autolearn, ip_dst(origip), 0, &ipentry) == 0)
+    if (version == 4)
     {
-      ipentry.sack_supported = synproxy->conf->own_sack;
-      ipentry.mss = synproxy->conf->own_mss;
+      if (sack_ip_port_hash_get4(&synproxy->autolearn, ip_dst(origip), 0, &ipentry) == 0)
+      {
+        ipentry.sack_supported = synproxy->conf->own_sack;
+        ipentry.mss = synproxy->conf->own_mss;
+      }
+    }
+    else
+    {
+      if (sack_ip_port_hash_get6(&synproxy->autolearn, ipv6_dst(origip), 0, &ipentry) == 0)
+      {
+        ipentry.sack_supported = synproxy->conf->own_sack;
+        ipentry.mss = synproxy->conf->own_mss;
+      }
     }
   }
   if (synproxy->conf->mssmode == HASHMODE_HASHIPPORT)
@@ -578,31 +657,31 @@ static void send_synack(
     own_wscale = synproxy->conf->own_wscale;
   }
 
-  local_ip = ip_dst(origip);
-  remote_ip = ip_src(origip);
+  local_ip = ip46_dst(origip);
+  remote_ip = ip46_src(origip);
   local_port = tcp_dst_port(origtcp);
   remote_port = tcp_src_port(origtcp);
 
   memcpy(ether_src(synack), ether_dst(orig), 6);
   memcpy(ether_dst(synack), ether_src(orig), 6);
-  ether_set_type(synack, 0x0800);
+  ether_set_type(synack, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(synack);
-  ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(synack) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 0); // XXX
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
-  ip_set_src(ip, ip_dst(origip));
-  ip_set_dst(ip, ip_src(origip));
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip_set_version(ip, version);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_payload_len(ip, sizeof(synack) - 14 - 40);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0); // XXX
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
+  ip46_set_src(ip, ip46_dst(origip));
+  ip46_set_dst(ip, ip46_src(origip));
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, tcp_dst_port(origtcp));
   tcp_set_dst_port(tcp, tcp_src_port(origtcp));
   tcp_set_syn_on(tcp);
   tcp_set_ack_on(tcp);
-  tcp_set_data_offset(tcp, sizeof(synack) - 14 - 20);
+  tcp_set_data_offset(tcp, sizeof(synack) - 14 - 40);
   tcp_set_seq_number(tcp, syn_cookie);
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp) + 1);
   tcp_set_window(tcp, 0);
@@ -662,11 +741,11 @@ static void send_synack(
   {
     memset(&tcpopts[12], 0, 12);
   }
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(synack) - 14 - 20);
-  pktstruct = ll_alloc_st(st, packet_size(sizeof(synack)));
+  tcp46_set_cksum_calc(ip);
+  pktstruct = ll_alloc_st(st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
-  pktstruct->sz = sizeof(synack);
-  memcpy(packet_data(pktstruct), synack, sizeof(synack));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), synack, sz);
   port->portfunc(pktstruct, port->userdata);
 
   if (synproxy->conf->halfopen_cache_max)
@@ -675,7 +754,8 @@ static void send_synack(
     struct synproxy_hash_entry *e2;
     struct synproxy_hash_ctx ctx;
     ctx.locked = 0;
-    e2 = synproxy_hash_get(local, local_ip, local_port, remote_ip, remote_port,
+    e2 = synproxy_hash_get(local, version,
+                           local_ip, local_port, remote_ip, remote_port,
                            &ctx);
     if (e2)
     {
@@ -730,9 +810,10 @@ static void send_synack(
       }
     }
     memset(e, 0, sizeof(*e));
-    e->local_ip = local_ip;
+    e->version = version;
+    memcpy(&e->local_ip, local_ip, (version == 6) ? 16 : 4);
+    memcpy(&e->remote_ip, remote_ip, (version == 6) ? 16 : 4);
     e->local_port = local_port;
-    e->remote_ip = remote_ip;
     e->remote_port = remote_port;
     e->was_synproxied = 1;
     e->timer.time64 = time64 + 64ULL*1000ULL*1000ULL;
@@ -759,30 +840,34 @@ static void send_or_resend_syn(
   struct ll_alloc_st *st,
   struct synproxy_hash_entry *entry)
 {
-  char syn[14+20+20+12+12] = {0};
+  char syn[14+20+40+12+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   unsigned char *tcpopts;
   struct packet *pktstruct;
+  int version;
+  size_t sz;
 
   origip = ether_payload(orig);
-  origtcp = ip_payload(origip);
+  version = ip_version(origip);
+  sz = ((version == 4) ? (sizeof(syn) - 20) : sizeof(syn));
+  origtcp = ip46_payload(origip);
 
   memcpy(ether_src(syn), ether_src(orig), 6);
   memcpy(ether_dst(syn), ether_dst(orig), 6);
-  ether_set_type(syn, 0x0800);
+  ether_set_type(syn, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(syn);
-  ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(syn) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 0); // XXX
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
-  ip_set_src(ip, ip_src(origip));
-  ip_set_dst(ip, ip_dst(origip));
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip_set_version(ip, version);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_payload_len(ip, sizeof(syn) - 14 - 40);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0); // XXX
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
+  ip46_set_src(ip, ip46_src(origip));
+  ip46_set_dst(ip, ip46_dst(origip));
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, tcp_src_port(origtcp));
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_syn_on(tcp);
@@ -847,11 +932,11 @@ static void send_or_resend_syn(
   {
     memset(&tcpopts[12], 0, 12);
   }
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(syn) - 14 - 20);
-  pktstruct = ll_alloc_st(st, packet_size(sizeof(syn)));
+  tcp46_set_cksum_calc(ip);
+  pktstruct = ll_alloc_st(st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-  pktstruct->sz = sizeof(syn);
-  memcpy(packet_data(pktstruct), syn, sizeof(syn));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), syn, sz);
   port->portfunc(pktstruct, port->userdata);
 }
 
@@ -870,7 +955,7 @@ static void resend_syn(
   }
 
   origip = ether_payload(orig);
-  origtcp = ip_payload(origip);
+  origtcp = ip46_payload(origip);
 
   if (seq_cmp(tcp_seq_number(origtcp), entry->wan_sent) >= 0)
   {
@@ -908,16 +993,18 @@ static void send_syn(
   void *origip;
   void *origtcp;
   struct tcp_information info;
+  int version;
 
   origip = ether_payload(orig);
-  origtcp = ip_payload(origip);
+  version = ip_version(origip);
+  origtcp = ip46_payload(origip);
   tcp_parse_options(origtcp, &info);
 
   if (entry == NULL)
   {
     entry = synproxy_hash_put(
-      local, ip_dst(origip), tcp_dst_port(origtcp),
-      ip_src(origip), tcp_src_port(origtcp),
+      local, version, ip46_dst(origip), tcp_dst_port(origtcp),
+      ip46_src(origip), tcp_src_port(origtcp),
       1, time64);
     if (entry == NULL)
     {
@@ -959,32 +1046,36 @@ static void send_ack_only(
   void *orig, struct synproxy_hash_entry *entry, struct port *port,
   struct ll_alloc_st *st)
 {
-  char ack[14+20+20+12] = {0};
+  char ack[14+40+20+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   struct packet *pktstruct;
   struct tcp_information tcpinfo;
   unsigned char *tcpopts;
+  int version;
+  size_t sz;
 
   origip = ether_payload(orig);
-  origtcp = ip_payload(origip);
+  version = ip_version(origip);
+  sz = ((version == 4) ? (sizeof(ack) - 20) : sizeof(ack));
+  origtcp = ip46_payload(origip);
   tcp_parse_options(origtcp, &tcpinfo);
 
   memcpy(ether_src(ack), ether_dst(orig), 6);
   memcpy(ether_dst(ack), ether_src(orig), 6);
-  ether_set_type(ack, 0x0800);
+  ether_set_type(ack, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ack);
-  ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(ack) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 0); // XXX
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
-  ip_set_src(ip, ip_dst(origip));
-  ip_set_dst(ip, ip_src(origip));
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip_set_version(ip, version);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_payload_len(ip, sizeof(ack) - 14 - 40);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0); // XXX
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
+  ip46_set_src(ip, ip46_dst(origip));
+  ip46_set_dst(ip, ip46_src(origip));
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, tcp_dst_port(origtcp));
   tcp_set_dst_port(tcp, tcp_src_port(origtcp));
   tcp_set_ack_on(tcp);
@@ -1009,12 +1100,12 @@ static void send_ack_only(
     memset(&tcpopts[0], 0, 12);
   }
 
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(ack) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(st, packet_size(sizeof(ack)));
+  pktstruct = ll_alloc_st(st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-  pktstruct->sz = sizeof(ack);
-  memcpy(packet_data(pktstruct), ack, sizeof(ack));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), ack, sz);
   port->portfunc(pktstruct, port->userdata);
 }
 
@@ -1022,34 +1113,38 @@ static void send_ack_and_window_update(
   void *orig, struct synproxy_hash_entry *entry, struct port *port,
   struct ll_alloc_st *st)
 {
-  char windowupdate[14+20+20+12] = {0};
+  char windowupdate[14+40+20+12] = {0};
   void *ip, *origip;
   void *tcp, *origtcp;
   struct packet *pktstruct;
   struct tcp_information tcpinfo;
   unsigned char *tcpopts;
+  int version;
+  size_t sz;
 
   origip = ether_payload(orig);
-  origtcp = ip_payload(origip);
+  version = ip_version(origip);
+  sz = (version == 4) ? (sizeof(windowupdate) - 20) : sizeof(windowupdate);
+  origtcp = ip46_payload(origip);
   tcp_parse_options(origtcp, &tcpinfo);
 
   send_ack_only(orig, entry, port, st); // XXX send_ack_only reparses opts
 
   memcpy(ether_src(windowupdate), ether_src(orig), 6);
   memcpy(ether_dst(windowupdate), ether_dst(orig), 6);
-  ether_set_type(windowupdate, 0x0800);
+  ether_set_type(windowupdate, (version == 4) ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(windowupdate);
-  ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(windowupdate) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 0); // XXX
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
-  ip_set_src(ip, ip_src(origip));
-  ip_set_dst(ip, ip_dst(origip));
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip_set_version(ip, version);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_payload_len(ip, sizeof(windowupdate) - 14 - 40);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0); // XXX
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
+  ip46_set_src(ip, ip46_src(origip));
+  ip46_set_dst(ip, ip46_dst(origip));
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, tcp_src_port(origtcp));
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_ack_on(tcp);
@@ -1087,12 +1182,12 @@ static void send_ack_and_window_update(
   {
     memset(&tcpopts[0], 0, 12);
   }
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(windowupdate) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
-  pktstruct = ll_alloc_st(st, packet_size(sizeof(windowupdate)));
+  pktstruct = ll_alloc_st(st, packet_size(sz));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
-  pktstruct->sz = sizeof(windowupdate);
-  memcpy(packet_data(pktstruct), windowupdate, sizeof(windowupdate));
+  pktstruct->sz = sz;
+  memcpy(packet_data(pktstruct), windowupdate, sz);
   port->portfunc(pktstruct, port->userdata);
 }
 
@@ -1106,10 +1201,10 @@ int downlink(
   size_t ether_len = pkt->sz;
   size_t ip_len;
   uint16_t ihl;
-  uint32_t remote_ip;
+  const void *remote_ip;
   uint16_t remote_port;
   uint8_t protocol;
-  uint32_t lan_ip;
+  const void *lan_ip;
   uint16_t lan_port;
   uint16_t tcp_len;
   struct synproxy_hash_entry *entry;
@@ -1122,13 +1217,14 @@ int downlink(
   struct sack_ts_headers hdrs;
   char statebuf[8192];
   char packetbuf[8192];
+  int version;
 
   if (ether_len < ETHER_HDR_LEN)
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full Ether hdr");
     return 1;
   }
-  if (ether_type(ether) != ETHER_TYPE_IP)
+  if (ether_type(ether) != ETHER_TYPE_IP && ether_type(ether) != ETHER_TYPE_IPV6)
   {
     port->portfunc(pkt, port->userdata);
     return 0;
@@ -1140,45 +1236,77 @@ int downlink(
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP hdr 1");
     return 1;
   }
-  if (ip_version(ip) != 4)
+  version = ip_version(ip);
+  if (version != 4 && version != 6)
   {
     log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP version mismatch");
     return 1;
   }
-  ihl = ip_hdr_len(ip);
-  if (ip_len < ihl)
+  if (version == 4)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP hdr 2");
-    return 1;
+    ihl = ip_hdr_len(ip);
+    if (ip_len < ihl)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP hdr 2");
+      return 1;
+    }
+    if (ip_proto(ip) != 6)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    if (ip_frag_off(ip) >= 60)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    else if (ip_frag_off(ip) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "fragment has partial header");
+      return 1;
+    }
+    if (ip_len < ip_total_len(ip))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP data");
+      return 1;
+    }
+    lan_ip = ip_dst_ptr(ip);
+    remote_ip = ip_src_ptr(ip);
+    protocol = ip_proto(ip);
+    ippay = ip_payload(ip);
   }
-  if (ip_proto(ip) != 6)
+  else if (version == 6)
   {
-    port->portfunc(pkt, port->userdata);
-    return 0;
+    ihl = 40;
+    if (ip_len < 40)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IPv6 hdr 1");
+      return 1;
+    }
+    // FIXME ext hdr traversal
+    if (ipv6_nexthdr(ip) != 6)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    if (ip_len < (size_t)(ipv6_payload_len(ip) + 40))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IPv6 data");
+      return 1;
+    }
+    lan_ip = ipv6_dst(ip);
+    remote_ip = ipv6_src(ip);
+    protocol = ipv6_nexthdr(ip);
+    ippay = ipv6_nexthdr_ptr(ip);
   }
-  if (ip_frag_off(ip) >= 60)
+  else
   {
-    port->portfunc(pkt, port->userdata);
-    return 0;
-  }
-  else if (ip_frag_off(ip) != 0)
-  {
-    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "fragment has partial header");
-    return 1;
-  }
-  if (ip_len < ip_total_len(ip))
-  {
-    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IP data");
-    return 1;
+    abort();
   }
   
-  protocol = ip_proto(ip);
-  ippay = ip_payload(ip);
-  lan_ip = ip_dst(ip);
-  remote_ip = ip_src(ip);
   if (protocol == 6)
   {
-    tcp_len = ip_total_len(ip) - ihl;
+    tcp_len = ip46_total_len(ip) - ihl;
     if (tcp_len < 20)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full TCP hdr");
@@ -1198,12 +1326,12 @@ int downlink(
   }
   if (unlikely(tcp_syn(ippay)))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
       return 1;
@@ -1216,12 +1344,25 @@ int downlink(
     if (!tcp_ack(ippay))
     {
       worker_local_wrlock(local);
-      if (!ip_permitted(
-        ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit))
+      if (version == 4)
       {
-        worker_local_wrunlock(local);
-        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP ratelimited");
-        return 1;
+        if (!ip_permitted(
+          ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit))
+        {
+          worker_local_wrunlock(local);
+          log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IP ratelimited");
+          return 1;
+        }
+      }
+      else
+      {
+        if (!ipv6_permitted(
+          ipv6_src(ip), synproxy->conf->ratehash.network_prefix6, &local->ratelimit))
+        {
+          worker_local_wrunlock(local);
+          log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IPv6 ratelimited");
+          return 1;
+        }
       }
       send_synack(ether, local, synproxy, port, st, time64);
       worker_local_wrunlock(local);
@@ -1232,7 +1373,7 @@ int downlink(
       struct tcp_information tcpinfo;
       ctx.locked = 0;
       entry = synproxy_hash_get(
-        local, lan_ip, lan_port, remote_ip, remote_port, &ctx);
+        local, version, lan_ip, lan_port, remote_ip, remote_port, &ctx);
       if (entry == NULL)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "SA/SA but entry nonexistent");
@@ -1345,7 +1486,7 @@ int downlink(
   }
   ctx.locked = 0;
   entry = synproxy_hash_get(
-    local, lan_ip, lan_port, remote_ip, remote_port, &ctx);
+    local, version, lan_ip, lan_port, remote_ip, remote_port, &ctx);
   if (entry != NULL && entry->flag_state == FLAG_STATE_DOWNLINK_HALF_OPEN)
   {
     if (tcp_rst(ippay))
@@ -1366,13 +1507,13 @@ int downlink(
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay))
     {
       uint32_t ack_num = tcp_ack_number(ippay);
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
@@ -1391,8 +1532,16 @@ int downlink(
         return 1;
       }
       worker_local_wrlock(local);
-      ip_increment_one(
-        ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
+      if (version == 4)
+      {
+        ip_increment_one(
+          ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
+      }
+      else
+      {
+        ipv6_increment_one(
+          ipv6_src(ip), synproxy->conf->ratehash.network_prefix6, &local->ratelimit);
+      }
       log_log(
         LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN, found");
       linked_list_delete(&entry->state_data.downlink_half_open.listnode);
@@ -1463,37 +1612,64 @@ int downlink(
       int ok;
       int was_keepalive = 0;
       struct tcp_information tcpinfo;
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
-      ok = verify_cookie(
-        &local->info, synproxy, ip_dst(ip), ip_src(ip),
-        tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
-        &mss, &wscale, &sack_permitted, other_seq - 1);
-      if (!ok)
+      if (version == 4)
       {
-        other_seq++;
         ok = verify_cookie(
           &local->info, synproxy, ip_dst(ip), ip_src(ip),
           tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
           &mss, &wscale, &sack_permitted, other_seq - 1);
-        if (ok)
+        if (!ok)
         {
-          synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
-          log_log(
-            LOG_LEVEL_NOTICE, "WORKERDOWNLINK",
-            "SYN proxy detected keepalive packet opening connection: %s",
-            packetbuf);
-          was_keepalive = 1;
+          other_seq++;
+          ok = verify_cookie(
+            &local->info, synproxy, ip_dst(ip), ip_src(ip),
+            tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
+            &mss, &wscale, &sack_permitted, other_seq - 1);
+          if (ok)
+          {
+            synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+            log_log(
+              LOG_LEVEL_NOTICE, "WORKERDOWNLINK",
+              "SYN proxy detected keepalive packet opening connection: %s",
+              packetbuf);
+            was_keepalive = 1;
+          }
+        }
+      }
+      else
+      {
+        ok = verify_cookie6(
+          &local->info, synproxy, ipv6_dst(ip), ipv6_src(ip),
+          tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
+          &mss, &wscale, &sack_permitted, other_seq - 1);
+        if (!ok)
+        {
+          other_seq++;
+          ok = verify_cookie6(
+            &local->info, synproxy, ipv6_dst(ip), ipv6_src(ip),
+            tcp_dst_port(ippay), tcp_src_port(ippay), ack_num - 1,
+            &mss, &wscale, &sack_permitted, other_seq - 1);
+          if (ok)
+          {
+            synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+            log_log(
+              LOG_LEVEL_NOTICE, "WORKERDOWNLINK",
+              "SYN proxy detected keepalive packet opening connection6: %s",
+              packetbuf);
+            was_keepalive = 1;
+          }
         }
       }
       if (ok)
@@ -1501,18 +1677,38 @@ int downlink(
         tcp_parse_options(ippay, &tcpinfo); // XXX send_syn reparses
         if (tcpinfo.options_valid && tcpinfo.ts_present)
         {
-          if (verify_timestamp(
-            &local->info, synproxy, ip_dst(ip), ip_src(ip),
-            tcp_dst_port(ippay), tcp_src_port(ippay), tcpinfo.tsecho,
-            &tsmss, &tswscale))
+          if (version == 4)
           {
-            if (tsmss > mss)
+            if (verify_timestamp(
+              &local->info, synproxy, ip_dst(ip), ip_src(ip),
+              tcp_dst_port(ippay), tcp_src_port(ippay), tcpinfo.tsecho,
+              &tsmss, &tswscale))
             {
-              mss = tsmss;
+              if (tsmss > mss)
+              {
+                mss = tsmss;
+              }
+              if (tswscale > wscale)
+              {
+                wscale = tswscale;
+              }
             }
-            if (tswscale > wscale)
+          }
+          else
+          {
+            if (verify_timestamp6(
+              &local->info, synproxy, ipv6_dst(ip), ipv6_src(ip),
+              tcp_dst_port(ippay), tcp_src_port(ippay), tcpinfo.tsecho,
+              &tsmss, &tswscale))
             {
-              wscale = tswscale;
+              if (tsmss > mss)
+              {
+                mss = tsmss;
+              }
+              if (tswscale > wscale)
+              {
+                wscale = tswscale;
+              }
             }
           }
         }
@@ -1538,8 +1734,16 @@ int downlink(
         return 1;
       }
       worker_local_wrlock(local);
-      ip_increment_one(
-        ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
+      if (version == 4)
+      {
+        ip_increment_one(
+          ip_src(ip), synproxy->conf->ratehash.network_prefix, &local->ratelimit);
+      }
+      else
+      {
+        ipv6_increment_one(
+          ipv6_src(ip), synproxy->conf->ratehash.network_prefix6, &local->ratelimit);
+      }
       worker_local_wrunlock(local);
       synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
       log_log(
@@ -1564,13 +1768,13 @@ int downlink(
   }
   if (unlikely(tcp_rst(ippay)))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
@@ -1676,13 +1880,13 @@ int downlink(
   last_seq = first_seq + data_len - 1;
   if (unlikely(tcp_fin(ippay)))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
@@ -1708,7 +1912,7 @@ int downlink(
   }
   if (unlikely(tcp_fin(ippay)) && entry->flag_state != FLAG_STATE_RESETED)
   {
-    if (ip_more_frags(ip))
+    if (version == 4 && ip_more_frags(ip)) // FIXME for IPv6 also
     {
       log_log(LOG_LEVEL_WARNING, "WORKERDOWNLINK", "FIN with more frags");
     }
@@ -1729,13 +1933,13 @@ int downlink(
     uint32_t fin = entry->state_data.established.upfin;
     if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
     {
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
@@ -1851,10 +2055,10 @@ int uplink(
   size_t ether_len = pkt->sz;
   size_t ip_len;
   uint16_t ihl;
-  uint32_t remote_ip;
+  const void *remote_ip;
   uint16_t remote_port;
   uint8_t protocol;
-  uint32_t lan_ip;
+  const void *lan_ip;
   uint16_t lan_port;
   uint16_t tcp_len;
   struct synproxy_hash_entry *entry;
@@ -1868,13 +2072,14 @@ int uplink(
   struct sack_ts_headers hdrs;
   char statebuf[8192];
   char packetbuf[8192];
+  int version;
 
   if (ether_len < ETHER_HDR_LEN)
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full Ether hdr");
     return 1;
   }
-  if (ether_type(ether) != ETHER_TYPE_IP)
+  if (ether_type(ether) != ETHER_TYPE_IP && ether_type(ether) != ETHER_TYPE_IPV6)
   {
     port->portfunc(pkt, port->userdata);
     return 0;
@@ -1886,45 +2091,74 @@ int uplink(
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 1");
     return 1;
   }
-  if (ip_version(ip) != 4)
+  version = ip_version(ip);
+  if (version != 4 && version != 6)
   {
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "IP version mismatch");
     return 1;
   }
-  ihl = ip_hdr_len(ip);
-  if (ip_len < ihl)
+  if (version == 4)
   {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 2");
-    return 1;
+    ihl = ip_hdr_len(ip);
+    if (ip_len < ihl)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP hdr 2");
+      return 1;
+    }
+    if (ip_proto(ip) != 6)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    if (ip_frag_off(ip) >= 60)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    else if (ip_frag_off(ip) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "fragment has partial header");
+      return 1;
+    }
+    if (ip_len < ip_total_len(ip))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
+      return 1;
+    }
+    
+    protocol = ip_proto(ip);
+    ippay = ip_payload(ip);
+    lan_ip = ip_src_ptr(ip);
+    remote_ip = ip_dst_ptr(ip);
   }
-  if (ip_proto(ip) != 6)
+  else
   {
-    port->portfunc(pkt, port->userdata);
-    return 0;
+    ihl = 40;
+    if (ip_len < 40)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IPv6 hdr 1");
+      return 1;
+    }
+    if (ipv6_nexthdr(ip) != 6) // FIXME ext hdr chains
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    // FIXME frag off check for IPv6
+    if (ip_len < (uint32_t)(ipv6_payload_len(ip) + 40))
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
+      return 1;
+    }
+    
+    protocol = ipv6_nexthdr(ip);
+    ippay = ipv6_nexthdr_ptr(ip);
+    lan_ip = ipv6_src(ip);
+    remote_ip = ipv6_dst(ip);
   }
-  if (ip_frag_off(ip) >= 60)
-  {
-    port->portfunc(pkt, port->userdata);
-    return 0;
-  }
-  else if (ip_frag_off(ip) != 0)
-  {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "fragment has partial header");
-    return 1;
-  }
-  if (ip_len < ip_total_len(ip))
-  {
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
-    return 1;
-  }
-  
-  protocol = ip_proto(ip);
-  ippay = ip_payload(ip);
-  lan_ip = ip_src(ip);
-  remote_ip = ip_dst(ip);
   if (protocol == 6)
   {
-    tcp_len = ip_total_len(ip) - ihl;
+    tcp_len = ip46_total_len(ip) - ihl;
     if (tcp_len < 20)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full TCP hdr");
@@ -1944,12 +2178,12 @@ int uplink(
   }
   if (unlikely(tcp_syn(ippay)))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
       return 1;
@@ -1964,7 +2198,7 @@ int uplink(
       struct tcp_information tcpinfo;
       ctx.locked = 0;
       entry = synproxy_hash_get(
-        local, lan_ip, lan_port, remote_ip, remote_port, &ctx);
+        local, version, lan_ip, lan_port, remote_ip, remote_port, &ctx);
       if (entry != NULL && entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT &&
           entry->state_data.uplink_syn_sent.isn == tcp_seq_number(ippay))
       {
@@ -1993,7 +2227,7 @@ int uplink(
         }
       }
       entry = synproxy_hash_put(
-        local, lan_ip, lan_port, remote_ip, remote_port, 0, time64);
+        local, version, lan_ip, lan_port, remote_ip, remote_port, 0, time64);
       if (entry == NULL)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "out of memory or already exists");
@@ -2047,7 +2281,7 @@ int uplink(
       uint8_t own_wscale;
       ctx.locked = 0;
       entry = synproxy_hash_get(
-        local, lan_ip, lan_port, remote_ip, remote_port, &ctx);
+        local, version, lan_ip, lan_port, remote_ip, remote_port, &ctx);
       if (entry == NULL)
       {
         synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
@@ -2101,20 +2335,46 @@ int uplink(
       if (   synproxy->conf->sackmode == HASHMODE_HASHIPPORT
           || synproxy->conf->mssmode == HASHMODE_HASHIPPORT)
       {
-        sack_ip_port_hash_add4(
-          &synproxy->autolearn, ip_src(ip), tcp_src_port(ippay), &sackdata);
+        if (version == 4)
+        {
+          sack_ip_port_hash_add4(
+            &synproxy->autolearn, ip_src(ip), tcp_src_port(ippay), &sackdata);
+        }
+        else
+        {
+          sack_ip_port_hash_add6(
+            &synproxy->autolearn, ipv6_src(ip), tcp_src_port(ippay), &sackdata);
+        }
       }
       if (   synproxy->conf->sackmode == HASHMODE_HASHIP
           || synproxy->conf->mssmode == HASHMODE_HASHIP)
       {
-        sack_ip_port_hash_add4(
-          &synproxy->autolearn, ip_src(ip), 0, &sackdata);
+        if (version == 4)
+        {
+          sack_ip_port_hash_add4(
+            &synproxy->autolearn, ip_src(ip), 0, &sackdata);
+        }
+        else
+        {
+          sack_ip_port_hash_add6(
+            &synproxy->autolearn, ipv6_src(ip), 0, &sackdata);
+        }
       }
       if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
       {
-        if (threetuplectx_find(&synproxy->threetuplectx, ip_src(ip), tcp_src_port(ippay), 6, &threetuplepayload) != 0)
+        if (version == 4)
         {
-          threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+          if (threetuplectx_find(&synproxy->threetuplectx, ip_src(ip), tcp_src_port(ippay), 6, &threetuplepayload) != 0)
+          {
+            threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+          }
+        }
+        else
+        {
+          if (threetuplectx_find6(&synproxy->threetuplectx, ipv6_src(ip), tcp_src_port(ippay), 6, &threetuplepayload) != 0)
+          {
+            threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
+          }
         }
       }
       if (synproxy->conf->wscalemode == HASHMODE_COMMANDED)
@@ -2160,7 +2420,7 @@ int uplink(
   }
   ctx.locked = 0;
   entry = synproxy_hash_get(
-    local, lan_ip, lan_port, remote_ip, remote_port, &ctx);
+    local, version, lan_ip, lan_port, remote_ip, remote_port, &ctx);
   if (entry == NULL)
   {
     synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
@@ -2170,13 +2430,13 @@ int uplink(
   }
   if (unlikely(entry->flag_state == FLAG_STATE_UPLINK_SYN_RCVD))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
@@ -2252,13 +2512,13 @@ int uplink(
   }
   if (unlikely(tcp_rst(ippay)))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
@@ -2370,13 +2630,13 @@ int uplink(
   last_seq = first_seq + data_len - 1;
   if (unlikely(tcp_fin(ippay)))
   {
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
       synproxy_hash_unlock(local, &ctx);
@@ -2412,7 +2672,7 @@ int uplink(
   }
   if (unlikely(tcp_fin(ippay)) && entry->flag_state != FLAG_STATE_RESETED)
   {
-    if (ip_more_frags(ip))
+    if (version == 4 && ip_more_frags(ip)) // FIXME for IPv6
     {
       log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
     }
@@ -2433,13 +2693,13 @@ int uplink(
     uint32_t fin = entry->state_data.established.downfin;
     if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
     {
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), ippay, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
         synproxy_hash_unlock(local, &ctx);

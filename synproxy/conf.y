@@ -55,7 +55,7 @@ int confyywrap(yyscan_t scanner)
 %token STRING_LITERAL
 %token SACKCONFLICT REMOVE RETAIN
 %token MSS_CLAMP
-%token NETWORK_PREFIX MSSMODE WSCALEMODE DEFAULT HALFOPEN_CACHE_MAX
+%token NETWORK_PREFIX NETWORK_PREFIX6 MSSMODE WSCALEMODE DEFAULT HALFOPEN_CACHE_MAX
 %token USER GROUP
 %token TEST_CONNECTIONS
 %token PORT
@@ -685,5 +685,16 @@ SIZE EQUALS INT_LITERAL SEMICOLON
     YYABORT;
   }
   conf->ratehash.network_prefix = $3;
+}
+| NETWORK_PREFIX6 EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 < 0 || $3 > 128)
+  {
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid ratehash network prefix6: %d at line %d col %d",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->ratehash.network_prefix6 = $3;
 }
 ;

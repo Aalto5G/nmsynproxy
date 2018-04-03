@@ -59,6 +59,7 @@ remove       return REMOVE;
 retain       return RETAIN;
 mss_clamp    return MSS_CLAMP;
 network_prefix return NETWORK_PREFIX;
+network_prefix6 return NETWORK_PREFIX6;
 halfopen_cache_max return HALFOPEN_CACHE_MAX;
 user         return USER;
 group        return GROUP;

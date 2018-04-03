@@ -23,5 +23,6 @@ synproxyconf = {
     timer_add = 400;
     initial_tokens = 2000;
     network_prefix = 24;
+    network_prefix6 = 64;
   };
 };
