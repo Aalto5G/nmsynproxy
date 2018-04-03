@@ -12,11 +12,20 @@
 const char *argv0;
 
 struct tcp_ctx {
+  int version;
   uint32_t seq;
   uint32_t seq1;
   uint32_t seq2;
-  uint32_t ip1;
-  uint32_t ip2;
+  uint32_t ulflowlabel;
+  uint32_t dlflowlabel;
+  union {
+    char ipv6[16];
+    uint32_t ipv4;
+  } ip1;
+  union {
+    char ipv6[16];
+    uint32_t ipv4;
+  } ip2;
   uint16_t port1;
   uint16_t port2;
 };
@@ -48,7 +57,7 @@ static void uplink_impl(
   struct linked_list_head head;
   struct linkedlistfunc_userdata ud;
   char pkt[1514] = {0};
-  char pktsmall[14+20+20] = {0};
+  char pktsmall[14+20+40] = {0};
   void *ether, *ip, *tcp;
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
   char lan_mac[6] = {0x02,0,0,0,0,0x01};
@@ -61,34 +70,40 @@ static void uplink_impl(
 
   time64 = gettime64();
 
+  if (ctx->version != 4 && ctx->version != 6)
+  {
+    abort();
+  }
+
   for (i = 0; i < pkts; i++)
   {
     ether = pkt;
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), lan_mac, 6);
     memcpy(ether_src(ether), cli_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, ctx->version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
-    ip_set_src(ip, ctx->ip1);
-    ip_set_dst(ip, ctx->ip2);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip_set_version(ip, ctx->version);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_flow_label(ip, ctx->ulflowlabel);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
+    ip46_set_src(ip, &ctx->ip1);
+    ip46_set_dst(ip, &ctx->ip2);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, ctx->port1);
     tcp_set_dst_port(tcp, ctx->port2);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, ctx->seq1);
     tcp_set_ack_number(tcp, ctx->seq2);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
-    ctx->seq1 += sizeof(pkt) - 14 - 20 - 20;
-    ctx->seq += sizeof(pkt) - 14 - 20 - 20;
+    tcp46_set_cksum_calc(ip);
+    ctx->seq1 += sizeof(pkt) - 14 - ip46_hdr_len(ip) - 20;
+    ctx->seq += sizeof(pkt) - 14 - ip46_hdr_len(ip) - 20;
 
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -116,27 +131,27 @@ static void uplink_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ctx->ip1)
+    if (memcmp(ip46_src(ip), &ctx->ip1, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ctx->ip2)
+    if (memcmp(ip46_dst(ip), &ctx->ip2, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -152,7 +167,7 @@ static void uplink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -169,31 +184,31 @@ static void uplink_impl(
     memset(pktsmall, 0, sizeof(pktsmall));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, ctx->version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pktsmall) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
-    ip_set_src(ip, ctx->ip2);
-    ip_set_dst(ip, ctx->ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_payload_len(ip, 20);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
+    ip46_set_src(ip, &ctx->ip2);
+    ip46_set_dst(ip, &ctx->ip1);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, ctx->port2);
     tcp_set_dst_port(tcp, ctx->port1);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, ctx->seq2);
     tcp_set_ack_number(tcp, ctx->seq);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pktsmall) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
 
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pktsmall)));
+    pktstruct = ll_alloc_st(loc, packet_size(14 + ip46_total_len(ip)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = sizeof(pktsmall);
-    memcpy(packet_data(pktstruct), pktsmall, sizeof(pktsmall));
+    pktstruct->sz = 14 + ip46_total_len(ip);
+    memcpy(packet_data(pktstruct), pktsmall, 14 + ip46_total_len(ip));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -205,7 +220,7 @@ static void uplink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz != sizeof(pktsmall))
+    if (pktstruct->sz != 14 + (ctx->version == 4 ? 20 : 40) + 20)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -216,27 +231,27 @@ static void uplink_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ctx->ip2)
+    if (memcmp(ip46_src(ip), &ctx->ip2, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ctx->ip1)
+    if (memcmp(ip46_dst(ip), &ctx->ip1, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -252,7 +267,7 @@ static void uplink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -292,33 +307,38 @@ static void downlink_impl(
 
   time64 = gettime64();
 
+  if (ctx->version != 4 && ctx->version != 6)
+  {
+    abort();
+  }
+
   for (i = 0; i < pkts; i++)
   {
     ether = pkt;
     memset(pkt, 0, sizeof(pkt));
     memcpy(ether_dst(ether), cli_mac, 6);
     memcpy(ether_src(ether), lan_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, ctx->version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
-    ip_set_src(ip, ctx->ip2);
-    ip_set_dst(ip, ctx->ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip_set_version(ip, ctx->version);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
+    ip46_set_src(ip, &ctx->ip2);
+    ip46_set_dst(ip, &ctx->ip1);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, ctx->port2);
     tcp_set_dst_port(tcp, ctx->port1);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, ctx->seq2);
     tcp_set_ack_number(tcp, ctx->seq);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
-    ctx->seq2 += sizeof(pkt) - 14 - 20 - 20;
+    tcp46_set_cksum_calc(ip);
+    ctx->seq2 += sizeof(pkt) - 14 - ip46_hdr_len(ip) - 20;
 
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -346,27 +366,27 @@ static void downlink_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ctx->ip2)
+    if (memcmp(ip46_src(ip), &ctx->ip2, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ctx->ip1)
+    if (memcmp(ip46_dst(ip), &ctx->ip1, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -382,7 +402,7 @@ static void downlink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -399,31 +419,31 @@ static void downlink_impl(
     memset(pktsmall, 0, sizeof(pktsmall));
     memcpy(ether_dst(ether), lan_mac, 6);
     memcpy(ether_src(ether), cli_mac, 6);
-    ether_set_type(ether, ETHER_TYPE_IP);
+    ether_set_type(ether, ctx->version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pktsmall) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
-    ip_set_src(ip, ctx->ip1);
-    ip_set_dst(ip, ctx->ip2);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip_set_version(ip, ctx->version);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_payload_len(ip, 20);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
+    ip46_set_src(ip, &ctx->ip1);
+    ip46_set_dst(ip, &ctx->ip2);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, ctx->port1);
     tcp_set_dst_port(tcp, ctx->port2);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, ctx->seq1);
     tcp_set_ack_number(tcp, ctx->seq2);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pktsmall) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
 
-    pktstruct = ll_alloc_st(loc, packet_size(sizeof(pktsmall)));
+    pktstruct = ll_alloc_st(loc, packet_size(14 + ip46_total_len(ip)));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
-    pktstruct->sz = sizeof(pktsmall);
-    memcpy(packet_data(pktstruct), pktsmall, sizeof(pktsmall));
+    pktstruct->sz = 14 + ip46_total_len(ip);
+    memcpy(packet_data(pktstruct), pktsmall, 14 + ip46_total_len(ip));
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -435,7 +455,7 @@ static void downlink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "no packet out");
       exit(1);
     }
-    if (pktstruct->sz != sizeof(pktsmall))
+    if (pktstruct->sz != 14 + 20 + (ctx->version == 4 ? 20 : 40))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet size doesn't agree");
       exit(1);
@@ -446,27 +466,27 @@ static void downlink_impl(
       exit(1);
     }
     ip = ether_payload(packet_data(pktstruct));
-    if (ip_src(ip) != ctx->ip1)
+    if (memcmp(ip46_src(ip), &ctx->ip1, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
       exit(1);
     }
-    if (ip_dst(ip) != ctx->ip2)
+    if (memcmp(ip46_dst(ip), &ctx->ip2, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -482,7 +502,7 @@ static void downlink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -538,22 +558,22 @@ static void synproxy_closed_port_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip2);
     ip_set_dst(ip, ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
     tcp_set_dst_port(tcp, port1);
     tcp_set_syn_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -591,17 +611,17 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (!tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -617,7 +637,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -648,23 +668,23 @@ static void synproxy_closed_port_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip2);
     ip_set_dst(ip, ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
     tcp_set_dst_port(tcp, port1);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2 + 1);
     tcp_set_ack_number(tcp, (*isn) + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -704,17 +724,17 @@ static void synproxy_closed_port_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
       }
-      if (ip_proto(ip) != 6)
+      if (ip46_proto(ip) != 6)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
         exit(1);
       }
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
         exit(1);
       }
-      tcp = ip_payload(ip);
+      tcp = ip46_payload(ip);
       if (!tcp_syn(tcp) || tcp_ack(tcp))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -730,7 +750,7 @@ static void synproxy_closed_port_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
         exit(1);
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
         exit(1);
@@ -765,16 +785,16 @@ static void synproxy_closed_port_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip1);
     ip_set_dst(ip, ip2);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
     tcp_set_dst_port(tcp, port2);
     tcp_set_rst_on(tcp);
@@ -782,7 +802,7 @@ static void synproxy_closed_port_impl(
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, 0);
     tcp_set_ack_number(tcp, isn2 + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -822,17 +842,17 @@ static void synproxy_closed_port_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
       }
-      if (ip_proto(ip) != 6)
+      if (ip46_proto(ip) != 6)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
         exit(1);
       }
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
         exit(1);
       }
-      tcp = ip_payload(ip);
+      tcp = ip46_payload(ip);
       if (tcp_syn(tcp) || tcp_ack(tcp) || tcp_fin(tcp) || !tcp_rst(tcp))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -858,7 +878,7 @@ static void synproxy_closed_port_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
         exit(1);
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
         exit(1);
@@ -928,22 +948,22 @@ static void closed_port(void)
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, (10<<24)|8);
   ip_set_dst(ip, (11<<24)|7);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 12345);
   tcp_set_dst_port(tcp, 54321);
   tcp_set_syn_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -1002,16 +1022,16 @@ static void closed_port(void)
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, (11<<24)|7);
   ip_set_dst(ip, (10<<24)|8);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 54321);
   tcp_set_dst_port(tcp, 12345);
   tcp_set_rst_on(tcp);
@@ -1019,7 +1039,7 @@ static void closed_port(void)
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn2);
   tcp_set_ack_number(tcp, isn1 + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -1112,22 +1132,22 @@ static void three_way_handshake_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip1);
     ip_set_dst(ip, ip2);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
     tcp_set_dst_port(tcp, port2);
     tcp_set_syn_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -1189,16 +1209,16 @@ static void three_way_handshake_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip2);
     ip_set_dst(ip, ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
     tcp_set_dst_port(tcp, port1);
     tcp_set_syn_on(tcp);
@@ -1206,7 +1226,7 @@ static void three_way_handshake_impl(
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2);
     tcp_set_ack_number(tcp, isn1 + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -1259,23 +1279,23 @@ static void three_way_handshake_impl(
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, ip1);
   ip_set_dst(ip, ip2);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, port1);
   tcp_set_dst_port(tcp, port2);
   tcp_set_ack_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn1 + 1);
   tcp_set_ack_number(tcp, isn2 + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -1359,22 +1379,22 @@ static void synproxy_handshake_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14 - 1);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14 - 1);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip2);
     ip_set_dst(ip, ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
     tcp_set_dst_port(tcp, port1);
     tcp_set_syn_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20 - 1);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt) - 1));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -1412,17 +1432,17 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (!tcp_syn(tcp) || !tcp_ack(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -1438,7 +1458,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -1469,23 +1489,23 @@ static void synproxy_handshake_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14 - 1 + (!!one_byte_payload));
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14 - 1 + (!!one_byte_payload));
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip2);
     ip_set_dst(ip, ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
     tcp_set_dst_port(tcp, port1);
     tcp_set_ack_on(tcp);
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2 + 1 - (!!keepalive));
     tcp_set_ack_number(tcp, (*isn) + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20 - 1 + (!!one_byte_payload));
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt) - 1 + (!!one_byte_payload)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -1525,17 +1545,17 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
       }
-      if (ip_proto(ip) != 6)
+      if (ip46_proto(ip) != 6)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
         exit(1);
       }
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
         exit(1);
       }
-      tcp = ip_payload(ip);
+      tcp = ip46_payload(ip);
       if (!tcp_syn(tcp) || tcp_ack(tcp))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -1551,7 +1571,7 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
         exit(1);
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
         exit(1);
@@ -1586,16 +1606,16 @@ static void synproxy_handshake_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14 - 1);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14 - 1);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip1);
     ip_set_dst(ip, ip2);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
     tcp_set_dst_port(tcp, port2);
     tcp_set_syn_on(tcp);
@@ -1604,7 +1624,7 @@ static void synproxy_handshake_impl(
     //tcp_set_seq_number(tcp, isn1 + 1);
     tcp_set_seq_number(tcp, isn1);
     tcp_set_ack_number(tcp, isn2 + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20 - 1);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt) - 1));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -1642,17 +1662,17 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
       exit(1);
     }
-    if (ip_proto(ip) != 6)
+    if (ip46_proto(ip) != 6)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
       exit(1);
     }
-    if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+    if (ip46_hdr_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
       exit(1);
     }
-    tcp = ip_payload(ip);
+    tcp = ip46_payload(ip);
     if (tcp_syn(tcp) || !tcp_ack(tcp) || tcp_fin(tcp) || tcp_rst(tcp))
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -1668,7 +1688,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
       exit(1);
     }
-    if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+    if (tcp46_cksum_calc(ip) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
       exit(1);
@@ -1703,17 +1723,17 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst IP doesn't agree");
         exit(1);
       }
-      if (ip_proto(ip) != 6)
+      if (ip46_proto(ip) != 6)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP protocol");
         exit(1);
       }
-      if (ip_hdr_cksum_calc(ip, ip_hdr_len(ip)) != 0)
+      if (ip46_hdr_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid IP checksum");
         exit(1);
       }
-      tcp = ip_payload(ip);
+      tcp = ip46_payload(ip);
       if (tcp_syn(tcp) || !tcp_ack(tcp) || tcp_fin(tcp) || tcp_rst(tcp))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet flags don't agree");
@@ -1729,7 +1749,7 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet dst port doesn't agree");
         exit(1);
       }
-      if (tcp_cksum_calc(ip, ip_hdr_len(ip), tcp, ip_total_len(ip)-ip_hdr_len(ip)) != 0)
+      if (tcp46_cksum_calc(ip) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "invalid TCP checksum");
         exit(1);
@@ -1792,16 +1812,16 @@ static void four_way_fin_seq_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip1);
     ip_set_dst(ip, ip2);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port1);
     tcp_set_dst_port(tcp, port2);
     tcp_set_ack_on(tcp);
@@ -1809,7 +1829,7 @@ static void four_way_fin_seq_impl(
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn1 + 1);
     tcp_set_ack_number(tcp, isn2 + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -1837,7 +1857,7 @@ static void four_way_fin_seq_impl(
       exit(1);
     }
     tcp_set_seq_number(tcp, isn1 + 1);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
     if (memcmp(packet_data(pktstruct), pkt, 14+20) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -1864,23 +1884,23 @@ static void four_way_fin_seq_impl(
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, ip2);
   ip_set_dst(ip, ip1);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, port2);
   tcp_set_dst_port(tcp, port1);
   tcp_set_ack_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn2 + 1);
   tcp_set_ack_number(tcp, isn + 2);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -1908,7 +1928,7 @@ static void four_way_fin_seq_impl(
     exit(1);
   }
   tcp_set_ack_number(tcp, isn1 + 2);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
   if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -1936,16 +1956,16 @@ static void four_way_fin_seq_impl(
     ether_set_type(ether, ETHER_TYPE_IP);
     ip = ether_payload(ether);
     ip_set_version(ip, 4);
-    ip_set_hdr_len(ip, 20);
-    ip_set_total_len(ip, sizeof(pkt) - 14);
-    ip_set_dont_frag(ip, 1);
-    ip_set_id(ip, 123);
-    ip_set_ttl(ip, 64);
-    ip_set_proto(ip, 6);
+    ip46_set_min_hdr_len(ip);
+    ip46_set_total_len(ip, sizeof(pkt) - 14);
+    ip46_set_dont_frag(ip, 1);
+    ip46_set_id(ip, 0);
+    ip46_set_ttl(ip, 64);
+    ip46_set_proto(ip, 6);
     ip_set_src(ip, ip2);
     ip_set_dst(ip, ip1);
-    ip_set_hdr_cksum_calc(ip, 20);
-    tcp = ip_payload(ip);
+    ip46_set_hdr_cksum_calc(ip);
+    tcp = ip46_payload(ip);
     tcp_set_src_port(tcp, port2);
     tcp_set_dst_port(tcp, port1);
     tcp_set_ack_on(tcp);
@@ -1953,7 +1973,7 @@ static void four_way_fin_seq_impl(
     tcp_set_data_offset(tcp, 20);
     tcp_set_seq_number(tcp, isn2 + 1);
     tcp_set_ack_number(tcp, isn + 2);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -1981,7 +2001,7 @@ static void four_way_fin_seq_impl(
       exit(1);
     }
     tcp_set_ack_number(tcp, isn1 + 2);
-    tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+    tcp46_set_cksum_calc(ip);
     if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -2008,23 +2028,23 @@ static void four_way_fin_seq_impl(
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, ip1);
   ip_set_dst(ip, ip2);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, port1);
   tcp_set_dst_port(tcp, port2);
   tcp_set_ack_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn1 + 2);
   tcp_set_ack_number(tcp, isn2 + 2);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -2052,7 +2072,7 @@ static void four_way_fin_seq_impl(
     exit(1);
   }
   tcp_set_seq_number(tcp, isn + 2);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
   if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -2167,22 +2187,22 @@ static void established_rst_uplink(void)
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, (10<<24)|4);
   ip_set_dst(ip, (11<<24)|3);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 12345);
   tcp_set_dst_port(tcp, 54321);
   tcp_set_rst_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn1 + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -2292,22 +2312,22 @@ static void established_rst_downlink(void)
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, (11<<24)|5);
   ip_set_dst(ip, (10<<24)|6);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 54321);
   tcp_set_dst_port(tcp, 12345);
   tcp_set_rst_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn2 + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -2419,22 +2439,22 @@ static void syn_proxy_rst_uplink(void)
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, (10<<24)|4);
   ip_set_dst(ip, (11<<24)|3);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 12345);
   tcp_set_dst_port(tcp, 54321);
   tcp_set_rst_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn1 + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
@@ -2462,7 +2482,7 @@ static void syn_proxy_rst_uplink(void)
     exit(1);
   }
   tcp_set_seq_number(tcp, isn + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
   if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -2548,22 +2568,22 @@ static void syn_proxy_rst_downlink(void)
   ether_set_type(ether, ETHER_TYPE_IP);
   ip = ether_payload(ether);
   ip_set_version(ip, 4);
-  ip_set_hdr_len(ip, 20);
-  ip_set_total_len(ip, sizeof(pkt) - 14);
-  ip_set_dont_frag(ip, 1);
-  ip_set_id(ip, 123);
-  ip_set_ttl(ip, 64);
-  ip_set_proto(ip, 6);
+  ip46_set_min_hdr_len(ip);
+  ip46_set_total_len(ip, sizeof(pkt) - 14);
+  ip46_set_dont_frag(ip, 1);
+  ip46_set_id(ip, 0);
+  ip46_set_ttl(ip, 64);
+  ip46_set_proto(ip, 6);
   ip_set_src(ip, (11<<24)|5);
   ip_set_dst(ip, (10<<24)|6);
-  ip_set_hdr_cksum_calc(ip, 20);
-  tcp = ip_payload(ip);
+  ip46_set_hdr_cksum_calc(ip);
+  tcp = ip46_payload(ip);
   tcp_set_src_port(tcp, 54321);
   tcp_set_dst_port(tcp, 12345);
   tcp_set_rst_on(tcp);
   tcp_set_data_offset(tcp, 20);
   tcp_set_seq_number(tcp, isn2 + 1);
-  tcp_set_cksum_calc(ip, 20, tcp, sizeof(pkt) - 14 - 20);
+  tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
@@ -2790,8 +2810,11 @@ static void syn_proxy_uplink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2821,8 +2844,11 @@ static void syn_proxy_uplink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 1, 0);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2852,8 +2878,11 @@ static void syn_proxy_uplink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 0, 1);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2895,8 +2924,11 @@ static void syn_proxy_downlink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2926,8 +2958,11 @@ static void syn_proxy_downlink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 1, 0);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -2957,8 +2992,11 @@ static void syn_proxy_downlink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 0, 1);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
@@ -3001,8 +3039,11 @@ static void syn_proxy_uplink_downlink(void)
   synproxy_handshake_impl(
     &synproxy, &local, &st, (10<<24)|18, (11<<24)|17, 12345, 54321,
     &isn, 1, 1, 1, 0, 0);
-  ctx.ip1 = (10<<24)|18;
-  ctx.ip2 = (11<<24)|17;
+  ctx.version = 4;
+  ctx.ulflowlabel = 0;
+  ctx.dlflowlabel = 0;
+  ctx.ip1.ipv4 = htonl((10<<24)|18);
+  ctx.ip2.ipv4 = htonl((11<<24)|17);
   ctx.port1 = 12345;
   ctx.port2 = 54321;
   ctx.seq1 = isn1 + 1;
