@@ -186,7 +186,7 @@ static void uplink_impl(
     memcpy(ether_src(ether), lan_mac, 6);
     ether_set_type(ether, ctx->version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
     ip = ether_payload(ether);
-    ip_set_version(ip, 4);
+    ip_set_version(ip, ctx->version);
     ip46_set_min_hdr_len(ip);
     ip46_set_payload_len(ip, 20);
     ip46_set_dont_frag(ip, 1);
