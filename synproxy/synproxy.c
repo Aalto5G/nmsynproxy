@@ -6,6 +6,7 @@
 #include "time64.h"
 
 #define MAX_FRAG 65535
+#define IPV6_FRAG_CUTOFF 512
 
 static inline uint32_t gen_flowlabel(const void *local_ip, uint16_t local_port,
                                      const void *remote_ip, uint16_t remote_port)
@@ -1325,6 +1326,8 @@ int downlink(
   }
   else if (version == 6)
   {
+    int is_frag = 0;
+    uint16_t proto_off_from_frag = 0;
     if (ip_len < 40)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IPv6 hdr 1");
@@ -1336,10 +1339,20 @@ int downlink(
       return 1;
     }
     protocol = 0;
-    ippay = ipv6_proto_hdr(ip, &protocol);
+    ippay = ipv6_proto_hdr_2(ip, &protocol, &is_frag, NULL, &proto_off_from_frag);
     if (ippay == NULL)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt without ext hdr chain");
+      return 1;
+    }
+    if (is_frag && proto_off_from_frag + 60 > IPV6_FRAG_CUTOFF)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IPv6 proto hdr too deep in hdr chain");
+      return 1;
+    }
+    if (protocol == 44 && ipv6_frag_off(ippay) < IPV6_FRAG_CUTOFF)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "IPv6 subsequent frag too low frag off");
       return 1;
     }
     if (protocol != 6)
@@ -2185,22 +2198,33 @@ int uplink(
   }
   else
   {
+    int is_frag = 0;
+    uint16_t proto_off_from_frag = 0;
     if (ip_len < 40)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IPv6 hdr 1");
       return 1;
     }
-    // FIXME frag off check for IPv6
-    if (ip_len < (uint32_t)(ipv6_payload_len(ip) + 40))
+    if (ip_len < (size_t)(ipv6_payload_len(ip) + 40))
     {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IPv6 data");
       return 1;
     }
     protocol = 0;
-    ippay = ipv6_proto_hdr(ip, &protocol);
+    ippay = ipv6_proto_hdr_2(ip, &protocol, &is_frag, NULL, &proto_off_from_frag);
     if (ippay == NULL)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt without ext hdr chain");
+      return 1;
+    }
+    if (is_frag && proto_off_from_frag + 60 > IPV6_FRAG_CUTOFF)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "IPv6 proto hdr too deep in hdr chain");
+      return 1;
+    }
+    if (protocol == 44 && ipv6_frag_off(ippay) < IPV6_FRAG_CUTOFF)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "IPv6 subsequent frag too low frag off");
       return 1;
     }
     if (protocol != 6)
