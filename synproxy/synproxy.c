@@ -7,6 +7,26 @@
 
 #define MAX_FRAG 65535
 
+static inline uint32_t gen_flowlabel(const void *local_ip, uint16_t local_port,
+                                     const void *remote_ip, uint16_t remote_port)
+{
+  struct siphash_ctx ctx;
+  siphash_init(&ctx, hash_seed_get());
+  siphash_feed_buf(&ctx, local_ip, 16);
+  siphash_feed_buf(&ctx, remote_ip, 16);
+  siphash_feed_u64(&ctx, ((uint32_t)local_port)<<16 | remote_port);
+  return siphash_get(&ctx) & ((1U<<20) - 1);
+}
+
+static inline uint32_t gen_flowlabel_entry(struct synproxy_hash_entry *e)
+{
+  if (e->version != 6)
+  {
+    abort();
+  }
+  return gen_flowlabel(&e->local_ip, e->local_port, &e->remote_ip, e->remote_port);
+}
+
 static size_t synproxy_state_to_str(
   char *str, size_t bufsiz, struct synproxy_hash_entry *e)
 {
@@ -667,6 +687,10 @@ static void send_synack(
   ether_set_type(synack, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(synack);
   ip_set_version(ip, version);
+  if (version == 6)
+  {
+    ipv6_set_flow_label(ip, gen_flowlabel(ip46_dst(origip), tcp_dst_port(origtcp), ip46_src(origip), tcp_src_port(origtcp)));
+  }
   ip46_set_min_hdr_len(ip);
   ip46_set_payload_len(ip, sizeof(synack) - 14 - 40);
   ip46_set_dont_frag(ip, 1);
@@ -829,6 +853,10 @@ static void send_synack(
     e->state_data.downlink_half_open.sack_permitted = tcpinfo.sack_permitted;
     e->state_data.downlink_half_open.remote_isn = tcp_seq_number(origtcp);
     e->state_data.downlink_half_open.local_isn = syn_cookie;
+    if (e->version == 6)
+    {
+      e->ulflowlabel = gen_flowlabel_entry(e);
+    }
 
     worker_local_wrunlock(local);
     synproxy_hash_unlock(local, &ctx);
@@ -858,6 +886,10 @@ static void send_or_resend_syn(
   ether_set_type(syn, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(syn);
   ip_set_version(ip, version);
+  if (version == 6)
+  {
+    ipv6_set_flow_label(ip, entry->dlflowlabel);
+  }
   ip46_set_min_hdr_len(ip);
   ip46_set_payload_len(ip, sizeof(syn) - 14 - 40);
   ip46_set_dont_frag(ip, 1);
@@ -1006,11 +1038,19 @@ static void send_syn(
       local, version, ip46_dst(origip), tcp_dst_port(origtcp),
       ip46_src(origip), tcp_src_port(origtcp),
       1, time64);
+    if (entry->version == 6)
+    {
+      entry->ulflowlabel = gen_flowlabel_entry(entry);
+    }
     if (entry == NULL)
     {
       log_log(LOG_LEVEL_ERR, "WORKER", "not enough memory or already existing");
       return;
     }
+  }
+  if (version == 6)
+  {
+    entry->dlflowlabel = ipv6_flow_label(origip);
   }
 
   entry->state_data.downlink_syn_sent.mss = mss;
@@ -1066,6 +1106,10 @@ static void send_ack_only(
   ether_set_type(ack, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(ack);
   ip_set_version(ip, version);
+  if (version == 6)
+  {
+    ipv6_set_flow_label(ip, entry->dlflowlabel);
+  }
   ip46_set_min_hdr_len(ip);
   ip46_set_payload_len(ip, sizeof(ack) - 14 - 40);
   ip46_set_dont_frag(ip, 1);
@@ -1135,6 +1179,10 @@ static void send_ack_and_window_update(
   ether_set_type(windowupdate, (version == 4) ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(windowupdate);
   ip_set_version(ip, version);
+  if (version == 6)
+  {
+    ipv6_set_flow_label(ip, entry->ulflowlabel);
+  }
   ip46_set_min_hdr_len(ip);
   ip46_set_payload_len(ip, sizeof(windowupdate) - 14 - 40);
   ip46_set_dont_frag(ip, 1);
@@ -2228,6 +2276,10 @@ int uplink(
       }
       entry = synproxy_hash_put(
         local, version, lan_ip, lan_port, remote_ip, remote_port, 0, time64);
+      if (version == 6)
+      {
+        entry->ulflowlabel = ipv6_flow_label(ip);
+      }
       if (entry == NULL)
       {
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "out of memory or already exists");
@@ -2756,6 +2808,10 @@ int uplink(
   }
   tcp_set_seq_number_cksum_update(
     ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
+  if (version == 6)
+  {
+    ipv6_set_flow_label(ip, entry->ulflowlabel);
+  }
   wscalediff = entry->wscalediff;
   if (wscalediff > 0)
   {

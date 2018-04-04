@@ -1884,6 +1884,10 @@ static void four_way_fin_seq_impl(
     }
     tcp_set_seq_number(tcp, isn1 + 1);
     tcp46_set_cksum_calc(ip);
+    if (version == 6)
+    {
+      ipv6_set_flow_label(ether_payload(packet_data(pktstruct)), ipv6_flow_label(ip));
+    }
     if (memcmp(packet_data(pktstruct), pkt, version == 4 ? 14+20 : 14+40) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
@@ -2099,6 +2103,10 @@ static void four_way_fin_seq_impl(
   }
   tcp_set_seq_number(tcp, isn + 2);
   tcp46_set_cksum_calc(ip);
+  if (version == 6)
+  {
+    ipv6_set_flow_label(ether_payload(packet_data(pktstruct)), ipv6_flow_label(ip));
+  }
   if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");

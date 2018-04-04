@@ -36,6 +36,8 @@ struct synproxy_hash_entry {
     uint32_t ipv4;
     char ipv6[16];
   } remote_ip;
+  uint32_t ulflowlabel; // after mangling
+  uint32_t dlflowlabel;
   uint16_t local_port;
   uint16_t remote_port;
   uint16_t flag_state;
