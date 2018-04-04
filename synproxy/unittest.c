@@ -1541,7 +1541,7 @@ static void synproxy_handshake_impl(
     }
   
     pktstruct = fetch_packet(&head);
-    if (i == 0)
+    //if (i == 0)
     {
       if (pktstruct == NULL)
       {
