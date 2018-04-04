@@ -1325,27 +1325,31 @@ int downlink(
   }
   else if (version == 6)
   {
-    ihl = 40;
     if (ip_len < 40)
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IPv6 hdr 1");
       return 1;
-    }
-    // FIXME ext hdr traversal
-    if (ipv6_nexthdr(ip) != 6)
-    {
-      port->portfunc(pkt, port->userdata);
-      return 0;
     }
     if (ip_len < (size_t)(ipv6_payload_len(ip) + 40))
     {
       log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt does not have full IPv6 data");
       return 1;
     }
+    protocol = 0;
+    ippay = ipv6_proto_hdr(ip, &protocol);
+    if (ippay == NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "pkt without ext hdr chain");
+      return 1;
+    }
+    if (protocol != 6)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    ihl = ((char*)ippay) - ((char*)ip);
     lan_ip = ipv6_dst(ip);
     remote_ip = ipv6_src(ip);
-    protocol = ipv6_nexthdr(ip);
-    ippay = ipv6_nexthdr_ptr(ip);
   }
   else
   {
@@ -2181,16 +2185,10 @@ int uplink(
   }
   else
   {
-    ihl = 40;
     if (ip_len < 40)
     {
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IPv6 hdr 1");
       return 1;
-    }
-    if (ipv6_nexthdr(ip) != 6) // FIXME ext hdr chains
-    {
-      port->portfunc(pkt, port->userdata);
-      return 0;
     }
     // FIXME frag off check for IPv6
     if (ip_len < (uint32_t)(ipv6_payload_len(ip) + 40))
@@ -2198,9 +2196,19 @@ int uplink(
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt does not have full IP data");
       return 1;
     }
-    
-    protocol = ipv6_nexthdr(ip);
-    ippay = ipv6_nexthdr_ptr(ip);
+    protocol = 0;
+    ippay = ipv6_proto_hdr(ip, &protocol);
+    if (ippay == NULL)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "pkt without ext hdr chain");
+      return 1;
+    }
+    if (protocol != 6)
+    {
+      port->portfunc(pkt, port->userdata);
+      return 0;
+    }
+    ihl = ((char*)ippay) - ((char*)ip);
     lan_ip = ipv6_src(ip);
     remote_ip = ipv6_dst(ip);
   }
