@@ -1,4 +1,5 @@
 Copyright (c) 2017-2018 Juha-Matti Tilli
+
 Copyright (c) 2018 Aalto University (some portions done at or after 22.2.2018).
 
 Permission is hereby granted, free of charge, to any person obtaining
