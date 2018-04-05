@@ -904,7 +904,7 @@ static void send_or_resend_syn(
   tcp_set_src_port(tcp, tcp_src_port(origtcp));
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_syn_on(tcp);
-  tcp_set_data_offset(tcp, sizeof(syn) - 14 - 20);
+  tcp_set_data_offset(tcp, sizeof(syn) - 14 - 40);
   tcp_set_seq_number(tcp, entry->state_data.downlink_syn_sent.remote_isn);
   tcp_set_ack_number(tcp, 0);
   tcp_set_window(tcp, tcp_window(origtcp));
@@ -1124,7 +1124,7 @@ static void send_ack_only(
   tcp_set_src_port(tcp, tcp_dst_port(origtcp));
   tcp_set_dst_port(tcp, tcp_src_port(origtcp));
   tcp_set_ack_on(tcp);
-  tcp_set_data_offset(tcp, sizeof(ack) - 14 - 20);
+  tcp_set_data_offset(tcp, sizeof(ack) - 14 - 40);
   tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
   tcp_set_window(tcp, entry->wan_max_window_unscaled);
@@ -1197,7 +1197,7 @@ static void send_ack_and_window_update(
   tcp_set_src_port(tcp, tcp_src_port(origtcp));
   tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
   tcp_set_ack_on(tcp);
-  tcp_set_data_offset(tcp, sizeof(windowupdate)-14-20);
+  tcp_set_data_offset(tcp, sizeof(windowupdate) - 14 - 40);
 #if 0
   tcp_set_seq_number(tcp, tcp_ack_number(origtcp)); // FIXME looks suspicious
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1); // FIXME the same
