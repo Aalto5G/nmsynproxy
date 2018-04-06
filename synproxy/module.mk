@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c yyutils.c secret.c ctrl.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c tcpsendrecv.c tcpsendrecv1.c ctrlperf.c odpsynproxy.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c tcpsendrecv.c tcpsendrecv1.c ctrlperf.c odpsynproxy.c ldpsynproxy.c
 
 SYNPROXY_LEX_LIB := conf.l
 SYNPROXY_LEX := $(SYNPROXY_LEX_LIB)
@@ -37,11 +37,11 @@ SYNPROXY_DEP := $(patsubst %.c,%.d,$(SYNPROXY_SRC))
 SYNPROXY_DEPGEN_LIB := $(patsubst %.c,%.d,$(SYNPROXY_GEN_LIB))
 SYNPROXY_DEPGEN := $(patsubst %.c,%.d,$(SYNPROXY_GEN))
 
-CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) -I$(DIRLOG) -I$(DIRHASHTABLE) -I$(DIRHASHLIST) -I$(DIRPORTS) -I$(DIRALLOC) -I$(DIRTIMERLINKHEAP) -I$(DIRMYPCAP) -I$(DIRDYNARR) -I$(DIRIPHASH) -I$(DIRSACKHASH) -I$(DIRTHREETUPLE) -I$(DIRDATABUF) -I$(DIRNETMAP)
+CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) -I$(DIRLOG) -I$(DIRHASHTABLE) -I$(DIRHASHLIST) -I$(DIRPORTS) -I$(DIRALLOC) -I$(DIRTIMERLINKHEAP) -I$(DIRMYPCAP) -I$(DIRDYNARR) -I$(DIRIPHASH) -I$(DIRSACKHASH) -I$(DIRTHREETUPLE) -I$(DIRDATABUF) -I$(DIRNETMAP) -I$(DIRLDP)
 
 MAKEFILES_SYNPROXY := $(DIRSYNPROXY)/module.mk
 
-LIBS_SYNPROXY := $(DIRSACKHASH)/libsackhash.a $(DIRIPHASH)/libiphash.a $(DIRMYPCAP)/libmypcap.a $(DIRDYNARR)/libdynarr.a $(DIRALLOC)/liballoc.a $(DIRIPHDR)/libiphdr.a $(DIRPORTS)/libports.a $(DIRHASHTABLE)/libhashtable.a $(DIRHASHLIST)/libhashlist.a $(DIRTIMERLINKHEAP)/libtimerlinkheap.a $(DIRMISC)/libmisc.a $(DIRTHREETUPLE)/libthreetuple.a $(DIRDATABUF)/libdatabuf.a $(DIRNETMAP)/libnetmap.a $(DIRLOG)/liblog.a
+LIBS_SYNPROXY := $(DIRSACKHASH)/libsackhash.a $(DIRIPHASH)/libiphash.a $(DIRMYPCAP)/libmypcap.a $(DIRDYNARR)/libdynarr.a $(DIRALLOC)/liballoc.a $(DIRIPHDR)/libiphdr.a $(DIRHASHTABLE)/libhashtable.a $(DIRHASHLIST)/libhashlist.a $(DIRTIMERLINKHEAP)/libtimerlinkheap.a $(DIRMISC)/libmisc.a $(DIRTHREETUPLE)/libthreetuple.a $(DIRDATABUF)/libdatabuf.a $(DIRNETMAP)/libnetmap.a $(DIRLOG)/liblog.a $(DIRLDP)/libldp.a $(DIRPORTS)/libports.a
 
 .PHONY: SYNPROXY clean_SYNPROXY distclean_SYNPROXY unit_SYNPROXY $(LCSYNPROXY) clean_$(LCSYNPROXY) distclean_$(LCSYNPROXY) unit_$(LCSYNPROXY)
 
@@ -59,8 +59,9 @@ endif
 ifeq ($(WITH_ODP),yes)
 SYNPROXY: $(DIRSYNPROXY)/odpsynproxy
 CFLAGS_SYNPROXY += -I$(ODP_DIR)/include
-LIBS_SYNPROXY += $(ODP_DIR)/lib/libodp-linux.a $(LIBS_ODPDEP)
+LIBS_SYNPROXY_ODP := $(ODP_DIR)/lib/libodp-linux.a $(LIBS_ODPDEP)
 endif
+SYNPROXY: $(DIRSYNPROXY)/ldpsynproxy
 
 unit_SYNPROXY: $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/unittest
 	$(DIRSYNPROXY)/workeronlyperf
@@ -77,8 +78,11 @@ $(DIRSYNPROXY)/workeronlyperf: $(DIRSYNPROXY)/workeronlyperf.o $(DIRSYNPROXY)/li
 $(DIRSYNPROXY)/nmsynproxy: $(DIRSYNPROXY)/nmsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
-$(DIRSYNPROXY)/odpsynproxy: $(DIRSYNPROXY)/odpsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+$(DIRSYNPROXY)/odpsynproxy: $(DIRSYNPROXY)/odpsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(LIBS_SYNPROXY_ODP) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread -lrt -ldl
+
+$(DIRSYNPROXY)/ldpsynproxy: $(DIRSYNPROXY)/ldpsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
 
 $(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread

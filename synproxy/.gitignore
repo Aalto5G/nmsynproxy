@@ -3,6 +3,7 @@
 /netmapsend
 /nmsynproxy
 /odpsynproxy
+/ldpsynproxy
 /secrettest
 /conftest
 /pcapngworkeronly
