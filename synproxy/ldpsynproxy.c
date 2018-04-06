@@ -417,8 +417,16 @@ int main(int argc, char **argv)
     uloutq[i] = ulintf->outq[i];
   }
   
-  ldp_link_wait(dlinq[0]->fd, argv[optind + 0]);
-  ldp_link_wait(ulinq[0]->fd, argv[optind + 1]);
+  if (ldp_link_wait(dlinq[0]->fd, argv[optind + 0]) != 0)
+  {
+    log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 0]);
+    exit(1);
+  }
+  if (ldp_link_wait(ulinq[0]->fd, argv[optind + 1]) != 0)
+  {
+    log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 1]);
+    exit(1);
+  }
 
   worker_local_init(&local, &synproxy, 0, 1);
   if (conf.test_connections)
