@@ -18,12 +18,20 @@ number as the number of threads before starting up nmsynproxy.
 Performance should be great. With any recent good CPU, even as few as three
 threads should achieve 40 Gbps link saturation when transferring large files.
 
+There are two main supported variants of SYN proxy: nmsynproxy and ldpsynproxy.
+nmsynproxy supports only netmap, ldpsynproxy can be used with netmap (using the
+`netmap:` prefix on inteface names) or without netmap (by leaving out the
+prefix). For highest performance, either nmsynproxy or the `netmap:` prefixed
+use of ldpsynproxy is required. This requires netmap to compile the sources and
+also the netmap kernel module must be installed.
+
 # Prerequisites
 
 You need to have flex and bison installed in order to compile this project.
 Also, needless to say, compiler tools and GNU make must be available. To
-actually communicate with real network interfaces, you also need netmap, but
-more on that later.
+actually communicate with real network interfaces, you also need netmap for the
+highest performance possible, but more on that later. If low performance is
+enough, ldpsynproxy can be used instead of nmsynproxy.
 
 Also, pptk submodule must be initialized and updated.
 
@@ -204,6 +212,15 @@ Note that the order interfaces are specified matters. The first is the LAN
 interface. The second is the WAN interface. Only connections from WAN to LAN
 are SYN proxied.
 
+If you don't have netmap installed or the netmap kernel module loaded, you may
+do instead:
+```
+./synproxy/ldpsynproxy eth0 eth1
+```
+
+...but note that in this variant, you must before remove any assigned addresses
+from the eth0 and eth1 interfaces.
+
 # Testing with network namespaces
 
 Execute:
@@ -232,6 +249,11 @@ ip netns exec ns2 ip link set veth3 up
 Then run in one terminal window and leave it running:
 ```
 ./synproxy/nmsynproxy netmap:veth1 netmap:veth2
+```
+
+Or you may alternatively run:
+```
+./synproxy/ldpsynproxy veth1 veth2
 ```
 
 Verify that ping works to both directions:
