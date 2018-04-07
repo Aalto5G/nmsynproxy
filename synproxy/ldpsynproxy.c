@@ -417,12 +417,12 @@ int main(int argc, char **argv)
     uloutq[i] = ulintf->outq[i];
   }
   
-  if (ldp_link_wait(sockfd, argv[optind + 0]) != 0)
+  if (ldp_interface_link_wait(dlintf) != 0)
   {
     log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 0]);
     exit(1);
   }
-  if (ldp_link_wait(sockfd, argv[optind + 1]) != 0)
+  if (ldp_interface_link_wait(ulintf) != 0)
   {
     log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 1]);
     exit(1);
@@ -487,8 +487,8 @@ int main(int argc, char **argv)
     }
   }
   sleep(1);
-  ldp_set_promisc_mode(sockfd, argv[optind + 0], 1);
-  ldp_set_promisc_mode(sockfd, argv[optind + 1], 1);
+  ldp_interface_set_promisc_mode(ulintf, 1);
+  ldp_interface_set_promisc_mode(dlintf, 1);
   if (getuid() == 0 && conf.gid != 0)
   {
     if (setgid(conf.gid) != 0)
@@ -536,8 +536,8 @@ int main(int argc, char **argv)
     pthread_join(ctrl, NULL);
   }
 
-  ldp_set_promisc_mode(sockfd, argv[optind + 0], 0);
-  ldp_set_promisc_mode(sockfd, argv[optind + 1], 0);
+  ldp_interface_set_promisc_mode(ulintf, 0);
+  ldp_interface_set_promisc_mode(dlintf, 0);
   ldp_interface_close(ulintf);
   ldp_interface_close(dlintf);
   close(pipefd[0]);
