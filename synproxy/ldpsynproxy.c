@@ -175,7 +175,10 @@ static void *rx_func(void *userdata)
     {
       ldp_out_txsync(dloutq[args->idx]);
       ldp_out_txsync(uloutq[args->idx]);
-      poll(pfds, 2, timeout);
+      if (pfds[0].fd >= 0 && pfds[1].fd >= 0)
+      {
+        poll(pfds, 2, timeout);
+      }
     }
 
     time64 = gettime64();
