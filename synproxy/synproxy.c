@@ -768,9 +768,10 @@ static void send_synack(
   }
   tcp46_set_cksum_calc(ip);
   pktstruct = ll_alloc_st(st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), synack, sz);
+  memcpy(pktstruct->data, synack, sz);
   port->portfunc(pktstruct, port->userdata);
 
   if (synproxy->conf->halfopen_cache_max)
@@ -967,9 +968,10 @@ static void send_or_resend_syn(
   }
   tcp46_set_cksum_calc(ip);
   pktstruct = ll_alloc_st(st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), syn, sz);
+  memcpy(pktstruct->data, syn, sz);
   port->portfunc(pktstruct, port->userdata);
 }
 
@@ -1148,9 +1150,10 @@ static void send_ack_only(
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), ack, sz);
+  memcpy(pktstruct->data, ack, sz);
   port->portfunc(pktstruct, port->userdata);
 }
 
@@ -1234,9 +1237,10 @@ static void send_ack_and_window_update(
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), windowupdate, sz);
+  memcpy(pktstruct->data, windowupdate, sz);
   port->portfunc(pktstruct, port->userdata);
 }
 
@@ -1244,7 +1248,7 @@ int downlink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
   struct port *port, uint64_t time64, struct ll_alloc_st *st)
 {
-  void *ether = packet_data(pkt);
+  void *ether = pkt->data;
   void *ip;
   void *ippay;
   size_t ether_len = pkt->sz;
@@ -2114,7 +2118,7 @@ int uplink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
   struct port *port, uint64_t time64, struct ll_alloc_st *st)
 {
-  void *ether = packet_data(pkt);
+  void *ether = pkt->data;
   void *ip;
   void *ippay;
   size_t ether_len = pkt->sz;

@@ -211,9 +211,10 @@ static void *rx_func(void *userdata)
     {
       struct packet *pktstruct;
       pktstruct = ll_alloc_st(&st, packet_size(pkts[i].sz));
+      pktstruct->data = packet_calc_data(pktstruct);
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
       pktstruct->sz = pkts[i].sz;
-      memcpy(packet_data(pktstruct), pkts[i].data, pkts[i].sz);
+      memcpy(pktstruct->data, pkts[i].data, pkts[i].sz);
 
       if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
@@ -245,9 +246,10 @@ static void *rx_func(void *userdata)
     {
       struct packet *pktstruct;
       pktstruct = ll_alloc_st(&st, packet_size(pkts[i].sz));
+      pktstruct->data = packet_calc_data(pktstruct);
       pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
       pktstruct->sz = pkts[i].sz;
-      memcpy(packet_data(pktstruct), pkts[i].data, pkts[i].sz);
+      memcpy(pktstruct->data, pkts[i].data, pkts[i].sz);
 
       if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {

@@ -208,9 +208,10 @@ static void *rx_func(void *userdata)
       }
 
       pktstruct = ll_alloc_st(&st, packet_size(hdr.len));
+      pktstruct->data = packet_calc_data(pktstruct);
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
       pktstruct->sz = hdr.len;
-      memcpy(packet_data(pktstruct), pkt, hdr.len);
+      memcpy(pktstruct->data, pkt, hdr.len);
 
       if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
@@ -247,9 +248,10 @@ static void *rx_func(void *userdata)
       }
 
       pktstruct = ll_alloc_st(&st, packet_size(hdr.len));
+      pktstruct->data = packet_calc_data(pktstruct);
       pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
       pktstruct->sz = hdr.len;
-      memcpy(packet_data(pktstruct), pkt, hdr.len);
+      memcpy(pktstruct->data, pkt, hdr.len);
 
       if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {

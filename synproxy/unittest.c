@@ -106,9 +106,10 @@ static void uplink_impl(
     ctx->seq += sizeof(pkt) - 14 - ip46_hdr_len(ip) - 20;
 
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    memcpy(pktstruct->data, pkt, sizeof(pkt));
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -130,7 +131,7 @@ static void uplink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), &ctx->ip1, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -206,9 +207,10 @@ static void uplink_impl(
     tcp46_set_cksum_calc(ip);
 
     pktstruct = ll_alloc_st(loc, packet_size(14 + ip46_total_len(ip)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = 14 + ip46_total_len(ip);
-    memcpy(packet_data(pktstruct), pktsmall, 14 + ip46_total_len(ip));
+    memcpy(pktstruct->data, pktsmall, 14 + ip46_total_len(ip));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -230,7 +232,7 @@ static void uplink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), &ctx->ip2, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -341,9 +343,10 @@ static void downlink_impl(
     ctx->seq2 += sizeof(pkt) - 14 - ip46_hdr_len(ip) - 20;
 
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    memcpy(pktstruct->data, pkt, sizeof(pkt));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -365,7 +368,7 @@ static void downlink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), &ctx->ip2, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -441,9 +444,10 @@ static void downlink_impl(
     tcp46_set_cksum_calc(ip);
 
     pktstruct = ll_alloc_st(loc, packet_size(14 + ip46_total_len(ip)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = 14 + ip46_total_len(ip);
-    memcpy(packet_data(pktstruct), pktsmall, 14 + ip46_total_len(ip));
+    memcpy(pktstruct->data, pktsmall, 14 + ip46_total_len(ip));
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -465,7 +469,7 @@ static void downlink_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), &ctx->ip1, ctx->version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -578,9 +582,10 @@ static void synproxy_closed_port_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sz));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sz;
-    memcpy(packet_data(pktstruct), pkt, sz);
+    memcpy(pktstruct->data, pkt, sz);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -602,7 +607,7 @@ static void synproxy_closed_port_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -689,9 +694,10 @@ static void synproxy_closed_port_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    memcpy(pktstruct->data, pkt, sizeof(pkt));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -715,7 +721,7 @@ static void synproxy_closed_port_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
         exit(1);
       }
-      ip = ether_payload(packet_data(pktstruct));
+      ip = ether_payload(pktstruct->data);
       if (memcmp(ip46_src(ip), ip2, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -807,9 +813,10 @@ static void synproxy_closed_port_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt);
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+    memcpy(pktstruct->data, pkt, sizeof(pkt));
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -833,7 +840,7 @@ static void synproxy_closed_port_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
         exit(1);
       }
-      ip = ether_payload(packet_data(pktstruct));
+      ip = ether_payload(pktstruct->data);
       if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 : 16))
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -985,9 +992,10 @@ static void closed_port(int version)
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  memcpy(pktstruct->data, pkt, sizeof(pkt));
   if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -1009,7 +1017,7 @@ static void closed_port(int version)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(pktstruct->data, pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -1061,9 +1069,10 @@ static void closed_port(int version)
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sizeof(pkt)));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sizeof(pkt);
-  memcpy(packet_data(pktstruct), pkt, sizeof(pkt));
+  memcpy(pktstruct->data, pkt, sizeof(pkt));
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -1085,7 +1094,7 @@ static void closed_port(int version)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sizeof(pkt)) != 0)
+  if (memcmp(pktstruct->data, pkt, sizeof(pkt)) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -1171,9 +1180,10 @@ static void three_way_handshake_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sz));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sz;
-    memcpy(packet_data(pktstruct), pkt, sz);
+    memcpy(pktstruct->data, pkt, sz);
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1195,7 +1205,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+    if (memcmp(pktstruct->data, pkt, sz) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -1250,9 +1260,10 @@ static void three_way_handshake_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sz));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sz;
-    memcpy(packet_data(pktstruct), pkt, sz);
+    memcpy(pktstruct->data, pkt, sz);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1274,7 +1285,7 @@ static void three_way_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+    if (memcmp(pktstruct->data, pkt, sz) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -1319,9 +1330,10 @@ static void three_way_handshake_impl(
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(loc, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
@@ -1343,7 +1355,7 @@ static void three_way_handshake_impl(
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -1421,9 +1433,10 @@ static void synproxy_handshake_impl(
     tcp46_set_cksum_calc(ip);
     
     pktstruct = ll_alloc_st(loc, packet_size(sz - 1));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sz - 1;
-    memcpy(packet_data(pktstruct), pkt, sz - 1);
+    memcpy(pktstruct->data, pkt, sz - 1);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1445,7 +1458,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 :16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -1532,9 +1545,10 @@ static void synproxy_handshake_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sz - 1 + (!!one_byte_payload)));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sz - 1 + (!!one_byte_payload);
-    memcpy(packet_data(pktstruct), pkt, sz - 1 + (!!one_byte_payload));
+    memcpy(pktstruct->data, pkt, sz - 1 + (!!one_byte_payload));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1558,7 +1572,7 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
         exit(1);
       }
-      ip = ether_payload(packet_data(pktstruct));
+      ip = ether_payload(pktstruct->data);
       if (memcmp(ip46_src(ip), ip2, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -1651,9 +1665,10 @@ static void synproxy_handshake_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sizeof(pkt) - 1));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sizeof(pkt) - 1;
-    memcpy(packet_data(pktstruct), pkt, sizeof(pkt) - 1);
+    memcpy(pktstruct->data, pkt, sizeof(pkt) - 1);
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1675,7 +1690,7 @@ static void synproxy_handshake_impl(
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
       exit(1);
     }
-    ip = ether_payload(packet_data(pktstruct));
+    ip = ether_payload(pktstruct->data);
     if (memcmp(ip46_src(ip), ip2, version == 4 ? 4 : 16) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -1736,7 +1751,7 @@ static void synproxy_handshake_impl(
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
         exit(1);
       }
-      ip = ether_payload(packet_data(pktstruct));
+      ip = ether_payload(pktstruct->data);
       if (memcmp(ip46_src(ip), ip1, version == 4 ? 4 : 16) != 0)
       {
         log_log(LOG_LEVEL_ERR, "UNIT", "output packet src IP doesn't agree");
@@ -1858,9 +1873,10 @@ static void four_way_fin_seq_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sz));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
     pktstruct->sz = sz;
-    memcpy(packet_data(pktstruct), pkt, sz);
+    memcpy(pktstruct->data, pkt, sz);
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -1886,9 +1902,9 @@ static void four_way_fin_seq_impl(
     tcp46_set_cksum_calc(ip);
     if (version == 6)
     {
-      ipv6_set_flow_label(ether_payload(packet_data(pktstruct)), ipv6_flow_label(ip));
+      ipv6_set_flow_label(ether_payload(pktstruct->data), ipv6_flow_label(ip));
     }
-    if (memcmp(packet_data(pktstruct), pkt, version == 4 ? 14+20 : 14+40) != 0)
+    if (memcmp(pktstruct->data, pkt, version == 4 ? 14+20 : 14+40) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -1933,9 +1949,10 @@ static void four_way_fin_seq_impl(
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(loc, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
@@ -1959,7 +1976,7 @@ static void four_way_fin_seq_impl(
   }
   tcp_set_ack_number(tcp, isn1 + 2);
   tcp46_set_cksum_calc(ip);
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2006,9 +2023,10 @@ static void four_way_fin_seq_impl(
     tcp46_set_cksum_calc(ip);
   
     pktstruct = ll_alloc_st(loc, packet_size(sz));
+    pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
     pktstruct->sz = sz;
-    memcpy(packet_data(pktstruct), pkt, sz);
+    memcpy(pktstruct->data, pkt, sz);
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -2032,7 +2050,7 @@ static void four_way_fin_seq_impl(
     }
     tcp_set_ack_number(tcp, isn1 + 2);
     tcp46_set_cksum_calc(ip);
-    if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+    if (memcmp(pktstruct->data, pkt, sz) != 0)
     {
       log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
       exit(1);
@@ -2077,9 +2095,10 @@ static void four_way_fin_seq_impl(
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(loc, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
@@ -2105,9 +2124,9 @@ static void four_way_fin_seq_impl(
   tcp46_set_cksum_calc(ip);
   if (version == 6)
   {
-    ipv6_set_flow_label(ether_payload(packet_data(pktstruct)), ipv6_flow_label(ip));
+    ipv6_set_flow_label(ether_payload(pktstruct->data), ipv6_flow_label(ip));
   }
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2276,9 +2295,10 @@ static void established_rst_uplink(int version)
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2300,7 +2320,7 @@ static void established_rst_uplink(int version)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2419,9 +2439,10 @@ static void established_rst_downlink(int version)
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2443,7 +2464,7 @@ static void established_rst_downlink(int version)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2564,9 +2585,10 @@ static void syn_proxy_rst_uplink(int version)
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_UPLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2590,7 +2612,7 @@ static void syn_proxy_rst_uplink(int version)
   }
   tcp_set_seq_number(tcp, isn + 1);
   tcp46_set_cksum_calc(ip);
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);
@@ -2711,9 +2733,10 @@ static void syn_proxy_rst_downlink(int version)
   tcp46_set_cksum_calc(ip);
 
   pktstruct = ll_alloc_st(&st, packet_size(sz));
+  pktstruct->data = packet_calc_data(pktstruct);
   pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
   pktstruct->sz = sz;
-  memcpy(packet_data(pktstruct), pkt, sz);
+  memcpy(pktstruct->data, pkt, sz);
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
@@ -2735,7 +2758,7 @@ static void syn_proxy_rst_downlink(int version)
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet direction doesn't agree");
     exit(1);
   }
-  if (memcmp(packet_data(pktstruct), pkt, sz) != 0)
+  if (memcmp(pktstruct->data, pkt, sz) != 0)
   {
     log_log(LOG_LEVEL_ERR, "UNIT", "output packet data doesn't agree");
     exit(1);

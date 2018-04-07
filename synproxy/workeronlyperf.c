@@ -156,7 +156,8 @@ static void *rx_func(void *userdata)
       pktstruct = ll_alloc_st(&st, packet_size(sizeof(ctx[i].pkt)));
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
       pktstruct->sz = sizeof(ctx[i].pkt);
-      memcpy(packet_data(pktstruct), ctx[i].pkt, sizeof(ctx[i].pkt));
+      pktstruct->data = packet_calc_data(pktstruct);
+      memcpy(pktstruct->data, ctx[i].pkt, sizeof(ctx[i].pkt));
       if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
         ll_free_st(&st, pktstruct);
@@ -168,7 +169,8 @@ static void *rx_func(void *userdata)
       pktstruct = ll_alloc_st(&st, packet_size(sizeof(ctx[i].pkt)));
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
       pktstruct->sz = sizeof(ctx[i].pkt);
-      memcpy(packet_data(pktstruct), ctx[i].pkt, sizeof(ctx[i].pkt));
+      pktstruct->data = packet_calc_data(pktstruct);
+      memcpy(pktstruct->data, ctx[i].pkt, sizeof(ctx[i].pkt));
       if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
         ll_free_st(&st, pktstruct);
@@ -179,7 +181,8 @@ static void *rx_func(void *userdata)
       pktstruct = ll_alloc_st(&st, packet_size(sizeof(ctx[i].pktsmall)));
       pktstruct->direction = PACKET_DIRECTION_UPLINK;
       pktstruct->sz = sizeof(ctx[i].pktsmall);
-      memcpy(packet_data(pktstruct), ctx[i].pktsmall, sizeof(ctx[i].pktsmall));
+      pktstruct->data = packet_calc_data(pktstruct);
+      memcpy(pktstruct->data, ctx[i].pktsmall, sizeof(ctx[i].pktsmall));
       if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
       {
         ll_free_st(&st, pktstruct);

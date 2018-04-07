@@ -230,8 +230,9 @@ static void *rx_func(void *userdata)
       size_t sz = odp_packet_len(packets[i]);
 
       pktstruct = ll_alloc_st(&st, packet_size(sz));
+      pktstruct->data = packet_calc_data(pktstruct);
       pktstruct->sz = sz;
-      memcpy(packet_data(pktstruct), pkt, sz);
+      memcpy(pktstruct->data, pkt, sz);
 
       if (from + inqidx != 1)
       {

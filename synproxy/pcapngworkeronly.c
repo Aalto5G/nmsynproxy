@@ -127,7 +127,8 @@ static void *rx_func(void *userdata)
     pktstruct = ll_alloc_st(&st, packet_size(snap));
     pktstruct->direction = direction;
     pktstruct->sz = snap;
-    memcpy(packet_data(pktstruct), buf, snap);
+    pktstruct->data = packet_calc_data(pktstruct);
+    memcpy(pktstruct->data, buf, snap);
     if (direction == PACKET_DIRECTION_UPLINK)
     {
       if (uplink(args->synproxy, args->local, pktstruct, &outport, pcaptime, &st))
@@ -151,12 +152,12 @@ static void *rx_func(void *userdata)
         if (pktstruct->direction == PACKET_DIRECTION_UPLINK)
         {
           pcapng_out_ctx_write(
-            &outctx, packet_data(pktstruct), pktstruct->sz, pcaptime, "out");
+            &outctx, pktstruct->data, pktstruct->sz, pcaptime, "out");
         }
         else
         {
           pcapng_out_ctx_write(
-            &outctx, packet_data(pktstruct), pktstruct->sz, pcaptime, "in");
+            &outctx, pktstruct->data, pktstruct->sz, pcaptime, "in");
         }
       }
       ll_free_st(&st, pktstruct);
