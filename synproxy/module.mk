@@ -82,7 +82,7 @@ $(DIRSYNPROXY)/odpsynproxy: $(DIRSYNPROXY)/odpsynproxy.o $(DIRSYNPROXY)/libsynpr
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread -lrt -ldl
 
 $(DIRSYNPROXY)/ldpsynproxy: $(DIRSYNPROXY)/ldpsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
-	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) $(LDFLAGS_LDP) -lpthread -ldl
 
 $(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread
