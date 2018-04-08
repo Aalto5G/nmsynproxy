@@ -114,6 +114,10 @@ static void uplink_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
 
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -214,6 +218,10 @@ static void uplink_impl(
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
 
     pktstruct = fetch_packet(&head);
@@ -351,6 +359,10 @@ static void downlink_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
 
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -451,6 +463,10 @@ static void downlink_impl(
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
 
     pktstruct = fetch_packet(&head);
@@ -590,6 +606,10 @@ static void synproxy_closed_port_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
   
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -701,6 +721,10 @@ static void synproxy_closed_port_impl(
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
   
     pktstruct = fetch_packet(&head);
@@ -820,6 +844,10 @@ static void synproxy_closed_port_impl(
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
   
     if (i == 0)
@@ -1000,6 +1028,10 @@ static void closed_port(int version)
   {
     ll_free_st(&st, pktstruct);
   }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
+  }
 
   pktstruct = fetch_packet(&head);
   if (pktstruct == NULL)
@@ -1076,6 +1108,10 @@ static void closed_port(int version)
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
+  }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
   }
 
   pktstruct = fetch_packet(&head);
@@ -1188,6 +1224,10 @@ static void three_way_handshake_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
   
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -1268,6 +1308,10 @@ static void three_way_handshake_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
   
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -1337,6 +1381,10 @@ static void three_way_handshake_impl(
   if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
+  }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
   }
 
   pktstruct = fetch_packet(&head);
@@ -1440,6 +1488,10 @@ static void synproxy_handshake_impl(
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
   
     pktstruct = fetch_packet(&head);
@@ -1552,6 +1604,10 @@ static void synproxy_handshake_impl(
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
   
     pktstruct = fetch_packet(&head);
@@ -1672,6 +1728,10 @@ static void synproxy_handshake_impl(
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
+    }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
     }
   
     pktstruct = fetch_packet(&head);
@@ -1881,6 +1941,10 @@ static void four_way_fin_seq_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
   
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -1957,6 +2021,10 @@ static void four_way_fin_seq_impl(
   {
     ll_free_st(loc, pktstruct);
   }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
+  }
 
   pktstruct = fetch_packet(&head);
   if (pktstruct == NULL)
@@ -2031,6 +2099,10 @@ static void four_way_fin_seq_impl(
     {
       ll_free_st(loc, pktstruct);
     }
+    else
+    {
+      outport.portfunc(pktstruct, outport.userdata);
+    }
   
     pktstruct = fetch_packet(&head);
     if (pktstruct == NULL)
@@ -2102,6 +2174,10 @@ static void four_way_fin_seq_impl(
   if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
   {
     ll_free_st(loc, pktstruct);
+  }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
   }
 
   pktstruct = fetch_packet(&head);
@@ -2303,6 +2379,10 @@ static void established_rst_uplink(int version)
   {
     ll_free_st(&st, pktstruct);
   }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
+  }
 
   pktstruct = fetch_packet(&head);
   if (pktstruct == NULL)
@@ -2446,6 +2526,10 @@ static void established_rst_downlink(int version)
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
+  }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
   }
 
   pktstruct = fetch_packet(&head);
@@ -2592,6 +2676,10 @@ static void syn_proxy_rst_uplink(int version)
   if (uplink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
+  }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
   }
 
   pktstruct = fetch_packet(&head);
@@ -2740,6 +2828,10 @@ static void syn_proxy_rst_downlink(int version)
   if (downlink(&synproxy, &local, pktstruct, &outport, time64, &st))
   {
     ll_free_st(&st, pktstruct);
+  }
+  else
+  {
+    outport.portfunc(pktstruct, outport.userdata);
   }
 
   pktstruct = fetch_packet(&head);

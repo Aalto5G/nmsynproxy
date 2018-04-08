@@ -118,7 +118,7 @@ static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
   struct ll_alloc_st st;
-  int i;
+  int i, j;
   struct port outport;
   struct ldpfunc2_userdata ud;
   struct timeval tv1;
@@ -206,21 +206,29 @@ static void *rx_func(void *userdata)
     }
 
     struct ldp_packet pkts[1000];
+    struct ldp_packet pkts2[1000];
     int num;
 
     num = ldp_in_nextpkts(dlinq[args->idx], pkts, sizeof(pkts)/sizeof(*pkts));
     
+    j = 0;
     for (i = 0; i < num; i++)
     {
-      struct packet *pktstruct;
-      pktstruct = ll_alloc_st(&st, packet_size(0));
-      pktstruct->data = pkts[i].data;
-      pktstruct->direction = PACKET_DIRECTION_UPLINK;
-      pktstruct->sz = pkts[i].sz;
+      struct packet pktstruct;
+      //pktstruct = ll_alloc_st(&st, packet_size(0));
+      pktstruct.data = pkts[i].data;
+      pktstruct.direction = PACKET_DIRECTION_UPLINK;
+      pktstruct.sz = pkts[i].sz;
 
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+      if (uplink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
       {
-        ll_free_st(&st, pktstruct);
+        //ll_free_st(&st, pktstruct);
+      }
+      else
+      {
+        pkts2[j].data = pktstruct.data;
+        pkts2[j].sz = pktstruct.sz;
+        j++;
       }
       periodic.ulpkts++;
       periodic.ulbytes += pkts[i].sz;
@@ -241,20 +249,28 @@ static void *rx_func(void *userdata)
         }
       }
     }
+    ldp_out_inject(uloutq[args->idx], pkts2, j);
 
     num = ldp_in_nextpkts(ulinq[args->idx], pkts, sizeof(pkts)/sizeof(*pkts));
     
+    j = 0;
     for (i = 0; i < num; i++)
     {
-      struct packet *pktstruct;
-      pktstruct = ll_alloc_st(&st, packet_size(0));
-      pktstruct->data = pkts[i].data;
-      pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-      pktstruct->sz = pkts[i].sz;
+      struct packet pktstruct;
+      //pktstruct = ll_alloc_st(&st, packet_size(0));
+      pktstruct.data = pkts[i].data;
+      pktstruct.direction = PACKET_DIRECTION_DOWNLINK;
+      pktstruct.sz = pkts[i].sz;
 
-      if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+      if (downlink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
       {
-        ll_free_st(&st, pktstruct);
+        //ll_free_st(&st, pktstruct);
+      }
+      else
+      {
+        pkts2[j].data = pktstruct.data;
+        pkts2[j].sz = pktstruct.sz;
+        j++;
       }
       periodic.dlpkts++;
       periodic.dlbytes += pkts[i].sz;
@@ -275,6 +291,7 @@ static void *rx_func(void *userdata)
         }
       }
     }
+    ldp_out_inject(dloutq[args->idx], pkts2, j);
   }
   ll_alloc_st_free(&st);
   log_log(LOG_LEVEL_NOTICE, "RX", "exiting RX thread");

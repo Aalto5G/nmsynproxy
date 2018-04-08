@@ -120,7 +120,7 @@ static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
   struct ll_alloc_st st;
-  int i;
+  int i, j, k;
   struct port outport;
   struct odpfunc3_userdata ud;
   struct timeval tv1;
@@ -169,6 +169,8 @@ static void *rx_func(void *userdata)
     int try;
     unsigned from;
     odp_packet_t packets[PKTCNT];
+    odp_packet_t pkts2[PKTCNT];
+    odp_packet_t pkts3[PKTCNT];
     uint64_t wait;
     int num_rcvd;
 
@@ -223,23 +225,32 @@ static void *rx_func(void *userdata)
       }
       worker_local_wrunlock(args->local);
     }
+    j = 0;
+    k = 0;
     for (i = 0; i < num_rcvd; i++)
     {
-      struct packet *pktstruct;
+      struct packet pktstruct;
       char *pkt = odp_packet_data(packets[i]);
       size_t sz = odp_packet_len(packets[i]);
 
-      pktstruct = ll_alloc_st(&st, packet_size(sz));
-      pktstruct->data = packet_calc_data(pktstruct);
-      pktstruct->sz = sz;
-      memcpy(pktstruct->data, pkt, sz);
+      //pktstruct = ll_alloc_st(&st, packet_size(sz));
+      pktstruct.data = pkt;
+      pktstruct.sz = sz;
+      //memcpy(pktstruct.data, pkt, sz);
 
       if (from + inqidx != 1)
       {
-        pktstruct->direction = PACKET_DIRECTION_UPLINK;
-        if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+        pktstruct.direction = PACKET_DIRECTION_UPLINK;
+        if (uplink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
         {
-          ll_free_st(&st, pktstruct);
+          //ll_free_st(&st, pktstruct);
+          pkts3[k] = packets[i];
+          k++;
+        }
+        else
+        {
+          pkts2[j] = packets[i];
+          j++;
         }
         periodic.ulpkts++;
         periodic.ulbytes += sz;
@@ -262,10 +273,17 @@ static void *rx_func(void *userdata)
       }
       else
       {
-        pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-        if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+        pktstruct.direction = PACKET_DIRECTION_DOWNLINK;
+        if (downlink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
         {
-          ll_free_st(&st, pktstruct);
+          //ll_free_st(&st, pktstruct);
+          pkts3[k] = packets[i];
+          k++;
+        }
+        else
+        {
+          pkts2[j] = packets[i];
+          j++;
         }
         periodic.dlpkts++;
         periodic.dlbytes += sz;
@@ -287,7 +305,25 @@ static void *rx_func(void *userdata)
         }
       }
     }
-    odp_packet_free_multi(packets, num_rcvd);
+    if (from + inqidx != 1)
+    {
+      int num_sent = odp_pktout_send(uloutq[args->idx], pkts2, j);
+      if (num_sent < 0)
+      {
+        num_sent = 0;
+      }
+      odp_packet_free_multi(pkts2 + num_sent, j - num_sent);
+    }
+    else
+    {
+      int num_sent = odp_pktout_send(dloutq[args->idx], pkts2, j);
+      if (num_sent < 0)
+      {
+        num_sent = 0;
+      }
+      odp_packet_free_multi(pkts2 + num_sent, j - num_sent);
+    }
+    odp_packet_free_multi(pkts3, k);
   }
   ll_alloc_st_free(&st);
   odp_term_local();

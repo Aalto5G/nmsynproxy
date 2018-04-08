@@ -1279,7 +1279,7 @@ int downlink(
   }
   if (ether_type(ether) != ETHER_TYPE_IP && ether_type(ether) != ETHER_TYPE_IPV6)
   {
-    port->portfunc(pkt, port->userdata);
+    //port->portfunc(pkt, port->userdata);
     return 0;
   }
   ip = ether_payload(ether);
@@ -1305,12 +1305,12 @@ int downlink(
     }
     if (ip_proto(ip) != 6)
     {
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
     if (ip_frag_off(ip) >= 60)
     {
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
     else if (ip_frag_off(ip) != 0)
@@ -1361,7 +1361,7 @@ int downlink(
     }
     if (protocol != 6)
     {
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
     ihl = ((char*)ippay) - ((char*)ip);
@@ -1471,7 +1471,7 @@ int downlink(
           }
         }
         synproxy_hash_unlock(local, &ctx);
-        port->portfunc(pkt, port->userdata);
+        //port->portfunc(pkt, port->userdata);
         return 0;
       }
       if (entry->flag_state == FLAG_STATE_ESTABLISHED &&
@@ -1497,7 +1497,7 @@ int downlink(
           }
         }
         synproxy_hash_unlock(local, &ctx);
-        port->portfunc(pkt, port->userdata);
+        //port->portfunc(pkt, port->userdata);
         return 0;
       }
       if (entry->flag_state != FLAG_STATE_UPLINK_SYN_SENT)
@@ -1549,7 +1549,7 @@ int downlink(
         }
       }
       synproxy_hash_unlock(local, &ctx);
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
   }
@@ -1894,7 +1894,7 @@ int downlink(
     timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
     synproxy_hash_unlock(local, &ctx);
-    port->portfunc(pkt, port->userdata);
+    //port->portfunc(pkt, port->userdata);
     return 0;
   }
   if (   tcp_ack(ippay)
@@ -2093,7 +2093,7 @@ int downlink(
     }
   }
   tcp_adjust_tsecho_cksum_update(ippay, &hdrs, -entry->tsoffset);
-  port->portfunc(pkt, port->userdata);
+  //port->portfunc(pkt, port->userdata);
   if (todelete)
   {
     worker_local_wrlock(local);
@@ -2150,7 +2150,7 @@ int uplink(
   }
   if (ether_type(ether) != ETHER_TYPE_IP && ether_type(ether) != ETHER_TYPE_IPV6)
   {
-    port->portfunc(pkt, port->userdata);
+    //port->portfunc(pkt, port->userdata);
     return 0;
   }
   ip = ether_payload(ether);
@@ -2176,12 +2176,12 @@ int uplink(
     }
     if (ip_proto(ip) != 6)
     {
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
     if (ip_frag_off(ip) >= 60)
     {
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
     else if (ip_frag_off(ip) != 0)
@@ -2233,7 +2233,7 @@ int uplink(
     }
     if (protocol != 6)
     {
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       return 0;
     }
     ihl = ((char*)ippay) - ((char*)ip);
@@ -2288,7 +2288,7 @@ int uplink(
       {
         // retransmit of SYN
         synproxy_hash_unlock(local, &ctx);
-        port->portfunc(pkt, port->userdata);
+        //port->portfunc(pkt, port->userdata);
         return 0;
       }
       if (entry != NULL)
@@ -2353,7 +2353,7 @@ int uplink(
           tcp_set_mss_cksum_update(ippay, &tcpinfo, mss);
         }
       }
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       worker_local_wrlock(local);
       entry->timer.time64 = time64 + 120ULL*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
@@ -2550,7 +2550,7 @@ int uplink(
       entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       synproxy_hash_unlock(local, &ctx);
       return 0;
     }
@@ -2588,7 +2588,7 @@ int uplink(
       entry->timer.time64 = time64 + 86400ULL*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       synproxy_hash_unlock(local, &ctx);
       return 0;
     }
@@ -2648,7 +2648,7 @@ int uplink(
       entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
-      port->portfunc(pkt, port->userdata);
+      //port->portfunc(pkt, port->userdata);
       synproxy_hash_unlock(local, &ctx);
       return 0;
     }
@@ -2674,7 +2674,7 @@ int uplink(
     entry->timer.time64 = time64 + 45ULL*1000ULL*1000ULL;
     timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
-    port->portfunc(pkt, port->userdata);
+    //port->portfunc(pkt, port->userdata);
     synproxy_hash_unlock(local, &ctx);
     return 0;
   }
@@ -2865,7 +2865,7 @@ int uplink(
   }
   tcp_find_sack_ts_headers(ippay, &hdrs);
   tcp_adjust_tsval_cksum_update(ippay, &hdrs, entry->tsoffset);
-  port->portfunc(pkt, port->userdata);
+  //port->portfunc(pkt, port->userdata);
   if (todelete)
   {
     worker_local_wrlock(local);

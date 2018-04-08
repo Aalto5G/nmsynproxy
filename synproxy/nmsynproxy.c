@@ -198,7 +198,7 @@ static void *rx_func(void *userdata)
     }
     for (i = 0; i < 1000; i++)
     {
-      struct packet *pktstruct;
+      struct packet pktstruct;
       struct nm_pkthdr hdr;
       unsigned char *pkt;
       pkt = nm_nextpkt(dlnmds[args->idx], &hdr);
@@ -207,14 +207,19 @@ static void *rx_func(void *userdata)
         break;
       }
 
-      pktstruct = ll_alloc_st(&st, packet_size(0));
-      pktstruct->data = pkt;
-      pktstruct->direction = PACKET_DIRECTION_UPLINK;
-      pktstruct->sz = hdr.len;
+      //pktstruct = ll_alloc_st(&st, packet_size(0));
+      pktstruct.data = pkt;
+      pktstruct.direction = PACKET_DIRECTION_UPLINK;
+      pktstruct.sz = hdr.len;
 
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+      if (uplink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
       {
-        ll_free_st(&st, pktstruct);
+        //ll_free_st(&st, pktstruct);
+      }
+      else
+      {
+        //outpkts[j++] = pktstruct;
+        nm_my_inject(ulnmds[args->idx], pkt, hdr.len);
       }
       periodic.ulpkts++;
       periodic.ulbytes += hdr.len;
@@ -237,7 +242,7 @@ static void *rx_func(void *userdata)
     }
     for (i = 0; i < 1000; i++)
     {
-      struct packet *pktstruct;
+      struct packet pktstruct;
       struct nm_pkthdr hdr;
       unsigned char *pkt;
       pkt = nm_nextpkt(ulnmds[args->idx], &hdr);
@@ -246,14 +251,19 @@ static void *rx_func(void *userdata)
         break;
       }
 
-      pktstruct = ll_alloc_st(&st, packet_size(0));
-      pktstruct->data = pkt;
-      pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-      pktstruct->sz = hdr.len;
+      //pktstruct = ll_alloc_st(&st, packet_size(0));
+      pktstruct.data = pkt;
+      pktstruct.direction = PACKET_DIRECTION_DOWNLINK;
+      pktstruct.sz = hdr.len;
 
-      if (downlink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
+      if (downlink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
       {
-        ll_free_st(&st, pktstruct);
+        //ll_free_st(&st, pktstruct);
+      }
+      else
+      {
+        //outpkts[j++] = pktstruct;
+        nm_my_inject(ulnmds[args->idx], pkt, hdr.len);
       }
       periodic.dlpkts++;
       periodic.dlbytes += hdr.len;
