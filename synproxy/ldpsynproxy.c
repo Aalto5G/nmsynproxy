@@ -455,15 +455,21 @@ int main(int argc, char **argv)
     uloutq[i] = ulintf->outq[i];
   }
   
-  if (ldp_interface_link_wait(dlintf) != 0)
+  if (strncmp(argv[optind+0], "pcap:", 5) != 0)
   {
-    log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 0]);
-    exit(1);
+    if (ldp_interface_link_wait(dlintf) != 0)
+    {
+      log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 0]);
+      exit(1);
+    }
   }
-  if (ldp_interface_link_wait(ulintf) != 0)
+  if (strncmp(argv[optind+1], "pcap:", 5) != 0)
   {
-    log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 1]);
-    exit(1);
+    if (ldp_interface_link_wait(ulintf) != 0)
+    {
+      log_log(LOG_LEVEL_CRIT, "LDPPROXY", "link %s not up", argv[optind + 1]);
+      exit(1);
+    }
   }
 
   worker_local_init(&local, &synproxy, 0, 1);
@@ -524,7 +530,11 @@ int main(int argc, char **argv)
       pthread_setaffinity_np(rx[i], sizeof(cpuset), &cpuset);
     }
   }
-  sleep(1);
+  if (strncmp(argv[optind+0], "pcap:", 5) != 0 ||
+      strncmp(argv[optind+1], "pcap:", 5) != 0)
+  {
+    sleep(1);
+  }
   ldp_interface_set_promisc_mode(ulintf, 1);
   ldp_interface_set_promisc_mode(dlintf, 1);
   if (getuid() == 0 && conf.gid != 0)
