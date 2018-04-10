@@ -1873,6 +1873,12 @@ int downlink(
     else
     {
       uint32_t seq = tcp_seq_number(ippay);
+      if (tcp_ack(ippay) && entry->flag_state == FLAG_STATE_RESETED)
+      {
+        // Don't spam the log in this common case
+        synproxy_hash_unlock(local, &ctx);
+        return 1;
+      }
       if (!rst_is_valid(seq, entry->wan_sent) &&
           !rst_is_valid(seq, entry->lan_acked))
       {
