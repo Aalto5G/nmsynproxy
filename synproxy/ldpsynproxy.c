@@ -156,6 +156,11 @@ static void *rx_func(void *userdata)
     uint32_t timeout;
     struct pollfd pfds[2];
 
+    if (ldp_in_eof(dlinq[args->idx]) && ldp_in_eof(ulinq[args->idx]))
+    {
+      break;
+    }
+
     pfds[0].fd = dlinq[args->idx]->fd;
     pfds[0].events = POLLIN;
     pfds[1].fd = ulinq[args->idx]->fd;
@@ -544,7 +549,7 @@ int main(int argc, char **argv)
   {
     pthread_join(rx[i], NULL);
   }
-  pthread_join(sigthr, NULL);
+  //pthread_join(sigthr, NULL);
   if (write(pipefd[1], "X", 1) != 1)
   {
     log_log(LOG_LEVEL_WARNING, "LDPPROXY", "pipe write failed");
