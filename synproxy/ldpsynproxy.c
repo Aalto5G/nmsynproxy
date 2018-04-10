@@ -21,6 +21,7 @@
 #include "linkcommon.h"
 
 atomic_int exit_threads = 0;
+int numpkts = 0;
 
 static void *signal_handler_thr(void *arg)
 {
@@ -119,6 +120,7 @@ static void *rx_func(void *userdata)
   struct rx_args *args = userdata;
   struct ll_alloc_st st;
   int i, j;
+  uint64_t pktnum = 1;
   struct port outport;
   struct ldpfunc2_userdata ud;
   struct timeval tv1;
@@ -224,6 +226,10 @@ static void *rx_func(void *userdata)
       pktstruct.data = pkts[i].data;
       pktstruct.direction = PACKET_DIRECTION_UPLINK;
       pktstruct.sz = pkts[i].sz;
+      if (numpkts)
+      {
+        printf("pkt %llu\n", (unsigned long long)(pktnum++));
+      }
 
       if (uplink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
       {
@@ -266,6 +272,10 @@ static void *rx_func(void *userdata)
       pktstruct.data = pkts[i].data;
       pktstruct.direction = PACKET_DIRECTION_DOWNLINK;
       pktstruct.sz = pkts[i].sz;
+      if (numpkts)
+      {
+        printf("pkt %llu\n", (unsigned long long)(pktnum++));
+      }
 
       if (downlink(args->synproxy, args->local, &pktstruct, &outport, time64, &st))
       {
@@ -347,7 +357,7 @@ int main(int argc, char **argv)
   hash_seed_init();
   setlinebuf(stdout);
 
-  while ((opt = getopt(argc, argv, "i:o:l:w:")) != -1)
+  while ((opt = getopt(argc, argv, "i:o:l:w:n")) != -1)
   {
     switch (opt)
     {
@@ -363,8 +373,11 @@ int main(int argc, char **argv)
       case 'w':
         wanname = optarg;
         break;
+      case 'n':
+        numpkts = 1;
+        break;
       default:
-        log_log(LOG_LEVEL_CRIT, "LDPPROXY", "usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] vale0:1 vale1:1", argv[0]);
+        log_log(LOG_LEVEL_CRIT, "LDPPROXY", "usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] [-n] vale0:1 vale1:1", argv[0]);
         exit(1);
         break;
     }
@@ -372,7 +385,7 @@ int main(int argc, char **argv)
 
   if (argc != optind + 2)
   {
-    log_log(LOG_LEVEL_CRIT, "LDPPROXY", "usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] vale0:1 vale1:1", argv[0]);
+    log_log(LOG_LEVEL_CRIT, "LDPPROXY", "usage: %s [-i in.pcapng] [-o out.pcapng] [-l lan.pcapng] [-w wan.pcapng] [-n] vale0:1 vale1:1", argv[0]);
     exit(1);
   }
   if (inname != NULL)
