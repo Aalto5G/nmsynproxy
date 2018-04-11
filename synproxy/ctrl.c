@@ -59,6 +59,8 @@ void *ctrl_func(void *userdata)
     log_log(LOG_LEVEL_ERR, "CTRL", "setting SO_REUSEADDR failed for IPv6");
     abort();
   }
+  memset(&sin6, 0, sizeof(sin6));
+  memset(&sin, 0, sizeof(sin));
   sin6.sin6_family = AF_INET6;
   memcpy(&sin6.sin6_addr, &in6addr_any, sizeof(sin6.sin6_addr));
   sin6.sin6_port = htons(args->synproxy->conf->port);
