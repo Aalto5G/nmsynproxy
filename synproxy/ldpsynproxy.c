@@ -177,8 +177,8 @@ static void *rx_func(void *userdata)
     }
     worker_local_rdunlock(args->local);
 
-    ldp_in_deallocate_all(dlinq[args->idx]);
-    ldp_in_deallocate_all(ulinq[args->idx]);
+    //ldp_in_deallocate_all(dlinq[args->idx]);
+    //ldp_in_deallocate_all(ulinq[args->idx]);
     timeout = (expiry > time64 ? (999 + expiry - time64)/1000 : 0);
     if (timeout > 0)
     {
@@ -263,7 +263,7 @@ static void *rx_func(void *userdata)
       }
     }
     ldp_out_inject(uloutq[args->idx], pkts2, j);
-    //ldp_in_deallocate_some(dlinq[args->idx], pkts, num);
+    ldp_in_deallocate_some(dlinq[args->idx], pkts, num);
 
     num = ldp_in_nextpkts(ulinq[args->idx], pkts, sizeof(pkts)/sizeof(*pkts));
     
@@ -310,7 +310,7 @@ static void *rx_func(void *userdata)
       }
     }
     ldp_out_inject(dloutq[args->idx], pkts2, j);
-    //ldp_in_deallocate_some(ulinq[args->idx], pkts, num);
+    ldp_in_deallocate_some(ulinq[args->idx], pkts, num);
   }
   ll_alloc_st_free(&st);
   log_log(LOG_LEVEL_NOTICE, "RX", "exiting RX thread");
