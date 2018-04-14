@@ -1,7 +1,8 @@
 # nmsynproxy
 
-nmsynproxy is a Linux user space TCP SYN proxy for IPv4 using netmap. IPv6 is
-not currently supported, but may be supported in the future.
+nmsynproxy is a Linux user space TCP SYN proxy for IPv4 and IPv6 using netmap,
+OpenDataPlane (ODP) or L Data Plane (LDP). The recommened variant today is the
+LDP variant.
 
 The SYN proxy makes hybrid use of SYN cookies and SYN cache. It also makes
 hybrid use of TCP sequence numbers and TCP timestamp option. The SYN cookie
@@ -13,7 +14,10 @@ uses SYN cookies.
 
 Multithreading is supported, provided that the network interface card (NIC) has
 multiple queues. Actually, the NIC queue count needs to be adjusted to the same
-number as the number of threads before starting up nmsynproxy.
+number as the number of threads before starting up nmsynproxy or ldpsynproxy.
+The ODP version, odpsynproxy, has somewhat more tolerance for different input
+queue counts, but even then performance can suffer if the NIC input queue count
+is not adjusted properly.
 
 Performance should be great. With any recent good CPU, even as few as three
 threads should achieve 40 Gbps link saturation when transferring large files.
@@ -25,13 +29,15 @@ prefix). For highest performance, either nmsynproxy or the `netmap:` prefixed
 use of ldpsynproxy is required. This requires netmap to compile the sources and
 also the netmap kernel module must be installed.
 
+An experimental ODP version, odpsynproxy, is also provided.
+
 # Prerequisites
 
 You need to have flex and bison installed in order to compile this project.
 Also, needless to say, compiler tools and GNU make must be available. To
 actually communicate with real network interfaces, you also need netmap for the
 highest performance possible, but more on that later. If low performance is
-enough, ldpsynproxy can be used instead of nmsynproxy.
+enough, ldpsynproxy can be used instead of nmsynproxy in the socket mode.
 
 Also, pptk submodule must be initialized and updated.
 
