@@ -275,18 +275,54 @@ static inline void synproxy_hash_unlock(
   }
 }
 
+static inline int ipmemequal(const void *a, const void *b, size_t sz)
+{
+  if (sz == 4)
+  {
+    return hdr_get32h(a) == hdr_get32h(b);
+  }
+  else if (sz == 16)
+  {
+    const char *ap = a, *bp = b;
+    if (hdr_get32h(ap) != hdr_get32h(bp))
+    {
+      return 0;
+    }
+    if (hdr_get32h(ap+4) != hdr_get32h(bp+4))
+    {
+      return 0;
+    }
+    if (hdr_get32h(ap+8) != hdr_get32h(bp+8))
+    {
+      return 0;
+    }
+    if (hdr_get32h(ap+12) != hdr_get32h(bp+12))
+    {
+      return 0;
+    }
+    return 1;
+  }
+  else
+  {
+    abort();
+  }
+}
+
 static inline struct synproxy_hash_entry *synproxy_hash_get(
   struct worker_local *local, int version,
   const void *local_ip, uint16_t local_port, const void *remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
 {
   struct hash_list_node *node;
+  int len;
   if (version == 4)
   {
     ctx->hashval = synproxy_hash_separate4(hdr_get32n(local_ip), local_port, hdr_get32n(remote_ip), remote_port);
+    len = 4;
   }
   else
   {
     ctx->hashval = synproxy_hash_separate6(local_ip, local_port, remote_ip, remote_port);
+    len = 16;
   }
   if (!ctx->locked)
   {
@@ -298,9 +334,9 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
     struct synproxy_hash_entry *entry;
     entry = CONTAINER_OF(node, struct synproxy_hash_entry, node);
     if (   entry->version == version
-        && memcmp(&entry->local_ip, local_ip, (version == 4) ? 4 : 16) == 0
+        && ipmemequal(&entry->local_ip, local_ip, len)
         && entry->local_port == local_port
-        && memcmp(&entry->remote_ip, remote_ip, (version == 4) ? 4 : 16) == 0
+        && ipmemequal(&entry->remote_ip, remote_ip, len)
         && entry->remote_port == remote_port)
     {
       //ctx->entry = entry;
