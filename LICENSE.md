@@ -1,6 +1,8 @@
-Copyright (c) 2017-2018 Juha-Matti Tilli
+Copyright (c) 2017-2018 Aalto University
 
-Copyright (c) 2018 Aalto University (some portions done at or after 22.2.2018).
+Authors:
+- Juha-Matti Tilli (copyright to Aalto University transferred on 19.4.2018)
+- Jesus Llorente Santos (Python c-plane only, copyright transfer on 19.4.2018)
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
