@@ -158,14 +158,8 @@ static void *rx_func(void *userdata)
       pktstruct->sz = sizeof(ctx[i].pkt);
       pktstruct->data = packet_calc_data(pktstruct);
       memcpy(pktstruct->data, ctx[i].pkt, sizeof(ctx[i].pkt));
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
-      {
-        ll_free_st(&st, pktstruct);
-      }
-      else
-      {
-        ll_free_st(&st, pktstruct);
-      }
+      uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st);
+      ll_free_st(&st, pktstruct);
       count++;
       periodic(count, &tv1);
   
@@ -175,14 +169,8 @@ static void *rx_func(void *userdata)
       pktstruct->sz = sizeof(ctx[i].pkt);
       pktstruct->data = packet_calc_data(pktstruct);
       memcpy(pktstruct->data, ctx[i].pkt, sizeof(ctx[i].pkt));
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
-      {
-        ll_free_st(&st, pktstruct);
-      }
-      else
-      {
-        ll_free_st(&st, pktstruct);
-      }
+      uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st);
+      ll_free_st(&st, pktstruct);
       count++;
       periodic(count, &tv1);
   
@@ -191,14 +179,8 @@ static void *rx_func(void *userdata)
       pktstruct->sz = sizeof(ctx[i].pktsmall);
       pktstruct->data = packet_calc_data(pktstruct);
       memcpy(pktstruct->data, ctx[i].pktsmall, sizeof(ctx[i].pktsmall));
-      if (uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st))
-      {
-        ll_free_st(&st, pktstruct);
-      }
-      else
-      {
-        ll_free_st(&st, pktstruct);
-      }
+      uplink(args->synproxy, args->local, pktstruct, &outport, time64, &st);
+      ll_free_st(&st, pktstruct);
       count++;
       periodic(count, &tv1);
     }
