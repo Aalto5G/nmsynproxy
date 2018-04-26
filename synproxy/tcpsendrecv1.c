@@ -6,6 +6,7 @@
 #include "ipcksum.h"
 #include "packet.h"
 #include "net/netmap_user.h"
+#include "netmapcommon.h"
 #include "mypcapng.h"
 #include "time64.h"
 #include "murmur.h"
@@ -37,29 +38,6 @@ static void *signal_handler_thr(void *arg)
   sigwait(&set, &sig);
   atomic_store(&exit_threads, 1);
   return NULL;
-}
-
-static inline void nm_my_inject(struct nm_desc *nmd, void *data, size_t sz)
-{
-  int i, j;
-  for (i = 0; i < 2; i++)
-  {
-    for (j = 0; j < 2; j++)
-    {
-      if (nm_inject(nmd, data, sz) == 0)
-      {
-        struct pollfd pollfd;
-        pollfd.fd = nmd->fd;
-        pollfd.events = POLLOUT;
-        poll(&pollfd, 1, 0);
-      }
-      else
-      {
-        return;
-      }
-    }
-    ioctl(nmd->fd, NIOCTXSYNC, NULL);
-  }
 }
 
 struct thr_arg {
