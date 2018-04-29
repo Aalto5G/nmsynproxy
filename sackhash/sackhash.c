@@ -29,15 +29,15 @@ ipport_form6(struct ipport *ipport, const void *ip, uint16_t port)
 static inline int
 ipport_equals(const struct ipport *ipport1, const struct ipport *ipport2)
 {
-  if (ipport2->ipport1 != ipport2->ipport1)
+  if (ipport1->ipport1 != ipport2->ipport1)
   {
     return 0;
   }
-  if (ipport2->ipport2 != ipport2->ipport2)
+  if (ipport1->ipport2 != ipport2->ipport2)
   {
     return 0;
   }
-  if (ipport2->ipport3 != ipport2->ipport3)
+  if (ipport1->ipport3 != ipport2->ipport3)
   {
     return 0;
   }
