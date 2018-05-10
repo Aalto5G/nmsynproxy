@@ -41,7 +41,8 @@ CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) 
 
 MAKEFILES_SYNPROXY := $(DIRSYNPROXY)/module.mk
 
-LIBS_SYNPROXY := $(DIRSACKHASH)/libsackhash.a $(DIRIPHASH)/libiphash.a $(DIRDYNARR)/libdynarr.a $(DIRALLOC)/liballoc.a $(DIRIPHDR)/libiphdr.a $(DIRHASHTABLE)/libhashtable.a $(DIRHASHLIST)/libhashlist.a $(DIRTIMERLINKHEAP)/libtimerlinkheap.a $(DIRMISC)/libmisc.a $(DIRTHREETUPLE)/libthreetuple.a $(DIRDATABUF)/libdatabuf.a $(DIRNETMAP)/libnetmap.a $(DIRLOG)/liblog.a $(DIRLDP)/libldp.a $(DIRPORTS)/libports.a $(DIRMYPCAP)/libmypcap.a
+#LIBS_SYNPROXY := $(DIRSACKHASH)/libsackhash.a $(DIRIPHASH)/libiphash.a $(DIRDYNARR)/libdynarr.a $(DIRALLOC)/liballoc.a $(DIRIPHDR)/libiphdr.a $(DIRHASHTABLE)/libhashtable.a $(DIRHASHLIST)/libhashlist.a $(DIRTIMERLINKHEAP)/libtimerlinkheap.a $(DIRMISC)/libmisc.a $(DIRTHREETUPLE)/libthreetuple.a $(DIRDATABUF)/libdatabuf.a $(DIRNETMAP)/libnetmap.a $(DIRLOG)/liblog.a $(DIRLDP)/libldp.a $(DIRPORTS)/libports.a $(DIRMYPCAP)/libmypcap.a
+LIBS_SYNPROXY := $(DIRSACKHASH)/libsackhash.a $(DIRTHREETUPLE)/libthreetuple.a $(DIRLIBPPTK)/libpptk.a
 
 .PHONY: SYNPROXY clean_SYNPROXY distclean_SYNPROXY unit_SYNPROXY $(LCSYNPROXY) clean_$(LCSYNPROXY) distclean_$(LCSYNPROXY) unit_$(LCSYNPROXY)
 

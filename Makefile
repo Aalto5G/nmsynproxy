@@ -79,6 +79,58 @@ DIRLDP := pptk/ldp
 LCLDP := ldp
 MODULES += LDP
 
+DIRLIBPPTK := pptk/libpptk
+LCLIBPPTK := libpptk
+MODULES += LIBPPTK
+
+DIRARP := pptk/arp
+LCARP := arp
+INCLUDES += ARP
+
+DIRRBTREE := pptk/rbtree
+LCRBTREE := rbtree
+INCLUDES += RBTREE
+
+DIRAVLTREE := pptk/avltree
+LCAVLTREE := avltree
+INCLUDES += AVLTREE
+
+DIRIPFRAG := pptk/ipfrag
+LCIPFRAG := ipfrag
+INCLUDES += IPFRAG
+
+DIRPORTLIST := pptk/portlist
+LCPORTLIST := portlist
+INCLUDES += PORTLIST
+
+DIRQUEUE := pptk/queue
+LCQUEUE := queue
+INCLUDES += QUEUE
+
+DIRRANDOM := pptk/random
+LCRANDOM := random
+INCLUDES += RANDOM
+
+DIRTIMERAVL := pptk/timeravl
+LCTIMERAVL := timeravl
+INCLUDES += TIMERAVL
+
+DIRTIMERRB := pptk/timerrb
+LCTIMERRB := timerrb
+INCLUDES += TIMERRB
+
+DIRTIMERSKIPLIST := pptk/timerskiplist
+LCTIMERSKIPLIST := timerskiplist
+INCLUDES += TIMERSKIPLIST
+
+DIRTIMERWHEEL := pptk/timerwheel
+LCTIMERWHEEL := timerwheel
+INCLUDES += TIMERWHEEL
+
+DIRTUNTAP := pptk/tuntap
+LCTUNTAP := tuntap
+INCLUDES += TUNTAP
+
 CFLAGS := -g -O2 -Wall -Wextra -Wno-missing-field-initializers -Wno-unused-parameter -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith -Werror -std=gnu11 -fPIC
 
 .PHONY: all clean distclean unit
@@ -98,6 +150,8 @@ LIBS_ODPDEP=/usr/lib/x86_64-linux-gnu/libssl.a /usr/lib/x86_64-linux-gnu/libcryp
 include opts.mk
 
 $(foreach module,$(MODULES),$(eval \
+    include $(DIR$(module))/module.mk))
+$(foreach module,$(INCLUDES),$(eval \
     include $(DIR$(module))/module.mk))
 
 opts.mk:
