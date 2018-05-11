@@ -14,10 +14,10 @@ uses SYN cookies.
 
 Multithreading is supported, provided that the network interface card (NIC) has
 multiple queues. Actually, the NIC queue count needs to be adjusted to the same
-number as the number of threads before starting up nmsynproxy or ldpsynproxy.
-The ODP version, odpsynproxy, has somewhat more tolerance for different input
-queue counts, but even then performance can suffer if the NIC input queue count
-is not adjusted properly.
+number as the number of threads before starting up nmsynproxy (ldpsynproxy does
+it automatically). The ODP version, odpsynproxy, has somewhat more tolerance
+for different input queue counts, but even then performance can suffer if the
+NIC input queue count is not adjusted properly.
 
 Performance should be great. With any recent good CPU, even as few as three
 threads should achieve 40 Gbps link saturation when transferring large files.
@@ -227,6 +227,14 @@ do instead:
 ...but note that in this variant, you must before remove any assigned addresses
 from the eth0 and eth1 interfaces.
 
+You can also use ldpsynproxy in netmap mode:
+```
+./synproxy/ldpsynproxy netmap:eth0 netmap:eth1
+```
+
+In this case, you don't have to do the cumbersome offload, queue count and
+promiscuous mode adjustments, as LDP does it automatically.
+
 # Testing with network namespaces
 
 Execute:
@@ -262,6 +270,11 @@ Then run in one terminal window and leave it running:
 Or you may alternatively run:
 ```
 ./synproxy/ldpsynproxy veth1 veth2
+```
+
+Or even:
+```
+./synproxy/ldpsynproxy netmap:veth1 netmap:veth2
 ```
 
 Verify that ping works to both directions:
