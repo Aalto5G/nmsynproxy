@@ -45,6 +45,6 @@ clean_THREETUPLE:
 	rm -f $(THREETUPLE_OBJ) $(THREETUPLE_DEP)
 
 distclean_THREETUPLE: clean_THREETUPLE
-	rm -f $(DIRTHREETUPLE)/libthreetuple.a $(DIRTHREETUPLE)/threetuple
+	rm -f $(DIRTHREETUPLE)/libthreetuple.a $(DIRTHREETUPLE)/threetupletest
 
 -include $(DIRTHREETUPLE)/*.d

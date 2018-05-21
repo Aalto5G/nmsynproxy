@@ -157,6 +157,6 @@ clean_SYNPROXY:
 	rm -f $(DIRSYNPROXY)/conf.tab.h
 
 distclean_SYNPROXY: clean_SYNPROXY
-	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/nmssynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1 $(DIRSYNPROXY)/ctrlperf
+	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1 $(DIRSYNPROXY)/ctrlperf $(DIRSYNPROXY)/ldpsynproxy $(DIRSYNPROXY)/odpsynproxy
 
 -include $(DIRSYNPROXY)/*.d
