@@ -1,5 +1,5 @@
 SYNPROXY_SRC_LIB := synproxy.c yyutils.c secret.c ctrl.c
-SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c tcpsendrecv.c tcpsendrecv1.c ctrlperf.c odpsynproxy.c ldpsynproxy.c
+SYNPROXY_SRC := $(SYNPROXY_SRC_LIB) workeronlyperf.c nmsynproxy.c netmapsend.c secrettest.c conftest.c pcapngworkeronly.c unittest.c sizeof.c tcpsendrecv.c tcpsendrecv1.c ctrlperf.c odpsynproxy.c ldpsynproxy.c ldpsend.c
 
 SYNPROXY_LEX_LIB := conf.l
 SYNPROXY_LEX := $(SYNPROXY_LEX_LIB)
@@ -63,6 +63,7 @@ CFLAGS_SYNPROXY += -I$(ODP_DIR)/include
 LIBS_SYNPROXY_ODP := $(ODP_DIR)/lib/libodp-linux.a $(LIBS_ODPDEP)
 endif
 SYNPROXY: $(DIRSYNPROXY)/ldpsynproxy
+SYNPROXY: $(DIRSYNPROXY)/ldpsend
 
 unit_SYNPROXY: $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/unittest
 	$(DIRSYNPROXY)/workeronlyperf
@@ -83,6 +84,9 @@ $(DIRSYNPROXY)/odpsynproxy: $(DIRSYNPROXY)/odpsynproxy.o $(DIRSYNPROXY)/libsynpr
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) -lpthread -lrt -ldl
 
 $(DIRSYNPROXY)/ldpsynproxy: $(DIRSYNPROXY)/ldpsynproxy.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
+	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) $(LDFLAGS_LDP) -lpthread -ldl
+
+$(DIRSYNPROXY)/ldpsend: $(DIRSYNPROXY)/ldpsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(CFLAGS_SYNPROXY) $(LDFLAGS_LDP) -lpthread -ldl
 
 $(DIRSYNPROXY)/netmapsend: $(DIRSYNPROXY)/netmapsend.o $(DIRSYNPROXY)/libsynproxy.a $(LIBS_SYNPROXY) $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
@@ -157,6 +161,6 @@ clean_SYNPROXY:
 	rm -f $(DIRSYNPROXY)/conf.tab.h
 
 distclean_SYNPROXY: clean_SYNPROXY
-	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1 $(DIRSYNPROXY)/ctrlperf $(DIRSYNPROXY)/ldpsynproxy $(DIRSYNPROXY)/odpsynproxy
+	rm -f $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/secrettest $(DIRSYNPROXY)/conftest $(DIRSYNPROXY)/pcapngworkeronly $(DIRSYNPROXY)/unittest $(DIRSYNPROXY)/sizeof $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1 $(DIRSYNPROXY)/ctrlperf $(DIRSYNPROXY)/ldpsynproxy $(DIRSYNPROXY)/odpsynproxy $(DIRSYNPROXY)/ldpsend
 
 -include $(DIRSYNPROXY)/*.d
