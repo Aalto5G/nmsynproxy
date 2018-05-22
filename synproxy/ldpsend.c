@@ -55,6 +55,7 @@ static inline void maybe_clear(struct ldp_out_queue *outq,
     return;
   }
   ldp_out_inject(outq, pkt_tbl, *cnt);
+  ldp_out_txsync(outq);
   *cnt = 0;
 }
 
