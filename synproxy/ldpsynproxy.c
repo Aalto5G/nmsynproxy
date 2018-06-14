@@ -27,6 +27,7 @@ static void *signal_handler_thr(void *arg)
 {
   sigset_t set;
   int sig;
+  char *signam = "";
   sigemptyset(&set);
   sigaddset(&set, SIGINT);
   sigaddset(&set, SIGPIPE);
@@ -36,7 +37,31 @@ static void *signal_handler_thr(void *arg)
   sigaddset(&set, SIGUSR2);
   sigaddset(&set, SIGALRM);
   sigwait(&set, &sig);
+  switch (sig) {
+    case SIGINT:
+      signam = "SIGINT";
+      break;
+    case SIGPIPE:
+      signam = "SIGPIPE";
+      break;
+    case SIGHUP:
+      signam = "SIGHUP";
+      break;
+    case SIGTERM:
+      signam = "SIGTERM";
+      break;
+    case SIGUSR1:
+      signam = "SIGUSR1";
+      break;
+    case SIGUSR2:
+      signam = "SIGUSR2";
+      break;
+    case SIGALRM:
+      signam = "SIGALRM";
+      break;
+  }
   atomic_store(&exit_threads, 1);
+  log_log(LOG_LEVEL_CRIT, "LDPPROXY", "Got signal %s", signam);
   return NULL;
 }
 
