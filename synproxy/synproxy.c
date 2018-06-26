@@ -367,7 +367,7 @@ static inline int resend_request_is_valid(uint32_t seq, uint32_t ref_seq)
 // caller must not have worker_local lock
 // caller must not have bucket lock
 static void synproxy_expiry_fn(
-  struct timer_link *timer, struct timer_linkheap *heap, void *ud)
+  struct timer_link *timer, struct timer_linkheap *heap, void *ud, void *td)
 {
   struct worker_local *local = ud;
   struct synproxy_hash_entry *e;

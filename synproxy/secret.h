@@ -25,7 +25,7 @@ void secret_init_random(struct secretinfo *info);
 void revolve_secret_impl(struct secretinfo *info);
 
 void revolve_secret(
-  struct timer_link *timer, struct timer_linkheap *heap, void *ud);
+  struct timer_link *timer, struct timer_linkheap *heap, void *ud, void *td);
 
 int verify_cookie(
   struct secretinfo *info,
