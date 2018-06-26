@@ -53,7 +53,7 @@ void revolve_secret_impl(struct secretinfo *info)
 }
 
 void revolve_secret(
-  struct timer_link *timer, struct timer_linkheap *heap, void *ud)
+  struct timer_link *timer, struct timer_linkheap *heap, void *ud, void *td)
 {
   struct secretinfo *info = ud;
   revolve_secret_impl(info);

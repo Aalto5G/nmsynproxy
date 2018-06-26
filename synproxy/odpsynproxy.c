@@ -220,7 +220,7 @@ static void *rx_func(void *userdata)
         struct timer_link *timer = timer_linkheap_next_expiry_timer(&args->local->timers);
         timer_linkheap_remove(&args->local->timers, timer);
         worker_local_wrunlock(args->local);
-        timer->fn(timer, &args->local->timers, timer->userdata);
+        timer->fn(timer, &args->local->timers, timer->userdata, NULL);
         worker_local_wrlock(args->local);
       }
       worker_local_wrunlock(args->local);

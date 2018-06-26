@@ -97,7 +97,7 @@ static void *rx_func(void *userdata)
       struct timer_link *timer = timer_linkheap_next_expiry_timer(&args->local->timers);
       //printf("EXECUTING TIMER\n");
       timer_linkheap_remove(&args->local->timers, timer);
-      timer->fn(timer, &args->local->timers, timer->userdata);
+      timer->fn(timer, &args->local->timers, timer->userdata, NULL);
     }
     printf("pkt %zu\n", ++cnt);
     if (snap != len)
