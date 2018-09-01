@@ -1,5 +1,7 @@
 Copyright (c) 2017-2018 Aalto University
 
+Copyright (c) 2018 Juha-Matti Tilli
+
 Authors:
 - Juha-Matti Tilli (copyright to Aalto University transferred on 19.4.2018)
 - Jesus Llorente Santos (Python c-plane only, copyright transfer on 19.4.2018)
