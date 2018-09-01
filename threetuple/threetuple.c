@@ -161,6 +161,7 @@ int threetuplectx_modify(
     }
   }
   struct threetupleentry *e = malloc(sizeof(*e));
+  e->version = 4;
   e->ip.ipv4 = ip;
   e->port = port;
   e->proto = proto;
