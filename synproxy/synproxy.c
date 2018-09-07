@@ -9,16 +9,6 @@
 #define IPV6_FRAG_CUTOFF 512
 
 
-#define TCP_CONNECTED_TIMEOUT_SECS 86400 // 1 day
-#define TCP_ONE_FIN_TIMEOUT_SECS 7440 // 2 hours 4 minutes (RFC5382)
-#define TCP_BOTH_FIN_TIMEOUT_SECS 240 // 4 minutes (RFC5382)
-#define TCP_UPLINK_SYN_SENT_TIMEOUT_USEC 240 // 4 minutes (RFC5382)
-#define TCP_UPLINK_SYN_RCVD_TIMEOUT_SECS 240 // 4 minutes (RFC5382)
-#define TCP_DOWNLINK_HALF_OPEN_TIMEOUT_SECS 240 // 4 minutes (RFC5382)
-#define TCP_DOWNLINK_SYN_SENT_TIMEOUT_SECS 240 // 4 minutes (RFC5382)
-#define TCP_TIME_WAIT_TIMEOUT_SECS 120 // no RFC5382 restrictions here
-#define TCP_RESETED_TIMEOUT_SECS 45
-
 static inline uint32_t gen_flowlabel(const void *local_ip, uint16_t local_port,
                                      const void *remote_ip, uint16_t remote_port)
 {
@@ -467,7 +457,8 @@ struct synproxy_hash_entry *synproxy_hash_put(
   e->local_port = local_port;
   e->remote_port = remote_port;
   e->was_synproxied = was_synproxied;
-  e->timer.time64 = time64 + TCP_CONNECTED_TIMEOUT_SECS*1000ULL*1000ULL;
+  e->timer.time64 = time64 +
+    local->synproxy->conf->timeouts.connected*1000ULL*1000ULL;
   e->timer.fn = synproxy_expiry_fn;
   e->timer.userdata = local;
   worker_local_wrlock(local);
@@ -854,7 +845,7 @@ static void send_synack(
     e->remote_port = remote_port;
     e->was_synproxied = 1;
     e->timer.time64 = time64 +
-      TCP_DOWNLINK_HALF_OPEN_TIMEOUT_SECS*1000ULL*1000ULL;
+      synproxy->conf->timeouts.dl_half_open*1000ULL*1000ULL;
     e->timer.fn = synproxy_expiry_fn;
     e->timer.userdata = local;
     timer_linkheap_add(&local->timers, &e->timer);
@@ -1025,7 +1016,7 @@ static void resend_syn(
     entry->wan_max_window_unscaled = tcp_window(origtcp);
   }
   entry->timer.time64 = time64 +
-    TCP_DOWNLINK_SYN_SENT_TIMEOUT_SECS*1000ULL*1000ULL;
+    local->synproxy->conf->timeouts.dl_syn_sent*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
 
   send_or_resend_syn(orig, local, port, st, entry);
@@ -1093,7 +1084,7 @@ static void send_syn(
   entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1 + (!!was_keepalive);
   entry->flag_state = FLAG_STATE_DOWNLINK_SYN_SENT;
   entry->timer.time64 = time64 +
-    TCP_DOWNLINK_SYN_SENT_TIMEOUT_SECS*1000ULL*1000ULL;
+    local->synproxy->conf->timeouts.dl_syn_sent*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
 
   send_or_resend_syn(orig, local, port, st, entry);
@@ -1547,7 +1538,7 @@ int downlink(
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       worker_local_wrlock(local);
       entry->timer.time64 = time64 +
-        TCP_UPLINK_SYN_RCVD_TIMEOUT_SECS*1000ULL*1000ULL;
+        synproxy->conf->timeouts.ul_syn_rcvd*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
       if (synproxy->conf->mss_clamp_enabled)
@@ -1911,7 +1902,8 @@ int downlink(
     }
     entry->flag_state = FLAG_STATE_RESETED;
     worker_local_wrlock(local);
-    entry->timer.time64 = time64 + TCP_RESETED_TIMEOUT_SECS*1000ULL*1000ULL;
+    entry->timer.time64 = time64 +
+      synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
     timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
     synproxy_hash_unlock(local, &ctx);
@@ -2070,20 +2062,20 @@ int downlink(
   uint64_t next64;
   if (entry->flag_state == FLAG_STATE_RESETED)
   {
-    next64 = time64 + TCP_RESETED_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
   }
   else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
            (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    next64 = time64 + TCP_BOTH_FIN_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.both_fin*1000ULL*1000ULL;
   }
   else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
   {
-    next64 = time64 + TCP_ONE_FIN_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.one_fin*1000ULL*1000ULL;
   }
   else
   {
-    next64 = time64 + TCP_CONNECTED_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.connected*1000ULL*1000ULL;
   }
   if (abs(next64 - entry->timer.time64) >= 1000*1000)
   {
@@ -2118,7 +2110,8 @@ int downlink(
   if (todelete)
   {
     worker_local_wrlock(local);
-    entry->timer.time64 = time64 + TCP_TIME_WAIT_TIMEOUT_SECS*1000ULL*1000ULL;
+    entry->timer.time64 = time64 +
+      synproxy->conf->timeouts.time_wait*1000ULL*1000ULL;
     entry->flag_state = FLAG_STATE_TIME_WAIT;
     timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
@@ -2377,7 +2370,7 @@ int uplink(
       //port->portfunc(pkt, port->userdata);
       worker_local_wrlock(local);
       entry->timer.time64 = time64 +
-        TCP_UPLINK_SYN_SENT_TIMEOUT_USEC*1000ULL*1000ULL;
+        synproxy->conf->timeouts.ul_syn_sent*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
       synproxy_hash_unlock(local, &ctx);
@@ -2520,7 +2513,8 @@ int uplink(
       }
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       worker_local_wrlock(local);
-      entry->timer.time64 = time64 + TCP_CONNECTED_TIMEOUT_SECS*1000ULL*1000ULL;
+      entry->timer.time64 = time64 +
+        synproxy->conf->timeouts.connected*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
       send_ack_and_window_update(ether, entry, port, st);
@@ -2569,7 +2563,8 @@ int uplink(
       }
       entry->flag_state = FLAG_STATE_RESETED;
       worker_local_wrlock(local);
-      entry->timer.time64 = time64 + TCP_RESETED_TIMEOUT_SECS*1000ULL*1000ULL;
+      entry->timer.time64 = time64 +
+        synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
       //port->portfunc(pkt, port->userdata);
@@ -2607,7 +2602,8 @@ int uplink(
       entry->lan_max = ack + (window << entry->lan_wscale);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       worker_local_wrlock(local);
-      entry->timer.time64 = time64 + TCP_CONNECTED_TIMEOUT_SECS*1000ULL*1000ULL;
+      entry->timer.time64 = time64 +
+        synproxy->conf->timeouts.connected*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
       //port->portfunc(pkt, port->userdata);
@@ -2667,7 +2663,8 @@ int uplink(
         ippay, tcp_len, 0);
       entry->flag_state = FLAG_STATE_RESETED;
       worker_local_wrlock(local);
-      entry->timer.time64 = time64 + TCP_RESETED_TIMEOUT_SECS*1000ULL*1000ULL;
+      entry->timer.time64 = time64 +
+        synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
       timer_linkheap_modify(&local->timers, &entry->timer);
       worker_local_wrunlock(local);
       //port->portfunc(pkt, port->userdata);
@@ -2693,7 +2690,8 @@ int uplink(
       ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
     entry->flag_state = FLAG_STATE_RESETED;
     worker_local_wrlock(local);
-    entry->timer.time64 = time64 + TCP_RESETED_TIMEOUT_SECS*1000ULL*1000ULL;
+    entry->timer.time64 = time64 +
+      synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
     timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);
     //port->portfunc(pkt, port->userdata);
@@ -2842,20 +2840,20 @@ int uplink(
   uint64_t next64;
   if (entry->flag_state == FLAG_STATE_RESETED)
   {
-    next64 = time64 + TCP_RESETED_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
   }
   else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
            (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    next64 = time64 + TCP_BOTH_FIN_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.both_fin*1000ULL*1000ULL;
   }
   else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
   {
-    next64 = time64 + TCP_ONE_FIN_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.one_fin*1000ULL*1000ULL;
   }
   else
   {
-    next64 = time64 + TCP_CONNECTED_TIMEOUT_SECS*1000ULL*1000ULL;
+    next64 = time64 + synproxy->conf->timeouts.connected*1000ULL*1000ULL;
   }
   if (abs(next64 - entry->timer.time64) >= 1000*1000)
   {
@@ -2891,7 +2889,8 @@ int uplink(
   if (todelete)
   {
     worker_local_wrlock(local);
-    entry->timer.time64 = time64 + TCP_TIME_WAIT_TIMEOUT_SECS*1000ULL*1000ULL;
+    entry->timer.time64 = time64 +
+      synproxy->conf->timeouts.time_wait*1000ULL*1000ULL;
     entry->flag_state = FLAG_STATE_TIME_WAIT;
     timer_linkheap_modify(&local->timers, &entry->timer);
     worker_local_wrunlock(local);

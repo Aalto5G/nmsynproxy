@@ -149,6 +149,7 @@ static inline uint32_t synproxy_hash(struct synproxy_hash_entry *e)
 uint32_t synproxy_hash_fn(struct hash_list_node *node, void *userdata);
 
 struct worker_local {
+  struct synproxy *synproxy;
   struct hash_table hash;
   int locked;
   pthread_rwlock_t rwlock; // Lock order: first hash bucket lock, then mutex, then global hash lock
@@ -240,6 +241,7 @@ static inline void worker_local_init(
   local->half_open_connections = 0;
   ip_hash_init(&local->ratelimit, &local->timers, locked ? &local->rwlock : NULL);
   linked_list_head_init(&local->half_open_list);
+  local->synproxy = synproxy;
 }
 
 static inline void worker_local_free(struct worker_local *local)

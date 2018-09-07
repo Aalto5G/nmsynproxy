@@ -33,6 +33,18 @@ struct ratehashconf {
   uint8_t network_prefix6;
 };
 
+struct timeouts {
+  uint32_t connected;
+  uint32_t one_fin;
+  uint32_t both_fin;
+  uint32_t ul_syn_sent;
+  uint32_t ul_syn_rcvd;
+  uint32_t dl_half_open;
+  uint32_t dl_syn_sent;
+  uint32_t time_wait;
+  uint32_t reseted;
+};
+
 struct conf {
   enum learnmode sackmode;
   enum sackconflict sackconflict;
@@ -65,6 +77,7 @@ struct conf {
   gid_t gid;
   int test_connections;
   uint16_t port;
+  struct timeouts timeouts;
 };
 
 #define CONF_INITIALIZER { \
@@ -73,6 +86,17 @@ struct conf {
   .mssmode = HASHMODE_HASHIP, \
   .learnhashsize = 131072, \
   .conntablesize = 131072, \
+  .timeouts = { \
+    .connected = 86400, \
+    .one_fin = 7440, \
+    .both_fin = 240, \
+    .ul_syn_sent = 240, \
+    .ul_syn_rcvd = 240, \
+    .dl_half_open = 240, \
+    .dl_syn_sent = 240, \
+    .time_wait = 120, \
+    .reseted = 45, \
+  }, \
   .ratehash = { \
     .size = 131072, \
     .timer_period_usec = (1000*1000), \

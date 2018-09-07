@@ -17,6 +17,17 @@ synproxyconf = {
   own_wscale = 7;
   own_sack = enable;
   mss_clamp = 1460;
+  timeouts = {
+    connected = 86400;
+    one_fin = 7440;
+    both_fin = 240;
+    ul_syn_sent = 240;
+    ul_syn_rcvd = 240;
+    dl_half_open = 240;
+    dl_syn_sent = 240;
+    time_wait = 120;
+    reseted = 45;
+  };
   ratehash = {
     size = 131072;
     timer_period_usec = 1000000;
