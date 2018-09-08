@@ -196,21 +196,21 @@ static size_t synproxy_entry_to_str(
   off += snprintf(str + off, bufsiz - off, ", ");
   off += snprintf(str + off, bufsiz - off, "tsoffset=%u", e->tsoffset);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "lan_sent=%u", e->lan_sent);
+  off += snprintf(str + off, bufsiz - off, "lan_sent=%u", e->statetrack.lan.sent);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "wan_sent=%u", e->wan_sent);
+  off += snprintf(str + off, bufsiz - off, "wan_sent=%u", e->statetrack.wan.sent);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "lan_acked=%u", e->lan_acked);
+  off += snprintf(str + off, bufsiz - off, "lan_acked=%u", e->statetrack.lan.acked);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "wan_acked=%u", e->wan_acked);
+  off += snprintf(str + off, bufsiz - off, "wan_acked=%u", e->statetrack.wan.acked);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "lan_max=%u", e->lan_max);
+  off += snprintf(str + off, bufsiz - off, "lan_max=%u", e->statetrack.lan.max);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "wan_max=%u", e->wan_max);
+  off += snprintf(str + off, bufsiz - off, "wan_max=%u", e->statetrack.wan.max);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "lan_max_window_unscaled=%u", e->lan_max_window_unscaled);
+  off += snprintf(str + off, bufsiz - off, "lan_max_window_unscaled=%u", e->statetrack.lan.max_window_unscaled);
   off += snprintf(str + off, bufsiz - off, ", ");
-  off += snprintf(str + off, bufsiz - off, "wan_max_window_unscaled=%u", e->wan_max_window_unscaled);
+  off += snprintf(str + off, bufsiz - off, "wan_max_window_unscaled=%u", e->statetrack.wan.max_window_unscaled);
   return off;
 }
 
@@ -425,6 +425,216 @@ static inline uint32_t between(uint32_t a, uint32_t x, uint32_t b)
   else
   {
     return x >= a || x < b;
+  }
+}
+
+static inline int
+rst_is_valid_downlink(uint32_t seq, struct tcp_statetrack_entry *statetrack)
+{
+  return rst_is_valid(seq, statetrack->wan.sent) ||
+         rst_is_valid(seq, statetrack->lan.acked);
+}
+
+static inline int
+rst_is_valid_uplink(uint32_t seq, struct tcp_statetrack_entry *statetrack)
+{
+  return rst_is_valid(seq, statetrack->lan.sent) ||
+         rst_is_valid(seq, statetrack->wan.acked);
+}
+
+struct seqs {
+  uint32_t first_seq;
+  uint32_t last_seq;
+};
+
+static inline int
+seqs_valid_downlink(struct synproxy_hash_entry *entry,
+                    struct seqs *seqs,
+                    const char *ether, const char *ip, const char *ippay,
+                    int log,
+                    char *statebuf, size_t statebufsiz,
+                    char *packetbuf, size_t packetbufsiz)
+{
+  uint32_t wan_min;
+
+  if (!between(
+    entry->statetrack.wan.acked -
+      (entry->statetrack.wan.max_window_unscaled<<entry->statetrack.wan.wscale),
+    tcp_ack_number(ippay),
+    entry->statetrack.lan.sent + 1 + MAX_FRAG))
+  {
+    if (log)
+    {
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid ACK number, state: %s, packet: %s", statebuf, packetbuf);
+    }
+    return 0;
+  }
+  if (unlikely(tcp_fin(ippay)))
+  {
+    if (ip46_hdr_cksum_calc(ip) != 0)
+    {
+      if (log)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+      }
+      return 0;
+    }
+    if (tcp46_cksum_calc(ip) != 0)
+    {
+      if (log)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+      }
+      return 0;
+    }
+  }
+  wan_min =
+    entry->statetrack.wan.sent -
+      (entry->statetrack.lan.max_window_unscaled<<entry->statetrack.lan.wscale);
+  if (
+    !between(
+      wan_min, seqs->first_seq, entry->statetrack.lan.max+1)
+    &&
+    !between(
+      wan_min, seqs->last_seq, entry->statetrack.lan.max+1)
+    )
+  {
+    if (log)
+    {
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number, state: %s, packet: %s", statebuf, packetbuf);
+    }
+    return 0;
+  }
+  return 1;
+}
+
+static inline int
+seqs_valid_uplink(struct synproxy_hash_entry *entry,
+                  struct seqs *seqs,
+                  const char *ether, const char *ip, const char *ippay,
+                  int log,
+                  char *statebuf, size_t statebufsiz,
+                  char *packetbuf, size_t packetbufsiz)
+{
+  uint32_t lan_min;
+
+  if (!between(
+    entry->statetrack.lan.acked -
+      (entry->statetrack.lan.max_window_unscaled<<entry->statetrack.lan.wscale),
+    tcp_ack_number(ippay),
+    entry->statetrack.wan.sent + 1 + MAX_FRAG))
+  {
+    if (log)
+    {
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid ACK number, state: %s, packet: %s", statebuf, packetbuf);
+    }
+    return 0;
+  }
+  if (unlikely(tcp_fin(ippay)))
+  {
+    if (ip46_hdr_cksum_calc(ip) != 0)
+    {
+      if (log)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+      }
+      return 0;
+    }
+    if (tcp46_cksum_calc(ip) != 0)
+    {
+      if (log)
+      {
+        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+      }
+      return 0;
+    }
+  }
+  lan_min =
+    entry->statetrack.lan.sent -
+      (entry->statetrack.wan.max_window_unscaled<<entry->statetrack.wan.wscale);
+  if (
+    !between(
+      lan_min, seqs->first_seq, entry->statetrack.wan.max+1)
+    &&
+    !between(
+      lan_min, seqs->last_seq, entry->statetrack.wan.max+1)
+    )
+  {
+    if (log)
+    {
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number, state: %s, packet: %s", statebuf, packetbuf);
+    }
+    return 0;
+  }
+  return 1;
+}
+
+static inline void
+calc_seqs(struct seqs *seqs, const char *ip, const char *ippay, uint32_t offset)
+{
+  int32_t data_len;
+  uint32_t ip_len = ip_total_len(ip);
+  uint32_t ihl = ip_hdr_len(ip);
+
+  seqs->first_seq = tcp_seq_number(ippay);
+  data_len =
+    ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
+  if (data_len < 0)
+  {
+    // This can occur in fragmented packets. We don't then know the true
+    // data length, and can therefore drop packets that would otherwise be
+    // valid.
+    data_len = 0;
+  }
+  seqs->last_seq = seqs->first_seq + data_len - 1;
+
+  seqs->first_seq += offset;
+  seqs->last_seq += offset;
+
+  if (unlikely(tcp_fin(ippay)))
+  {
+    seqs->last_seq += 1;
+  }
+}
+
+
+static inline void
+update_side(struct tcp_statetrackside_entry *side,
+            struct seqs *seqs, const char *ippay)
+{
+  if (tcp_window(ippay) > side->max_window_unscaled)
+  {
+    side->max_window_unscaled = tcp_window(ippay);
+    if (side->max_window_unscaled == 0)
+    {
+      side->max_window_unscaled = 1;
+    }
+  }
+
+  if (seq_cmp(seqs->last_seq, side->sent) >= 0)
+  {
+    side->sent = seqs->last_seq + 1;
+  }
+  if (likely(tcp_ack(ippay)))
+  {
+    uint32_t ack = tcp_ack_number(ippay);
+    uint16_t window = tcp_window(ippay);
+    if (seq_cmp(ack, side->acked) >= 0)
+    {
+      side->acked = ack;
+    }
+    if (seq_cmp(ack + (window << side->wscale), side->max) >= 0)
+    {
+      side->max = ack + (window << side->wscale);
+    }
   }
 }
 
@@ -986,6 +1196,7 @@ static void resend_syn(
 {
   void *origip;
   void *origtcp;
+  struct seqs seqs;
 
   if (entry->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
   {
@@ -995,26 +1206,9 @@ static void resend_syn(
   origip = ether_payload(orig);
   origtcp = ip46_payload(origip);
 
-  if (seq_cmp(tcp_seq_number(origtcp), entry->wan_sent) >= 0)
-  {
-    entry->wan_sent = tcp_seq_number(origtcp);
-  }
-  if (seq_cmp(tcp_ack_number(origtcp), entry->wan_acked) >= 0)
-  {
-    entry->wan_acked = tcp_ack_number(origtcp);
-  }
-  if (seq_cmp(
-    tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale),
-    entry->wan_max) >= 0)
-  {
-    entry->wan_max =
-      tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
-  }
+  calc_seqs(&seqs, origip, origtcp, 0);
+  update_side(&entry->statetrack.wan, &seqs, origtcp);
 
-  if (tcp_window(origtcp) > entry->wan_max_window_unscaled)
-  {
-    entry->wan_max_window_unscaled = tcp_window(origtcp);
-  }
   entry->timer.time64 = time64 +
     local->synproxy->conf->timeouts.dl_syn_sent*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
@@ -1069,16 +1263,16 @@ static void send_syn(
     entry->state_data.downlink_syn_sent.remote_timestamp = info.ts;
   }
 
-  entry->wan_wscale = wscale;
-  entry->wan_sent = tcp_seq_number(origtcp) + (!!was_keepalive);
-  entry->wan_acked = tcp_ack_number(origtcp);
-  entry->wan_max =
+  entry->statetrack.wan.wscale = wscale;
+  entry->statetrack.wan.sent = tcp_seq_number(origtcp) + (!!was_keepalive);
+  entry->statetrack.wan.acked = tcp_ack_number(origtcp);
+  entry->statetrack.wan.max =
     tcp_ack_number(origtcp) + (tcp_window(origtcp) << entry->wan_wscale);
 
-  entry->wan_max_window_unscaled = tcp_window(origtcp);
-  if (entry->wan_max_window_unscaled == 0)
+  entry->statetrack.wan.max_window_unscaled = tcp_window(origtcp);
+  if (entry->statetrack.wan.max_window_unscaled == 0)
   {
-    entry->wan_max_window_unscaled = 1;
+    entry->statetrack.wan.max_window_unscaled = 1;
   }
   entry->state_data.downlink_syn_sent.local_isn = tcp_ack_number(origtcp) - 1;
   entry->state_data.downlink_syn_sent.remote_isn = tcp_seq_number(origtcp) - 1 + (!!was_keepalive);
@@ -1134,7 +1328,7 @@ static void send_ack_only(
   tcp_set_data_offset(tcp, sizeof(ack) - 14 - 40);
   tcp_set_seq_number(tcp, tcp_ack_number(origtcp));
   tcp_set_ack_number(tcp, tcp_seq_number(origtcp)+1);
-  tcp_set_window(tcp, entry->wan_max_window_unscaled);
+  tcp_set_window(tcp, entry->statetrack.wan.max_window_unscaled);
 
   tcpopts = &((unsigned char*)tcp)[20];
 
@@ -1249,6 +1443,85 @@ static void send_ack_and_window_update(
   port->portfunc(pktstruct, port->userdata);
 }
 
+static int
+check_downlink_finack(struct synproxy_hash_entry *entry, void *ip, void *ippay)
+{
+  int todelete = 0;
+  uint32_t fin = entry->state_data.established.upfin;
+  if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
+  {
+    if (ip46_hdr_cksum_calc(ip) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
+      return -1;
+    }
+    if (tcp46_cksum_calc(ip) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
+      return -1;
+    }
+    entry->flag_state |= FLAG_STATE_UPLINK_FIN_ACK;
+    if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN_ACK)
+    {
+      todelete = 1;
+    }
+  }
+  return todelete;
+}
+
+static int
+handle_downlink_fin(struct synproxy_hash_entry *entry, void *ip,
+                    struct seqs *seqs, int version)
+{
+  if (version == 4 && ip_more_frags(ip)) // FIXME for IPv6 also
+  {
+    log_log(LOG_LEVEL_WARNING, "WORKERDOWNLINK", "FIN with more frags");
+  }
+  if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)
+  {
+    if (entry->state_data.established.downfin != seqs->last_seq)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "FIN seq changed");
+      return 1;
+    }
+  }
+  entry->state_data.established.downfin = seqs->last_seq;
+  entry->flag_state |= FLAG_STATE_DOWNLINK_FIN;
+  return 0;
+}
+
+static inline void update_tcp_timeout(struct synproxy_hash_entry *entry,
+                                      struct worker_local *local,
+                                      uint64_t time64)
+{
+  uint64_t next64;
+  if (entry->flag_state == FLAG_STATE_RESETED)
+  {
+    next64 = time64 + local->synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
+  }
+  else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
+           (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
+  {
+    next64 = time64 + local->synproxy->conf->timeouts.both_fin*1000ULL*1000ULL;
+  }
+  else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
+  {
+    next64 = time64 + local->synproxy->conf->timeouts.one_fin*1000ULL*1000ULL;
+  }
+  else
+  {
+    next64 = time64 + local->synproxy->conf->timeouts.connected*1000ULL*1000ULL;
+  }
+  if (abs(next64 - entry->timer.time64) >= 1000*1000)
+  {
+    worker_local_wrlock(local);
+    entry->timer.time64 = next64;
+    timer_linkheap_modify(&local->timers, &entry->timer);
+    worker_local_wrunlock(local);
+  }
+}
+
+
 int downlink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
   struct port *port, uint64_t time64, struct ll_alloc_st *st)
@@ -1267,15 +1540,12 @@ int downlink(
   uint16_t tcp_len;
   struct synproxy_hash_entry *entry;
   struct synproxy_hash_ctx ctx;
-  uint32_t first_seq;
-  uint32_t last_seq;
-  int32_t data_len;
   int todelete = 0;
-  uint32_t wan_min;
   struct sack_ts_headers hdrs;
   char statebuf[8192];
   char packetbuf[8192];
   int version;
+  struct seqs seqs;
 
   if (ether_len < ETHER_HDR_LEN)
   {
@@ -1480,7 +1750,7 @@ int downlink(
         return 0;
       }
       if (entry->flag_state == FLAG_STATE_ESTABLISHED &&
-          entry->wan_sent-1 == tcp_seq_number(ippay))
+          entry->statetrack.wan.sent-1 == tcp_seq_number(ippay))
       {
         // retransmit of SYN+ACK
         // FIXME should store the ISN for a longer duration of time...
@@ -1525,16 +1795,16 @@ int downlink(
         tcpinfo.mss = 1460;
       }
       entry->wan_wscale = tcpinfo.wscale;
-      entry->wan_max_window_unscaled = tcp_window(ippay);
-      if (entry->wan_max_window_unscaled == 0)
+      entry->statetrack.wan.max_window_unscaled = tcp_window(ippay);
+      if (entry->statetrack.wan.max_window_unscaled == 0)
       {
-        entry->wan_max_window_unscaled = 1;
+        entry->statetrack.wan.max_window_unscaled = 1;
       }
       entry->state_data.uplink_syn_rcvd.isn = tcp_seq_number(ippay);
-      entry->wan_sent = tcp_seq_number(ippay) + 1;
-      entry->wan_acked = tcp_ack_number(ippay);
-      entry->wan_max =
-        entry->wan_acked + (tcp_window(ippay) << entry->wan_wscale);
+      entry->statetrack.wan.sent = tcp_seq_number(ippay) + 1;
+      entry->statetrack.wan.acked = tcp_ack_number(ippay);
+      entry->statetrack.wan.max =
+        entry->statetrack.wan.acked + (tcp_window(ippay) << entry->wan_wscale);
       entry->flag_state = FLAG_STATE_UPLINK_SYN_RCVD;
       worker_local_wrlock(local);
       entry->timer.time64 = time64 +
@@ -1643,40 +1913,17 @@ int downlink(
       ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
        (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)))
   {
-    first_seq = tcp_seq_number(ippay);
-    data_len =
-      ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
-    if (data_len < 0)
-    {
-      // This can occur in fragmented packets. We don't then know the true
-      // data length, and can therefore drop packets that would otherwise be
-      // valid.
-      data_len = 0;
-    }
-    last_seq = first_seq + data_len - 1;
-    if (entry != NULL)
-    {
-      wan_min =
-        entry->wan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
-    }
-
     /*
      * If entry is NULL, it can only be ACK of a SYN+ACK so we verify cookie
      * If entry is non-NULL, it can be ACK of FIN or ACK of SYN+ACK
      * In the latter case, we verify whether the SEQ/ACK numbers look fine.
      * If either SEQ or ACK number is invalid, it has to be ACK of SYN+ACK
      */
+    calc_seqs(&seqs, ip, ippay, 0);
     if (tcp_ack(ippay) && !tcp_fin(ippay) && !tcp_rst(ippay) && !tcp_syn(ippay)
         && (entry == NULL ||
-            !between(
-              entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
-              tcp_ack_number(ippay),
-              entry->lan_sent + 1 + MAX_FRAG) ||
-            (!between(
-               wan_min, first_seq, entry->lan_max+1)
-             &&
-             !between(
-               wan_min, last_seq, entry->lan_max+1))))
+            (!seqs_valid_downlink(entry, &seqs, ether, ip, ippay, 0,
+                                  NULL, 0, NULL, 0))))
     {
       uint32_t ack_num = tcp_ack_number(ippay);
       uint32_t other_seq = tcp_seq_number(ippay);
@@ -1885,12 +2132,11 @@ int downlink(
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
-      if (!rst_is_valid(seq, entry->wan_sent) &&
-          !rst_is_valid(seq, entry->lan_acked))
+      if (!rst_is_valid_downlink(seq, &entry->statetrack))
       {
         log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK",
                 "RST has invalid SEQ number, %u/%u/%u",
-                seq, entry->wan_sent, entry->lan_acked);
+                seq, entry->statetrack.wan.sent, entry->statetrack.lan.acked);
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
@@ -1912,8 +2158,8 @@ int downlink(
   }
   if (   tcp_ack(ippay)
       && entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT
-      && resend_request_is_valid(tcp_seq_number(ippay), entry->wan_sent)
-      && resend_request_is_valid(tcp_ack_number(ippay), entry->wan_acked))
+      && resend_request_is_valid(tcp_seq_number(ippay), entry->statetrack.wan.sent)
+      && resend_request_is_valid(tcp_ack_number(ippay), entry->statetrack.wan.acked))
   {
     log_log(LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "resending SYN");
     worker_local_wrlock(local);
@@ -1938,152 +2184,38 @@ int downlink(
     synproxy_hash_unlock(local, &ctx);
     return 1;
   }
-  if (!between(
-    entry->wan_acked - (entry->wan_max_window_unscaled<<entry->wan_wscale),
-    tcp_ack_number(ippay),
-    entry->lan_sent + 1 + MAX_FRAG))
+
+  calc_seqs(&seqs, ip, ippay, 0);
+  if (!seqs_valid_downlink(entry, &seqs, ether, ip, ippay, 1,
+                           statebuf, sizeof(statebuf),
+                           packetbuf, sizeof(packetbuf)))
   {
-    synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-    synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
-    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid ACK number, state: %s, packet: %s", statebuf, packetbuf);
     synproxy_hash_unlock(local, &ctx);
     return 1;
   }
-  first_seq = tcp_seq_number(ippay);
-  data_len =
-    ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
-  if (data_len < 0)
-  {
-    // This can occur in fragmented packets. We don't then know the true
-    // data length, and can therefore drop packets that would otherwise be
-    // valid.
-    data_len = 0;
-  }
-  last_seq = first_seq + data_len - 1;
-  if (unlikely(tcp_fin(ippay)))
-  {
-    if (ip46_hdr_cksum_calc(ip) != 0)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
-      synproxy_hash_unlock(local, &ctx);
-      return 1;
-    }
-    if (tcp46_cksum_calc(ip) != 0)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
-      synproxy_hash_unlock(local, &ctx);
-      return 1;
-    }
-    last_seq += 1;
-  }
-  wan_min =
-    entry->wan_sent - (entry->lan_max_window_unscaled<<entry->lan_wscale);
-  if (
-    !between(
-      wan_min, first_seq, entry->lan_max+1)
-    &&
-    !between(
-      wan_min, last_seq, entry->lan_max+1)
-    )
-  {
-    synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-    synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
-    log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "packet has invalid SEQ number, state: %s, packet: %s", statebuf, packetbuf);
-    synproxy_hash_unlock(local, &ctx);
-    return 1;
-  }
+
   if (unlikely(tcp_fin(ippay)) && entry->flag_state != FLAG_STATE_RESETED)
   {
-    if (version == 4 && ip_more_frags(ip)) // FIXME for IPv6 also
+    if (handle_downlink_fin(entry, ip, &seqs, version))
     {
-      log_log(LOG_LEVEL_WARNING, "WORKERDOWNLINK", "FIN with more frags");
+      synproxy_hash_unlock(local, &ctx);
+      return 1;
     }
-    if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN)
-    {
-      if (entry->state_data.established.downfin != last_seq)
-      {
-        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "FIN seq changed");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
-      }
-    }
-    entry->state_data.established.downfin = last_seq;
-    entry->flag_state |= FLAG_STATE_DOWNLINK_FIN;
   }
   if (unlikely(entry->flag_state & FLAG_STATE_UPLINK_FIN))
   {
-    uint32_t fin = entry->state_data.established.upfin;
-    if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
+    todelete = check_downlink_finack(entry, ip, ippay);
+    if (todelete < 0)
     {
-      if (ip46_hdr_cksum_calc(ip) != 0)
-      {
-        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid IP hdr cksum");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
-      }
-      if (tcp46_cksum_calc(ip) != 0)
-      {
-        log_log(LOG_LEVEL_ERR, "WORKERDOWNLINK", "invalid TCP hdr cksum");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
-      }
-      entry->flag_state |= FLAG_STATE_UPLINK_FIN_ACK;
-      if (entry->flag_state & FLAG_STATE_DOWNLINK_FIN_ACK)
-      {
-        todelete = 1;
-      }
+      synproxy_hash_unlock(local, &ctx);
+      return 1;
     }
   }
-  if (tcp_window(ippay) > entry->wan_max_window_unscaled)
-  {
-    entry->wan_max_window_unscaled = tcp_window(ippay);
-    if (entry->wan_max_window_unscaled == 0)
-    {
-      entry->wan_max_window_unscaled = 1;
-    }
-  }
-  if (seq_cmp(last_seq, entry->wan_sent) >= 0)
-  {
-    entry->wan_sent = last_seq + 1;
-  }
-  if (likely(tcp_ack(ippay)))
-  {
-    uint32_t ack = tcp_ack_number(ippay);
-    uint16_t window = tcp_window(ippay);
-    if (seq_cmp(ack, entry->wan_acked) >= 0)
-    {
-      entry->wan_acked = ack;
-    }
-    if (seq_cmp(ack + (window << entry->wan_wscale), entry->wan_max) >= 0)
-    {
-      entry->wan_max = ack + (window << entry->wan_wscale);
-    }
-  }
-  uint64_t next64;
-  if (entry->flag_state == FLAG_STATE_RESETED)
-  {
-    next64 = time64 + synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
-  }
-  else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
-           (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
-  {
-    next64 = time64 + synproxy->conf->timeouts.both_fin*1000ULL*1000ULL;
-  }
-  else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
-  {
-    next64 = time64 + synproxy->conf->timeouts.one_fin*1000ULL*1000ULL;
-  }
-  else
-  {
-    next64 = time64 + synproxy->conf->timeouts.connected*1000ULL*1000ULL;
-  }
-  if (abs(next64 - entry->timer.time64) >= 1000*1000)
-  {
-    worker_local_wrlock(local);
-    entry->timer.time64 = next64;
-    timer_linkheap_modify(&local->timers, &entry->timer);
-    worker_local_wrunlock(local);
-  }
+
+  update_side(&entry->statetrack.wan, &seqs, ippay);
+
+  update_tcp_timeout(entry, local, time64);
+
   tcp_find_sack_ts_headers(ippay, &hdrs);
   if (tcp_ack(ippay))
   {
@@ -2120,6 +2252,53 @@ int downlink(
   return 0;
 }
 
+static int
+check_uplink_finack(struct synproxy_hash_entry *entry, void *ip, void *ippay)
+{
+  int todelete = 0;
+  uint32_t fin = entry->state_data.established.downfin;
+  if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
+  {
+    if (ip46_hdr_cksum_calc(ip) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
+      return -1;
+    }
+    if (tcp46_cksum_calc(ip) != 0)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
+      return -1;
+    }
+    entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
+    if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
+    {
+      todelete = 1;
+    }
+  }
+  return todelete;
+}
+
+static int
+handle_uplink_fin(struct synproxy_hash_entry *entry, void *ip,
+                    struct seqs *seqs, int version)
+{
+  if (version == 4 && ip_more_frags(ip)) // FIXME for IPv6 also
+  {
+    log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
+  }
+  if (entry->flag_state & FLAG_STATE_UPLINK_FIN)
+  {
+    if (entry->state_data.established.upfin != seqs->last_seq)
+    {
+      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "FIN seq changed");
+      return 1;
+    }
+  }
+  entry->state_data.established.upfin = seqs->last_seq;
+  entry->flag_state |= FLAG_STATE_UPLINK_FIN;
+  return 0;
+}
+
 /*
   Uplink packet arrives. It has lan_ip:lan_port remote_ip:remote_port
   - Lookup by lan_ip:lan_port, verify remote_ip:remote_port
@@ -2151,11 +2330,11 @@ int uplink(
   uint32_t last_seq;
   int32_t data_len;
   int todelete = 0;
-  uint32_t lan_min;
   struct sack_ts_headers hdrs;
   char statebuf[8192];
   char packetbuf[8192];
   int version;
+  struct seqs seqs;
 
   if (ether_len < ETHER_HDR_LEN)
   {
@@ -2347,13 +2526,13 @@ int uplink(
       entry->flag_state = FLAG_STATE_UPLINK_SYN_SENT;
       entry->state_data.uplink_syn_sent.isn = tcp_seq_number(ippay);
       entry->lan_wscale = tcpinfo.wscale;
-      entry->lan_max_window_unscaled = tcp_window(ippay);
+      entry->statetrack.lan.max_window_unscaled = tcp_window(ippay);
       entry->lan_sack_was_supported = tcpinfo.sack_permitted;
-      if (entry->lan_max_window_unscaled == 0)
+      if (entry->statetrack.lan.max_window_unscaled == 0)
       {
-        entry->lan_max_window_unscaled = 1;
+        entry->statetrack.lan.max_window_unscaled = 1;
       }
-      entry->lan_sent = tcp_seq_number(ippay) + 1;
+      entry->statetrack.lan.sent = tcp_seq_number(ippay) + 1;
       if (synproxy->conf->mss_clamp_enabled)
       {
         uint16_t mss;
@@ -2395,8 +2574,8 @@ int uplink(
       if (entry->flag_state == FLAG_STATE_ESTABLISHED)
       {
         // FIXME we should store the ISN permanently...
-        if (tcp_ack_number(ippay) == entry->lan_acked &&
-            tcp_seq_number(ippay) + 1 + entry->seqoffset == entry->lan_sent)
+        if (tcp_ack_number(ippay) == entry->statetrack.lan.acked &&
+            tcp_seq_number(ippay) + 1 + entry->seqoffset == entry->statetrack.lan.sent)
         {
           synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
           synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
@@ -2502,14 +2681,14 @@ int uplink(
         entry->tsoffset = 0;
       }
       entry->lan_wscale = tcpinfo.wscale;
-      entry->lan_sent = tcp_seq_number(ippay) + 1 + entry->seqoffset;
-      entry->lan_acked = tcp_ack_number(ippay);
-      entry->lan_max = tcp_ack_number(ippay) + (tcp_window(ippay) << entry->lan_wscale);
-      entry->lan_max_window_unscaled = tcp_window(ippay);
+      entry->statetrack.lan.sent = tcp_seq_number(ippay) + 1 + entry->seqoffset;
+      entry->statetrack.lan.acked = tcp_ack_number(ippay);
+      entry->statetrack.lan.max = tcp_ack_number(ippay) + (tcp_window(ippay) << entry->lan_wscale);
+      entry->statetrack.lan.max_window_unscaled = tcp_window(ippay);
       entry->lan_sack_was_supported = tcpinfo.sack_permitted;
-      if (entry->lan_max_window_unscaled == 0)
+      if (entry->statetrack.lan.max_window_unscaled == 0)
       {
-        entry->lan_max_window_unscaled = 1;
+        entry->statetrack.lan.max_window_unscaled = 1;
       }
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       worker_local_wrlock(local);
@@ -2549,14 +2728,13 @@ int uplink(
     if (tcp_rst(ippay))
     {
       uint32_t seq = tcp_seq_number(ippay) + entry->seqoffset;
-      if (!rst_is_valid(seq, entry->lan_sent) &&
-          !rst_is_valid(seq, entry->wan_acked))
+      if (!rst_is_valid_uplink(seq, &entry->statetrack))
       {
         synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
         synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK",
                 "invalid SEQ num in RST, %u/%u/%u, state: %s, packet: %s",
-                seq, entry->lan_sent, entry->wan_acked,
+                seq, entry->statetrack.lan.sent, entry->statetrack.wan.acked,
                 statebuf, packetbuf);
         synproxy_hash_unlock(local, &ctx);
         return 1;
@@ -2594,12 +2772,12 @@ int uplink(
         data_len = 0;
       }
       last_seq = first_seq + data_len - 1;
-      if (seq_cmp(last_seq, entry->lan_sent) >= 0)
+      if (seq_cmp(last_seq, entry->statetrack.lan.sent) >= 0)
       {
-        entry->lan_sent = last_seq + 1;
+        entry->statetrack.lan.sent = last_seq + 1;
       }
-      entry->lan_acked = ack;
-      entry->lan_max = ack + (window << entry->lan_wscale);
+      entry->statetrack.lan.acked = ack;
+      entry->statetrack.lan.max = ack + (window << entry->lan_wscale);
       entry->flag_state = FLAG_STATE_ESTABLISHED;
       worker_local_wrlock(local);
       entry->timer.time64 = time64 +
@@ -2674,14 +2852,13 @@ int uplink(
     else
     {
       uint32_t seq = tcp_seq_number(ippay) + entry->seqoffset;
-      if (!rst_is_valid(seq, entry->lan_sent) &&
-          !rst_is_valid(seq, entry->wan_acked))
+      if (!rst_is_valid_uplink(seq, &entry->statetrack))
       {
         synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
         synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK",
                 "invalid SEQ num in RST, %u/%u/%u, state: %s, packet: %s",
-                seq, entry->lan_sent, entry->wan_acked, statebuf, packetbuf);
+                seq, entry->statetrack.lan.sent, entry->statetrack.wan.acked, statebuf, packetbuf);
         synproxy_hash_unlock(local, &ctx);
         return 1;
       }
@@ -2714,154 +2891,37 @@ int uplink(
     synproxy_hash_unlock(local, &ctx);
     return 1;
   }
-  if (!between(
-    entry->lan_acked - (entry->lan_max_window_unscaled<<entry->lan_wscale),
-    tcp_ack_number(ippay),
-    entry->wan_sent + 1 + MAX_FRAG))
+
+  calc_seqs(&seqs, ip, ippay, entry->seqoffset);
+  if (!seqs_valid_uplink(entry, &seqs, ether, ip, ippay, 1,
+                         statebuf, sizeof(statebuf),
+                         packetbuf, sizeof(packetbuf)))
   {
-    synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-    synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid ACK number, state: %s, packet: %s", statebuf, packetbuf);
     synproxy_hash_unlock(local, &ctx);
     return 1;
   }
-  first_seq = tcp_seq_number(ippay);
-  data_len =
-    ((int32_t)ip_len) - ((int32_t)ihl) - ((int32_t)tcp_data_offset(ippay));
-  if (data_len < 0)
-  {
-    // This can occur in fragmented packets. We don't then know the true
-    // data length, and can therefore drop packets that would otherwise be
-    // valid.
-    data_len = 0;
-  }
-  last_seq = first_seq + data_len - 1;
-  if (unlikely(tcp_fin(ippay)))
-  {
-    if (ip46_hdr_cksum_calc(ip) != 0)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
-      synproxy_hash_unlock(local, &ctx);
-      return 1;
-    }
-    if (tcp46_cksum_calc(ip) != 0)
-    {
-      log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
-      synproxy_hash_unlock(local, &ctx);
-      return 1;
-    }
-    last_seq += 1;
-  }
-  lan_min =
-    entry->lan_sent - (entry->wan_max_window_unscaled<<entry->wan_wscale);
-  first_seq += entry->seqoffset;
-  last_seq += entry->seqoffset;
-  if (
-    !between(
-      lan_min, first_seq, entry->wan_max+1)
-    &&
-    !between(
-      lan_min, last_seq, entry->wan_max+1)
-    )
-  {
-    synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-    synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
-    log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "packet has invalid SEQ number, state: %s, packet: %s", statebuf, packetbuf);
-    synproxy_hash_unlock(local, &ctx);
-    return 1;
-  }
-  if (tcp_window(ippay) > entry->lan_max_window_unscaled)
-  {
-    entry->lan_max_window_unscaled = tcp_window(ippay);
-    if (entry->lan_max_window_unscaled == 0)
-    {
-      entry->lan_max_window_unscaled = 1;
-    }
-  }
+
   if (unlikely(tcp_fin(ippay)) && entry->flag_state != FLAG_STATE_RESETED)
   {
-    if (version == 4 && ip_more_frags(ip)) // FIXME for IPv6
+    if (handle_uplink_fin(entry, ip, &seqs, version))
     {
-      log_log(LOG_LEVEL_WARNING, "WORKERUPLINK", "FIN with more frags");
+      return 1;
     }
-    if (entry->flag_state & FLAG_STATE_UPLINK_FIN)
-    {
-      if (entry->state_data.established.upfin != last_seq)
-      {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "FIN seq changed");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
-      }
-    }
-    entry->state_data.established.upfin = last_seq;
-    entry->flag_state |= FLAG_STATE_UPLINK_FIN;
   }
   if (unlikely(entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
   {
-    uint32_t fin = entry->state_data.established.downfin;
-    if (tcp_ack(ippay) && tcp_ack_number(ippay) == fin + 1)
+    todelete = check_uplink_finack(entry, ip, ippay);
+    if (todelete < 0)
     {
-      if (ip46_hdr_cksum_calc(ip) != 0)
-      {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid IP hdr cksum");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
-      }
-      if (tcp46_cksum_calc(ip) != 0)
-      {
-        log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid TCP hdr cksum");
-        synproxy_hash_unlock(local, &ctx);
-        return 1;
-      }
-      entry->flag_state |= FLAG_STATE_DOWNLINK_FIN_ACK;
-      if (entry->flag_state & FLAG_STATE_UPLINK_FIN_ACK)
-      {
-        todelete = 1;
-      }
+      synproxy_hash_unlock(local, &ctx);
+      return 1;
     }
   }
-  if (seq_cmp(last_seq, entry->lan_sent) >= 0)
-  {
-    entry->lan_sent = last_seq + 1;
-  }
-  if (likely(tcp_ack(ippay)))
-  {
-    uint32_t ack = tcp_ack_number(ippay);
-    uint16_t window = tcp_window(ippay);
-    if (seq_cmp(ack, entry->lan_acked) >= 0)
-    {
-      entry->lan_acked = ack;
-    }
-    if (seq_cmp(ack + (window << entry->lan_wscale), entry->lan_max) >= 0)
-    {
-      entry->lan_max = ack + (window << entry->lan_wscale);
-    }
-  }
-  uint64_t next64;
-  if (entry->flag_state == FLAG_STATE_RESETED)
-  {
-    next64 = time64 + synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
-  }
-  else if ((entry->flag_state & FLAG_STATE_UPLINK_FIN) &&
-           (entry->flag_state & FLAG_STATE_DOWNLINK_FIN))
-  {
-    next64 = time64 + synproxy->conf->timeouts.both_fin*1000ULL*1000ULL;
-  }
-  else if (entry->flag_state & (FLAG_STATE_UPLINK_FIN|FLAG_STATE_DOWNLINK_FIN))
-  {
-    next64 = time64 + synproxy->conf->timeouts.one_fin*1000ULL*1000ULL;
-  }
-  else
-  {
-    next64 = time64 + synproxy->conf->timeouts.connected*1000ULL*1000ULL;
-  }
-  if (abs(next64 - entry->timer.time64) >= 1000*1000)
-  {
-    worker_local_wrlock(local);
-    entry->timer.time64 = next64;
-    timer_linkheap_modify(&local->timers, &entry->timer);
-    worker_local_wrunlock(local);
-  }
+
+  update_side(&entry->statetrack.lan, &seqs, ippay);
+
+  update_tcp_timeout(entry, local, time64);
+
   tcp_set_seq_number_cksum_update(
     ippay, tcp_len, tcp_seq_number(ippay)+entry->seqoffset);
   if (version == 6)
