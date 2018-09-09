@@ -37,7 +37,7 @@ static void *signal_handler_thr(void *arg)
 }
 
 struct thr_arg {
-  int idx;
+  size_t idx;
 };
 
 struct ldp_interface *nmd;
@@ -69,12 +69,12 @@ static void *thr(void *arg)
   char lan_mac[6] = {0x3c,0xfd,0xfe,0xa5,0x41,0x49};
   void *ip;
   void *tcp;
-  int i;
+  size_t i;
   struct ldp_packet pkt_tbl[1024];
-  int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
+  size_t cnt = (int)(sizeof(ctx)/sizeof(*ctx));
   int x = 0;
 
-  for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+  for (i = 0; i < (sizeof(ctx)/sizeof(*ctx)); i++)
   {
     ether = ctx[i].pkt;
     memcpy(ether_dst(ether), lan_mac, 6);
@@ -150,7 +150,7 @@ int main(int argc, char **argv)
   struct thr_arg args[NUM_THR];
   pthread_t thrs[NUM_THR];
   pthread_t sigthr;
-  int i;
+  size_t i;
   sigset_t set;
 
   sigemptyset(&set);

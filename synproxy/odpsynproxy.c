@@ -128,7 +128,7 @@ static void *rx_func(void *userdata)
   struct allocif intf = {.ops = &ll_allocif_ops_st, .userdata = &st};
   odp_pktin_queue_t inqs[3] =
     {dlinq[args->idx], ulinq[args->idx], dlinq[args->idx]};
-  int inqidx = 0;
+  unsigned inqidx = 0;
 
   gettimeofday(&tv1, NULL);
 
@@ -404,7 +404,7 @@ int main(int argc, char **argv)
   char *outname = NULL;
   char *lanname = NULL;
   char *wanname = NULL;
-  int i;
+  size_t i;
   sigset_t set;
   int pipefd[2];
   int sockfd;
@@ -525,8 +525,8 @@ int main(int argc, char **argv)
     wan = 1;
   }
 
-  int num_rx;
-  int max;
+  size_t num_rx;
+  size_t max;
   num_rx = conf.threadcount;
   if (num_rx <= 0 || num_rx > MAX_RX)
   {
@@ -551,12 +551,12 @@ int main(int argc, char **argv)
   worker_local_init(&local, &synproxy, 0, 1);
   if (conf.test_connections)
   {
-    int j;
+    size_t j;
     for (j = 0; j < 90*6; j++)
     {
       uint32_t src, dst;
-      src = htonl((10<<24)|(2*j+2));
-      dst = htonl((11<<24)|(2*j+1));
+      src = htonl((10U<<24)|(2U*j+2U));
+      dst = htonl((11U<<24)|(2U*j+1U));
       synproxy_hash_put_connected(
         &local, 4, &src, 12345, &dst, 54321,
         gettime64());
@@ -615,8 +615,13 @@ int main(int argc, char **argv)
   {
     pthread_create(&rx[i], NULL, rx_func, &rx_args[i]);
   }
-  int cpu = 0;
-  if (num_rx <= sysconf(_SC_NPROCESSORS_ONLN))
+  size_t cpu = 0;
+  int sc = sysconf(_SC_NPROCESSORS_ONLN);
+  if (sc < 0)
+  {
+    abort();
+  }
+  if (num_rx <= (size_t)sc)
   {
     for (i = 0; i < num_rx; i++)
     {

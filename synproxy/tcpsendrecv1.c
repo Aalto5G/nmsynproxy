@@ -41,7 +41,7 @@ static void *signal_handler_thr(void *arg)
 }
 
 struct thr_arg {
-  int idx;
+  size_t idx;
 };
 
 struct nm_desc *ulnmds[NUM_THR];
@@ -151,7 +151,7 @@ static void init_uplink(struct tcp_ctx *ctx)
 
 static inline int seq_cmp(uint32_t x, uint32_t y)
 {
-  int32_t result = x-y;
+  int32_t result = (int32_t)(x-y);
   if (result > 512*1024*1024 || result < -512*1024*1024)
   {
     printf("TOO GREAT SEQUENCE NUMBER DIFFERENCE %u %u", x, y);
@@ -226,15 +226,15 @@ static void *thr(void *arg)
   void *ether;
   void *ip;
   void *tcp;
-  int i;
+  size_t i;
   char pkt[14+20+20] = {0};
-  int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
+  size_t cnt = (sizeof(ctx)/sizeof(*ctx));
   struct pcapng_out_ctx pcapctx;
   char filebuf[256] = {0};
 
   hash_seed_init();
   
-  snprintf(filebuf, sizeof(filebuf), "tcpsendrecv-%d.pcapng", args->idx);
+  snprintf(filebuf, sizeof(filebuf), "tcpsendrecv-%zu.pcapng", args->idx);
 
   //if (pcapng_out_ctx_init(&pcapctx, filebuf) != 0)
   //{
@@ -243,7 +243,7 @@ static void *thr(void *arg)
 
   hash_table_init(&tbl, 3*sizeof(ctx)/sizeof(*ctx), tcp_ctx_hash_fn, NULL);
 
-  for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+  for (i = 0; i < (sizeof(ctx)/sizeof(*ctx)); i++)
   {
     ctx[i].ip1 = (10<<24)|(100<<16)|(2*(i+cnt*args->idx)+2);
     ctx[i].ip2 = (11<<24)|(100<<16)|(2*(i+cnt*args->idx)+1);
@@ -486,7 +486,7 @@ int main(int argc, char **argv)
   pthread_t thrs[NUM_THR];
   pthread_t sigthr;
   struct nmreq nmr;
-  int i;
+  size_t i;
   char nmifnamebuf[64];
   sigset_t set;
 
@@ -509,7 +509,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < NUM_THR; i++)
   {
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[1], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[1], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
     nmr.nr_rx_slots = 256;
@@ -526,7 +526,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < NUM_THR; i++)
   {
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[2], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[2], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
     nmr.nr_rx_slots = 256;

@@ -25,6 +25,20 @@ struct synproxy {
   struct threetuplectx threetuplectx;
 };
 
+// Comments are made for wan struct
+struct tcp_statetrackside_entry {
+  uint32_t sent; // what WAN has sent plus 1
+  uint32_t acked; // what LAN has sent and WAN has acked plus 1
+  uint32_t max; // wan_acked + (tcp_window()<<wan_wscale)
+  uint16_t max_window_unscaled; // max window WAN has advertised
+  uint8_t wscale;
+};
+
+struct tcp_statetrack_entry {
+  struct tcp_statetrackside_entry wan;
+  struct tcp_statetrackside_entry lan;
+};
+
 struct synproxy_hash_entry {
   struct hash_list_node node;
   struct timer_link timer;
@@ -43,26 +57,17 @@ struct synproxy_hash_entry {
   uint16_t flag_state;
   uint8_t version; // 4 or 6, IPv4 or IPv6
   int8_t wscalediff;
-  uint8_t lan_wscale;
-  uint8_t wan_wscale;
   uint8_t was_synproxied;
   uint8_t lan_sack_was_supported;
   uint32_t seqoffset;
   uint32_t tsoffset;
-  uint32_t lan_sent; // what LAN has sent plus 1
-  uint32_t wan_sent; // what WAN has sent plus 1
-  uint32_t lan_acked; // what WAN has sent and LAN has acked plus 1
-  uint32_t wan_acked; // what LAN has sent and WAN has acked plus 1
-  uint32_t lan_max; // lan_acked + (tcp_window()<<lan_wscale)
-  uint32_t wan_max; // wan_acked + (tcp_window()<<wan_wscale)
+  struct tcp_statetrack_entry statetrack;
 #if 0
   uint32_t lan_next;
   uint32_t wan_next;
   uint32_t lan_window; // FIXME make unscaled to save space
   uint32_t wan_window; // FIXME make unscaled to save space
 #endif
-  uint16_t lan_max_window_unscaled; // max window LAN has advertised
-  uint16_t wan_max_window_unscaled; // max window WAN has advertised
   union {
     struct {
       uint32_t isn;
@@ -315,7 +320,7 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
   const void *local_ip, uint16_t local_port, const void *remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
 {
   struct hash_list_node *node;
-  int len;
+  size_t len;
   if (version == 4)
   {
     ctx->hashval = synproxy_hash_separate4(hdr_get32n(local_ip), local_port, hdr_get32n(remote_ip), remote_port);
@@ -380,11 +385,11 @@ static inline void synproxy_hash_put_connected(
   e = synproxy_hash_put(
     local, version, local_ip, local_port, remote_ip, remote_port, 0, time64);
   e->flag_state = FLAG_STATE_ESTABLISHED;
-  e->lan_max = 32768;
-  e->lan_sent = 0;
-  e->lan_acked = 0;
-  e->wan_wscale = 0;
-  e->wan_max_window_unscaled = 65535;
+  e->statetrack.lan.max = 32768;
+  e->statetrack.lan.sent = 0;
+  e->statetrack.lan.acked = 0;
+  e->statetrack.wan.wscale = 0;
+  e->statetrack.wan.max_window_unscaled = 65535;
 }
 
 static inline void synproxy_init(

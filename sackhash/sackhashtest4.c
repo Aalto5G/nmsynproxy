@@ -25,7 +25,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < 10*1000*1000; i++)
   {
-    uint32_t randval = rand();
+    uint32_t randval = (uint32_t)rand();
     uint32_t ip = randval&0xFFF;
     uint16_t port = 128 | ((randval>>16)&0xF);
     if (sack_ip_port_hash_add4(&hash, ip, port, &data) != 0)

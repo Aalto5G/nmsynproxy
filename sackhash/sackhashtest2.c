@@ -236,7 +236,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < 10*1000*1000; i++)
   {
-    uint32_t randval = rand();
+    uint32_t randval = (uint32_t)rand();
     uint32_t ip = randval&0xFFFF;
     int oper = (randval>>16) % 2;
     if (oper)

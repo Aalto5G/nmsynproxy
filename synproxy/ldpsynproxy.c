@@ -11,6 +11,7 @@
 #include "mypcapng.h"
 #include "ldpports.h"
 #include <unistd.h>
+#include <limits.h>
 #include <sys/poll.h>
 #include <sys/time.h>
 #include "time64.h"
@@ -211,7 +212,11 @@ static void *rx_func(void *userdata)
       ldp_out_txsync(uloutq[args->idx]);
       if (pfds[0].fd >= 0 && pfds[1].fd >= 0)
       {
-        poll(pfds, 2, timeout);
+        if (timeout > INT_MAX)
+        {
+          timeout = INT_MAX;
+        }
+        poll(pfds, 2, (int)timeout);
       }
     }
 
@@ -356,7 +361,7 @@ int main(int argc, char **argv)
   char *outname = NULL;
   char *lanname = NULL;
   char *wanname = NULL;
-  int i;
+  size_t i;
   sigset_t set;
   int pipefd[2];
   int sockfd;
@@ -454,8 +459,8 @@ int main(int argc, char **argv)
     wan = 1;
   }
 
-  int num_rx;
-  int max;
+  size_t num_rx;
+  size_t max;
   num_rx = conf.threadcount;
   if (num_rx <= 0 || num_rx > MAX_RX)
   {
@@ -504,7 +509,7 @@ int main(int argc, char **argv)
   worker_local_init(&local, &synproxy, 0, 1);
   if (conf.test_connections)
   {
-    int j;
+    size_t j;
     for (j = 0; j < 90*6; j++)
     {
       uint32_t src, dst;
@@ -548,8 +553,13 @@ int main(int argc, char **argv)
   {
     pthread_create(&rx[i], NULL, rx_func, &rx_args[i]);
   }
-  int cpu = 0;
-  if (num_rx <= sysconf(_SC_NPROCESSORS_ONLN))
+  size_t cpu = 0;
+  int sc = sysconf(_SC_NPROCESSORS_ONLN);
+  if (sc < 0)
+  {
+    abort();
+  }
+  if (num_rx <= (size_t)sc)
   {
     for (i = 0; i < num_rx; i++)
     {

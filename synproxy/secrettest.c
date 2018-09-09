@@ -10,7 +10,7 @@ int main(int argc, char **argv)
   uint16_t port1 = rand(), port2 = rand();
   char ipv6_1[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
   char ipv6_2[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-  uint32_t ip1 = rand(), ip2 = rand();
+  uint32_t ip1 = ((uint32_t)rand()), ip2 = ((uint32_t)rand());
   uint8_t wscale = 6;
   uint16_t mss = 1450;
   uint32_t cookie;

@@ -39,7 +39,7 @@ static void *signal_handler_thr(void *arg)
 }
 
 struct thr_arg {
-  int idx;
+  size_t idx;
 };
 
 struct nm_desc *ulnmds[NUM_THR];
@@ -158,13 +158,13 @@ static void *thr(void *arg)
   void *ether;
   void *ip;
   void *tcp;
-  int i;
+  size_t i;
   char pkt[14+20+20] = {0};
-  int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
+  size_t cnt = (sizeof(ctx)/sizeof(*ctx));
   struct pcapng_out_ctx pcapctx;
   char filebuf[256] = {0};
   
-  snprintf(filebuf, sizeof(filebuf), "tcpsendrecv-%d.pcapng", args->idx);
+  snprintf(filebuf, sizeof(filebuf), "tcpsendrecv-%zu.pcapng", args->idx);
 
   //if (pcapng_out_ctx_init(&pcapctx, filebuf) != 0)
   //{
@@ -172,10 +172,10 @@ static void *thr(void *arg)
   //}
 
 
-  for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
+  for (i = 0; i < (sizeof(ctx)/sizeof(*ctx)); i++)
   {
-    ctx[i].ip1 = (10<<24)|(100<<16)|(2*(i+cnt*args->idx)+2);
-    ctx[i].ip2 = (11<<24)|(100<<16)|(2*(i+cnt*args->idx)+1);
+    ctx[i].ip1 = (10U<<24)|(100U<<16)|(2*(i+cnt*args->idx)+2);
+    ctx[i].ip2 = (11U<<24)|(100U<<16)|(2*(i+cnt*args->idx)+1);
     ctx[i].port1 = 12121;
     ctx[i].port2 = 21212;
     ctx[i].seq1 = 0x12345678;
@@ -289,7 +289,7 @@ int main(int argc, char **argv)
   pthread_t thrs[NUM_THR];
   pthread_t sigthr;
   struct nmreq nmr;
-  int i;
+  size_t i;
   char nmifnamebuf[64];
   sigset_t set;
 
@@ -312,7 +312,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < NUM_THR; i++)
   {
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[1], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[1], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
     nmr.nr_tx_rings = NUM_THR;
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < NUM_THR; i++)
   {
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[2], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[2], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
     nmr.nr_tx_rings = NUM_THR;

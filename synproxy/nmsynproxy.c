@@ -12,6 +12,7 @@
 #include "mypcapng.h"
 #include "netmapports.h"
 #include <unistd.h>
+#include <limits.h>
 #include <sys/poll.h>
 #include <sys/time.h>
 #include "time64.h"
@@ -170,7 +171,11 @@ static void *rx_func(void *userdata)
     {
       ioctl(dlnmds[args->idx]->fd, NIOCTXSYNC, NULL);
       ioctl(ulnmds[args->idx]->fd, NIOCTXSYNC, NULL);
-      poll(pfds, 2, timeout);
+      if (timeout > INT_MAX)
+      {
+        timeout = INT_MAX;
+      }
+      poll(pfds, 2, (int)timeout);
     }
 
     time64 = gettime64();
@@ -305,7 +310,7 @@ int main(int argc, char **argv)
   char *outname = NULL;
   char *lanname = NULL;
   char *wanname = NULL;
-  int i;
+  size_t i;
   char nmifnamebuf[64];
   sigset_t set;
   int pipefd[2];
@@ -401,8 +406,8 @@ int main(int argc, char **argv)
     wan = 1;
   }
 
-  int num_rx;
-  int max;
+  size_t num_rx;
+  size_t max;
   num_rx = conf.threadcount;
   if (num_rx <= 0 || num_rx > MAX_RX)
   {
@@ -422,7 +427,7 @@ int main(int argc, char **argv)
     nmr.nr_rx_slots = 256;
     nmr.nr_tx_slots = 64;
 #endif
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[optind+0], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[optind+0], i);
     dlnmds[i] = nm_open(nmifnamebuf, &nmr, 0, NULL);
     if (dlnmds[i] == NULL)
     {
@@ -449,7 +454,7 @@ int main(int argc, char **argv)
     nmr.nr_rx_slots = 256;
     nmr.nr_tx_slots = 64;
 #endif
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[optind+1], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[optind+1], i);
     ulnmds[i] = nm_open(nmifnamebuf, &nmr, 0, NULL);
     if (ulnmds[i] == NULL)
     {
@@ -471,12 +476,12 @@ int main(int argc, char **argv)
   worker_local_init(&local, &synproxy, 0, 1);
   if (conf.test_connections)
   {
-    int j;
+    size_t j;
     for (j = 0; j < 90*6; j++)
     {
       uint32_t src, dst;
-      src = htonl((10<<24)|(2*j+2));
-      dst = htonl((11<<24)|(2*j+1));
+      src = htonl((10U<<24)|(2U*j+2U));
+      dst = htonl((11U<<24)|(2U*j+1U));
       synproxy_hash_put_connected(
         &local, 4, &src, 12345, &dst, 54321,
         gettime64());
@@ -513,8 +518,13 @@ int main(int argc, char **argv)
   {
     pthread_create(&rx[i], NULL, rx_func, &rx_args[i]);
   }
-  int cpu = 0;
-  if (num_rx <= sysconf(_SC_NPROCESSORS_ONLN))
+  size_t cpu = 0;
+  int sc = sysconf(_SC_NPROCESSORS_ONLN);
+  if (sc < 0)
+  { 
+    abort();
+  }
+  if (num_rx <= (size_t)sc)
   {
     for (i = 0; i < num_rx; i++)
     {
