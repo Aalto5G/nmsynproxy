@@ -1715,7 +1715,7 @@ handle_ack_cookie(void *ether, void *ip, void *ippay, // RFE const
         &mss, &wscale, &sack_permitted, other_seq - 1);
       if (ok)
       {
-        synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+        synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
         log_log(
           LOG_LEVEL_NOTICE, "WORKERDOWNLINK",
           "SYN proxy detected keepalive packet opening connection: %s",
@@ -1739,7 +1739,7 @@ handle_ack_cookie(void *ether, void *ip, void *ippay, // RFE const
         &mss, &wscale, &sack_permitted, other_seq - 1);
       if (ok)
       {
-        synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+        synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
         log_log(
           LOG_LEVEL_NOTICE, "WORKERDOWNLINK",
           "SYN proxy detected keepalive packet opening connection6: %s",
@@ -1793,15 +1793,15 @@ handle_ack_cookie(void *ether, void *ip, void *ippay, // RFE const
   {
     if (entry != NULL)
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(
         LOG_LEVEL_ERR, "WORKERDOWNLINK",
         "entry found, A/SAFR set, SYN cookie invalid, state: %s, packet: %s", statebuf, packetbuf);
     }
     else
     {
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(
         LOG_LEVEL_ERR, "WORKERDOWNLINK",
         "entry not found but A/SAFR set, SYN cookie invalid, packet: %s", packetbuf);
@@ -1820,7 +1820,7 @@ handle_ack_cookie(void *ether, void *ip, void *ippay, // RFE const
       ipv6_src(ip), synproxy->conf->ratehash.network_prefix6, &local->ratelimit);
   }
   worker_local_wrunlock(local);
-  synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+  synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
   log_log(
     LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "SYN proxy sending SYN, packet: %s",
     packetbuf);
@@ -2414,8 +2414,8 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
       }
       else
       {
-        synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-        synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+        synproxy_entry_to_str(statebuf, statebufsiz, entry);
+        synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
         log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "S/SA but entry exists, state: %s, packet: %s", statebuf, packetbuf);
         synproxy_hash_unlock(local, &ctx);
         return 1;
@@ -2484,7 +2484,7 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
       local, version, lan_ip, lan_port, remote_ip, remote_port, &ctx);
     if (entry == NULL)
     {
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA but entry nonexistent, packet: %s", packetbuf);
       synproxy_hash_unlock(local, &ctx);
       return 1;
@@ -2495,8 +2495,8 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
       if (tcp_ack_number(ippay) == entry->statetrack.lan.acked &&
           tcp_seq_number(ippay) + 1 + entry->seqoffset == entry->statetrack.lan.sent)
       {
-        synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-        synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+        synproxy_entry_to_str(statebuf, statebufsiz, entry);
+        synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
         log_log(LOG_LEVEL_NOTICE, "WORKERUPLINK", "resending ACK, state: %s, packet: %s", statebuf, packetbuf);
         send_ack_only(ether, entry, port, st);
         synproxy_hash_unlock(local, &ctx);
@@ -2505,16 +2505,16 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
     }
     if (entry->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, entry != DL_SYN_SENT, state: %s, packet: %s", statebuf, packetbuf);
       synproxy_hash_unlock(local, &ctx);
       return 1;
     }
     if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.remote_isn + 1)
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "SA/SA, invalid ACK num, state: %s, packet: %s", statebuf, packetbuf);
       synproxy_hash_unlock(local, &ctx);
       return 1;
@@ -2649,8 +2649,8 @@ handle_uplink_syn_rcvd(struct packet *pkt, void *ether, void *ip, void *ippay,
     uint32_t seq = tcp_seq_number(ippay) + entry->seqoffset;
     if (!rst_is_valid_uplink(seq, &entry->statetrack))
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK",
               "invalid SEQ num in RST, %u/%u/%u, state: %s, packet: %s",
               seq, entry->statetrack.lan.sent, entry->statetrack.wan.acked,
@@ -2672,8 +2672,8 @@ handle_uplink_syn_rcvd(struct packet *pkt, void *ether, void *ip, void *ippay,
     uint16_t window = tcp_window(ippay);
     if (tcp_ack_number(ippay) != entry->state_data.uplink_syn_rcvd.isn + 1)
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "invalid ACK number, state: %s, packet: %s", statebuf, packetbuf);
       return 1;
     }
@@ -2703,8 +2703,8 @@ handle_uplink_syn_rcvd(struct packet *pkt, void *ether, void *ip, void *ippay,
     //port->portfunc(pkt, port->userdata);
     return 0;
   }
-  synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-  synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+  synproxy_entry_to_str(statebuf, statebufsiz, entry);
+  synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
   log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "UPLINK_SYN_RECEIVED w/o ACK, state: %s, packet: %s", statebuf, packetbuf);
   return 1;
 }
@@ -2736,8 +2736,8 @@ handle_uplink_rst(void *ether, void *ip, void *ippay,
   }
   if (entry->flag_state == FLAG_STATE_UPLINK_SYN_SENT)
   {
-    synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-    synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+    synproxy_entry_to_str(statebuf, statebufsiz, entry);
+    synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
     log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "dropping RST in UPLINK_SYN_SENT, state: %s, packet: %s", statebuf, packetbuf);
     return 1;
   }
@@ -2745,15 +2745,15 @@ handle_uplink_rst(void *ether, void *ip, void *ippay,
   {
     if (!tcp_ack(ippay))
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "R/RA in DOWNLINK_SYN_SENT, state: %s, packet: %s", statebuf, packetbuf);
       return 1;
     }
     if (tcp_ack_number(ippay) != entry->state_data.downlink_syn_sent.remote_isn + 1)
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK", "RA/RA in DL_SYN_SENT, bad seq, state: %s, packet: %s", statebuf, packetbuf);
       return 1;
     }
@@ -2776,8 +2776,8 @@ handle_uplink_rst(void *ether, void *ip, void *ippay,
     uint32_t seq = tcp_seq_number(ippay) + entry->seqoffset;
     if (!rst_is_valid_uplink(seq, &entry->statetrack))
     {
-      synproxy_entry_to_str(statebuf, sizeof(statebuf), entry);
-      synproxy_packet_to_str(packetbuf, sizeof(packetbuf), ether);
+      synproxy_entry_to_str(statebuf, statebufsiz, entry);
+      synproxy_packet_to_str(packetbuf, packetbufsiz, ether);
       log_log(LOG_LEVEL_ERR, "WORKERUPLINK",
               "invalid SEQ num in RST, %u/%u/%u, state: %s, packet: %s",
               seq, entry->statetrack.lan.sent, entry->statetrack.wan.acked, statebuf, packetbuf);
