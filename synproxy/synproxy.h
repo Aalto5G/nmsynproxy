@@ -57,8 +57,6 @@ struct synproxy_hash_entry {
   uint16_t flag_state;
   uint8_t version; // 4 or 6, IPv4 or IPv6
   int8_t wscalediff;
-  uint8_t lan_wscale;
-  uint8_t wan_wscale;
   uint8_t was_synproxied;
   uint8_t lan_sack_was_supported;
   uint32_t seqoffset;
@@ -322,7 +320,7 @@ static inline struct synproxy_hash_entry *synproxy_hash_get(
   const void *local_ip, uint16_t local_port, const void *remote_ip, uint16_t remote_port, struct synproxy_hash_ctx *ctx)
 {
   struct hash_list_node *node;
-  int len;
+  size_t len;
   if (version == 4)
   {
     ctx->hashval = synproxy_hash_separate4(hdr_get32n(local_ip), local_port, hdr_get32n(remote_ip), remote_port);

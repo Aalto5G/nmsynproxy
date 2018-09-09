@@ -37,7 +37,7 @@ SYNPROXY_DEP := $(patsubst %.c,%.d,$(SYNPROXY_SRC))
 SYNPROXY_DEPGEN_LIB := $(patsubst %.c,%.d,$(SYNPROXY_GEN_LIB))
 SYNPROXY_DEPGEN := $(patsubst %.c,%.d,$(SYNPROXY_GEN))
 
-CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) -I$(DIRLOG) -I$(DIRHASHTABLE) -I$(DIRHASHLIST) -I$(DIRPORTS) -I$(DIRALLOC) -I$(DIRTIMERLINKHEAP) -I$(DIRMYPCAP) -I$(DIRDYNARR) -I$(DIRIPHASH) -I$(DIRSACKHASH) -I$(DIRTHREETUPLE) -I$(DIRDATABUF) -I$(DIRNETMAP) -I$(DIRLDP)
+CFLAGS_SYNPROXY := -I$(DIRPACKET) -I$(DIRLINKEDLIST) -I$(DIRIPHDR) -I$(DIRMISC) -I$(DIRLOG) -I$(DIRHASHTABLE) -I$(DIRHASHLIST) -I$(DIRPORTS) -I$(DIRALLOC) -I$(DIRTIMERLINKHEAP) -I$(DIRMYPCAP) -I$(DIRDYNARR) -I$(DIRIPHASH) -I$(DIRSACKHASH) -I$(DIRTHREETUPLE) -I$(DIRDATABUF) -I$(DIRNETMAP) -I$(DIRLDP) -I$(DIRRBTREE)
 
 MAKEFILES_SYNPROXY := $(DIRSYNPROXY)/module.mk
 
@@ -120,8 +120,8 @@ $(SYNPROXY_OBJ): %.o: %.c %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SYNPROXY)
 	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_SYNPROXY)
 $(SYNPROXY_OBJGEN): %.o: %.c %.h %.d $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
-	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SYNPROXY) -Wno-sign-compare -Wno-missing-prototypes
-	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_SYNPROXY) -Wno-sign-compare -Wno-missing-prototypes
+	$(CC) $(CFLAGS) -c -o $*.o $*.c $(CFLAGS_SYNPROXY) -Wno-sign-compare -Wno-missing-prototypes -Wno-sign-conversion
+	$(CC) $(CFLAGS) -c -S -o $*.s $*.c $(CFLAGS_SYNPROXY) -Wno-sign-compare -Wno-missing-prototypes -Wno-sign-conversion
 
 $(SYNPROXY_DEP): %.d: %.c $(MAKEFILES_COMMON) $(MAKEFILES_SYNPROXY)
 	$(CC) $(CFLAGS) -MM -MP -MT "$*.d $*.o" -o $*.d $*.c $(CFLAGS_SYNPROXY)

@@ -8,7 +8,7 @@
 #include "yyutils.h"
 #include "time64.h"
 
-int threadcnt = 1;
+unsigned threadcnt = 1;
 
 #define POOL_SIZE 300
 #define CACHE_SIZE 100
@@ -34,7 +34,7 @@ struct rx_args {
   struct queue *workerq;
   struct synproxy *synproxy;
   struct worker_local *local;
-  int threadidx;
+  size_t threadidx;
 };
 
 struct pktctx {
@@ -45,7 +45,7 @@ struct pktctx {
 static void *rx_func(void *userdata)
 {
   struct rx_args *args = userdata;
-  int threadidx = args->threadidx;
+  size_t threadidx = args->threadidx;
   void *ether;
   struct pktctx ctx[90] = {};
   char cli_mac[6] = {0x02,0,0,0,0,0x04};
@@ -59,8 +59,8 @@ static void *rx_func(void *userdata)
   struct allocif intf = {.ops = &ll_allocif_ops_st, .userdata = &st};
   struct timeval tv1;
   uint64_t count = 0;
-  int i;
-  int cnt = sizeof(ctx)/sizeof(*ctx);
+  size_t i;
+  size_t cnt = sizeof(ctx)/sizeof(*ctx);
 
   gettimeofday(&tv1, NULL);
 
@@ -91,8 +91,8 @@ static void *rx_func(void *userdata)
     ip_set_id(ip, 123);
     ip_set_ttl(ip, 64);
     ip_set_proto(ip, 6);
-    ip_set_src(ip, (10<<24)|(2*(i+cnt*threadidx)+2));
-    ip_set_dst(ip, (11<<24)|(2*(i+cnt*threadidx)+1));
+    ip_set_src(ip, (10U<<24)|(2U*(i+cnt*threadidx)+2U));
+    ip_set_dst(ip, (11U<<24)|(2U*(i+cnt*threadidx)+1U));
     ip_set_hdr_cksum_calc(ip, 20);
     tcp = ip_payload(ip);
     tcp_set_src_port(tcp, 12345);
@@ -198,7 +198,7 @@ int main(int argc, char **argv)
   struct worker_local local;
   cpu_set_t cpuset;
   struct conf conf = CONF_INITIALIZER;
-  int i,j;
+  size_t i,j;
 
   confyydirparse(argv[0], "conf.txt", &conf, 0);
   synproxy_init(&synproxy, &conf);

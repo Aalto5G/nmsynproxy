@@ -131,7 +131,7 @@ DIRTUNTAP := pptk/tuntap
 LCTUNTAP := tuntap
 INCLUDES += TUNTAP
 
-CFLAGS := -g -O2 -Wall -Wextra -Wno-missing-field-initializers -Wno-unused-parameter -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith -Werror -std=gnu11 -fPIC
+CFLAGS := -g -O2 -Wall -Wextra -Wsign-conversion -Wno-missing-field-initializers -Wno-unused-parameter -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wpointer-arith -Werror -std=gnu11 -fPIC
 
 .PHONY: all clean distclean unit
 

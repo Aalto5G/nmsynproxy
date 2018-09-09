@@ -37,7 +37,7 @@ static void *signal_handler_thr(void *arg)
 }
 
 struct thr_arg {
-  int idx;
+  size_t idx;
 };
 
 struct nm_desc *nmds[NUM_THR];
@@ -57,8 +57,8 @@ static void *thr(void *arg)
   char lan_mac[6] = {0x3c,0xfd,0xfe,0xa5,0x41,0x49};
   void *ip;
   void *tcp;
-  int i;
-  int cnt = (int)(sizeof(ctx)/sizeof(*ctx));
+  size_t i;
+  size_t cnt = (sizeof(ctx)/sizeof(*ctx));
 
   for (i = 0; i < (int)(sizeof(ctx)/sizeof(*ctx)); i++)
   {
@@ -74,8 +74,8 @@ static void *thr(void *arg)
     ip_set_id(ip, 123);
     ip_set_ttl(ip, 64);
     ip_set_proto(ip, 6);
-    ip_set_src(ip, (10<<24)|(2*(i+cnt*args->idx)+2));
-    ip_set_dst(ip, (11<<24)|(2*(i+cnt*args->idx)+1));
+    ip_set_src(ip, (10U<<24)|(2*(i+cnt*args->idx)+2));
+    ip_set_dst(ip, (11U<<24)|(2*(i+cnt*args->idx)+1));
     ip_set_hdr_cksum_calc(ip, 20);
     tcp = ip_payload(ip);
     tcp_set_src_port(tcp, 12345);
@@ -126,7 +126,7 @@ int main(int argc, char **argv)
   pthread_t thrs[NUM_THR];
   pthread_t sigthr;
   struct nmreq nmr;
-  int i;
+  size_t i;
   char nmifnamebuf[64];
   sigset_t set;
 
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
   }
   for (i = 0; i < NUM_THR; i++)
   {
-    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%d", argv[1], i);
+    snprintf(nmifnamebuf, sizeof(nmifnamebuf), "%s-%zu", argv[1], i);
     memset(&nmr, 0, sizeof(nmr));
     nmr.nr_tx_slots = 64;
     nmr.nr_tx_rings = NUM_THR;

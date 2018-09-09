@@ -210,11 +210,11 @@ static void uplink_impl(
     tcp_set_ack_number(tcp, ctx->seq);
     tcp46_set_cksum_calc(ip);
 
-    pktstruct = ll_alloc_st(loc, packet_size(14 + ip46_total_len(ip)));
+    pktstruct = ll_alloc_st(loc, packet_size(14 + (size_t)ip46_total_len(ip)));
     pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_DOWNLINK;
-    pktstruct->sz = 14 + ip46_total_len(ip);
-    memcpy(pktstruct->data, pktsmall, 14 + ip46_total_len(ip));
+    pktstruct->sz = 14 + (size_t)ip46_total_len(ip);
+    memcpy(pktstruct->data, pktsmall, 14 + (size_t)ip46_total_len(ip));
     if (downlink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
@@ -455,11 +455,11 @@ static void downlink_impl(
     tcp_set_ack_number(tcp, ctx->seq2);
     tcp46_set_cksum_calc(ip);
 
-    pktstruct = ll_alloc_st(loc, packet_size(14 + ip46_total_len(ip)));
+    pktstruct = ll_alloc_st(loc, packet_size(14 + (size_t)ip46_total_len(ip)));
     pktstruct->data = packet_calc_data(pktstruct);
     pktstruct->direction = PACKET_DIRECTION_UPLINK;
-    pktstruct->sz = 14 + ip46_total_len(ip);
-    memcpy(pktstruct->data, pktsmall, 14 + ip46_total_len(ip));
+    pktstruct->sz = 14 + (size_t)ip46_total_len(ip);
+    memcpy(pktstruct->data, pktsmall, 14 + (size_t)ip46_total_len(ip));
     if (uplink(synproxy, local, pktstruct, &outport, time64, loc))
     {
       ll_free_st(loc, pktstruct);
