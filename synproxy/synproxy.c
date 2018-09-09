@@ -2194,6 +2194,7 @@ int downlink(
                         packetbuf, sizeof(packetbuf),
                         statebuf, sizeof(statebuf),
                         port, st);
+      synproxy_hash_unlock(local, &ctx);
       return 1;
     }
     if (entry == NULL)
