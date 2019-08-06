@@ -43,6 +43,7 @@ struct timeouts {
   uint32_t dl_syn_sent;
   uint32_t time_wait;
   uint32_t reseted;
+  uint32_t syn_retx;
 };
 
 struct conf {
@@ -96,6 +97,7 @@ struct conf {
     .dl_syn_sent = 240, \
     .time_wait = 120, \
     .reseted = 45, \
+    .syn_retx = 1, \
   }, \
   .ratehash = { \
     .size = 131072, \

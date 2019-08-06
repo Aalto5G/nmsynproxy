@@ -70,6 +70,7 @@ int confyywrap(yyscan_t scanner)
 %token DL_SYN_SENT
 %token TIME_WAIT
 %token RESETED
+%token SYN_RETX
 
 %type<i> sackhashval
 %type<i> msshashval
@@ -813,5 +814,16 @@ CONNECTED EQUALS INT_LITERAL SEMICOLON
     YYABORT;
   }
   conf->timeouts.reseted = $3;
+}
+| SYN_RETX EQUALS INT_LITERAL SEMICOLON
+{
+  if ($3 <= 0)
+  {
+    log_log(LOG_LEVEL_CRIT, "CONFPARSER",
+            "invalid timeout: %d at line %d col %d",
+            $3, @3.first_line, @3.first_column);
+    YYABORT;
+  }
+  conf->timeouts.syn_retx = $3;
 }
 ;

@@ -42,6 +42,7 @@ struct tcp_statetrack_entry {
 struct synproxy_hash_entry {
   struct hash_list_node node;
   struct timer_link timer;
+  struct timer_link syn_timer;
   union {
     uint32_t ipv4;
     char ipv6[16];
@@ -83,6 +84,21 @@ struct synproxy_hash_entry {
       uint8_t timestamp_present;
       uint32_t local_timestamp;
       uint32_t remote_timestamp;
+
+      //
+      char syn_src_ether[6];
+      char syn_dst_ether[6];
+      union {
+        uint32_t ipv4;
+        char ipv6[16];
+      } syn_src_ip;
+      union {
+        uint32_t ipv4;
+        char ipv6[16];
+      } syn_dst_ip;
+      uint16_t syn_src_port;
+      uint16_t syn_dst_port;
+      uint16_t window;
     } downlink_syn_sent;
     struct {
       uint32_t upfin; // valid if FLAG_STATE_UPLINK_FIN
@@ -260,6 +276,10 @@ static inline void worker_local_free(struct worker_local *local)
     e = CONTAINER_OF(n, struct synproxy_hash_entry, node);
     hash_table_delete(&local->hash, &e->node, synproxy_hash(e));
     timer_linkheap_remove(&local->timers, &e->timer);
+    if (e->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+    {
+      timer_linkheap_remove(&local->timers, &e->syn_timer);
+    }
     free(e);
   }
   hash_table_free(&local->hash);
@@ -428,8 +448,17 @@ static inline void synproxy_hash_del(
     linked_list_delete(&e->state_data.downlink_half_open.listnode);
     local->half_open_connections--;
   }
+  if (e->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    timer_linkheap_remove(&local->timers, &e->syn_timer);
+  }
   free(e);
 }
+
+struct timer_thread_data {
+  struct port *port;
+  struct ll_alloc_st *st;
+};
 
 int downlink(
   struct synproxy *synproxy, struct worker_local *local, struct packet *pkt,
