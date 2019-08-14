@@ -48,6 +48,14 @@ int confyywrap(yyscan_t scanner)
 
 %destructor { free ($$); } STRING_LITERAL
 
+%token LDP
+%token NETMAP_NR_RX_SLOTS
+%token NETMAP_NR_TX_SLOTS
+%token SOCKET_NUM_BUFS
+%token SOCKET_RCVBUF
+%token SOCKET_SNDBUF
+
+
 %token ENABLE DISABLE HASHIP HASHIPPORT COMMANDED SACKHASHMODE EQUALS SEMICOLON OPENBRACE CLOSEBRACE SYNPROXYCONF ERROR_TOK INT_LITERAL
 %token LEARNHASHSIZE RATEHASH SIZE TIMER_PERIOD_USEC TIMER_ADD INITIAL_TOKENS
 %token CONNTABLESIZE THREADCOUNT
@@ -175,6 +183,10 @@ wscaleval:
 
 ratehashlist:
 | ratehashlist ratehash_entry
+;
+
+ldplist:
+| ldplist ldp_entry
 ;
 
 timeoutlist:
@@ -636,7 +648,31 @@ TEST_CONNECTIONS SEMICOLON
   conf->halfopen_cache_max = $3;
 }
 | RATEHASH EQUALS OPENBRACE ratehashlist CLOSEBRACE SEMICOLON
+| LDP EQUALS OPENBRACE ldplist CLOSEBRACE SEMICOLON
 | TIMEOUTS EQUALS OPENBRACE timeoutlist CLOSEBRACE SEMICOLON
+;
+
+ldp_entry:
+  NETMAP_NR_RX_SLOTS EQUALS INT_LITERAL SEMICOLON
+{
+  conf->ldp.netmap_nr_rx_slots = $3;
+}
+| NETMAP_NR_TX_SLOTS EQUALS INT_LITERAL SEMICOLON
+{
+  conf->ldp.netmap_nr_tx_slots = $3;
+}
+| SOCKET_NUM_BUFS EQUALS INT_LITERAL SEMICOLON
+{
+  conf->ldp.socket_num_bufs = $3;
+}
+| SOCKET_RCVBUF EQUALS INT_LITERAL SEMICOLON
+{
+  conf->ldp.socket_rcvbuf = $3;
+}
+| SOCKET_SNDBUF EQUALS INT_LITERAL SEMICOLON
+{
+  conf->ldp.socket_sndbuf = $3;
+}
 ;
 
 ratehash_entry:

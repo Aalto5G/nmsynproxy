@@ -389,7 +389,10 @@ int main(int argc, char **argv)
   sigaddset(&set, SIGALRM);
   pthread_sigmask(SIG_BLOCK, &set, NULL);
 
+  ldp_config_init(&conf.ldp);
   confyydirparse(argv[0], "conf.txt", &conf, 0);
+  ldp_config_set(&conf.ldp);
+
   synproxy_init(&synproxy, &conf);
 
   hash_seed_init();

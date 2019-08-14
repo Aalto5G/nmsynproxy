@@ -6,6 +6,7 @@
 #include <errno.h>
 #include "dynarr.h"
 #include "log.h"
+#include "ldp.h"
 
 enum sackmode {
   SACKMODE_ENABLE,
@@ -79,6 +80,7 @@ struct conf {
   int test_connections;
   uint16_t port;
   struct timeouts timeouts;
+  struct ldp_config ldp;
 };
 
 #define CONF_INITIALIZER { \
