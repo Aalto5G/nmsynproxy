@@ -227,7 +227,14 @@ do instead:
 ```
 
 ...but note that in this variant, you must before remove any assigned addresses
-from the eth0 and eth1 interfaces.
+from the eth0 and eth1 interfaces. Also, if running ldpsynproxy without netmap,
+it's heavily recommended to bump up socket memory:
+```
+sudo sysctl net.core.rmem\_max=2129920
+sudo sysctl net.core.wmem\_max=2129920
+```
+
+...or else you may experience packet loss in cases of highly bursty traffic.
 
 You can also use ldpsynproxy in netmap mode:
 ```
