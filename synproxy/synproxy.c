@@ -396,6 +396,10 @@ static void synproxy_expiry_fn(
     linked_list_delete(&e->state_data.downlink_half_open.listnode);
     local->half_open_connections--;
   }
+  if (e->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    timer_linkheap_remove(&local->timers, &e->syn_timer);
+  }
   worker_local_wrunlock(local);
   free(e);
 }
@@ -730,6 +734,11 @@ static void delete_closing_already_bucket_locked(
   {
     local->direct_connections--;
   }
+  if (entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    // Ok, this should never happen but let's use belts and suspenders!
+    timer_linkheap_remove(&local->timers, &entry->syn_timer);
+  }
   worker_local_wrunlock(local);
   free(entry);
   entry = NULL;
@@ -1030,6 +1039,10 @@ static void send_synack(
       hashval = synproxy_hash(e);
       linked_list_delete(&e->state_data.downlink_half_open.listnode);
       timer_linkheap_remove(&local->timers, &e->timer);
+      if (e->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+      {
+        timer_linkheap_remove(&local->timers, &e->syn_timer);
+      }
       if (ctx.hashval == hashval)
       {
         hash_table_delete_already_bucket_locked(&local->hash, &e->node);
@@ -1087,25 +1100,23 @@ static void send_synack(
 }
 
 static void send_or_resend_syn(
-  void *orig, struct worker_local *local, struct port *port,
+  struct worker_local *local, struct port *port,
   struct ll_alloc_st *st,
   struct synproxy_hash_entry *entry)
 {
   char syn[14+20+40+12+12] = {0};
-  void *ip, *origip;
-  void *tcp, *origtcp;
+  void *ip;
+  void *tcp;
   unsigned char *tcpopts;
   struct packet *pktstruct;
   int version;
   size_t sz;
 
-  origip = ether_payload(orig);
-  version = ip_version(origip);
+  version = entry->version;
   sz = ((version == 4) ? (sizeof(syn) - 20) : sizeof(syn));
-  origtcp = ip46_payload(origip);
 
-  memcpy(ether_src(syn), ether_src(orig), 6);
-  memcpy(ether_dst(syn), ether_dst(orig), 6);
+  memcpy(ether_src(syn), entry->state_data.downlink_syn_sent.syn_src_ether, 6);
+  memcpy(ether_dst(syn), entry->state_data.downlink_syn_sent.syn_dst_ether, 6);
   ether_set_type(syn, version == 4 ? ETHER_TYPE_IP : ETHER_TYPE_IPV6);
   ip = ether_payload(syn);
   ip_set_version(ip, version);
@@ -1119,17 +1130,17 @@ static void send_or_resend_syn(
   ip46_set_id(ip, 0); // XXX
   ip46_set_ttl(ip, 64);
   ip46_set_proto(ip, 6);
-  ip46_set_src(ip, ip46_src(origip));
-  ip46_set_dst(ip, ip46_dst(origip));
+  ip46_set_src(ip, &entry->state_data.downlink_syn_sent.syn_src_ip);
+  ip46_set_dst(ip, &entry->state_data.downlink_syn_sent.syn_dst_ip);
   ip46_set_hdr_cksum_calc(ip);
   tcp = ip46_payload(ip);
-  tcp_set_src_port(tcp, tcp_src_port(origtcp));
-  tcp_set_dst_port(tcp, tcp_dst_port(origtcp));
+  tcp_set_src_port(tcp, entry->state_data.downlink_syn_sent.syn_src_port);
+  tcp_set_dst_port(tcp, entry->state_data.downlink_syn_sent.syn_dst_port);
   tcp_set_syn_on(tcp);
   tcp_set_data_offset(tcp, sizeof(syn) - 14 - 40);
   tcp_set_seq_number(tcp, entry->state_data.downlink_syn_sent.remote_isn);
   tcp_set_ack_number(tcp, 0);
-  tcp_set_window(tcp, tcp_window(origtcp));
+  tcp_set_window(tcp, entry->state_data.downlink_syn_sent.window);
   tcpopts = &((unsigned char*)tcp)[20];
   // WS, kind 3 len 3
   // NOP, kind 1 len 1
@@ -1221,7 +1232,58 @@ static void resend_syn(
     local->synproxy->conf->timeouts.dl_syn_sent*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
 
-  send_or_resend_syn(orig, local, port, st, entry);
+  // Update state_date packet info cache
+  memcpy(entry->state_data.downlink_syn_sent.syn_src_ether, ether_src(orig), 6);
+  memcpy(entry->state_data.downlink_syn_sent.syn_dst_ether, ether_dst(orig), 6);
+  memcpy(&entry->state_data.downlink_syn_sent.syn_src_ip, ip46_src(origip), (entry->version == 4) ? 4 : 16);
+  memcpy(&entry->state_data.downlink_syn_sent.syn_dst_ip, ip46_dst(origip), (entry->version == 4) ? 4 : 16);
+  entry->state_data.downlink_syn_sent.syn_src_port = tcp_src_port(origtcp);
+  entry->state_data.downlink_syn_sent.syn_dst_port = tcp_dst_port(origtcp);
+  entry->state_data.downlink_syn_sent.window = tcp_window(origtcp);
+
+  send_or_resend_syn(local, port, st, entry);
+}
+
+static void timed_resend_syn(
+  struct worker_local *local, struct port *port,
+  struct ll_alloc_st *st,
+  struct synproxy_hash_entry *entry,
+  uint64_t time64)
+{
+  if (entry->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    abort();
+  }
+  send_or_resend_syn(local, port, st, entry);
+}
+
+// caller must not have worker_local lock
+// caller must not have bucket lock
+static void synproxy_resend_syn_fn(
+  struct timer_link *timer, struct timer_linkheap *heap, void *ud, void *vtd)
+{
+  struct worker_local *local = ud;
+  struct timer_thread_data *td = vtd;
+  struct synproxy_hash_entry *e;
+
+  e = CONTAINER_OF(timer, struct synproxy_hash_entry, syn_timer);
+
+  if (e->flag_state != FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    log_log(LOG_LEVEL_EMERG, "WORKER",
+      "DETECTED TIMER synproxy_resend_syn_fn IN STATE %d", (int)e->flag_state);
+    return;
+  }
+
+  log_log(LOG_LEVEL_NOTICE, "WORKERDOWNLINK", "resending SYN in a timed manner");
+
+  // FIXME take bucket lock for timed_resend_syn??? take wrker lock too?
+  timed_resend_syn(local, td->port, td->st, e, gettime64());
+
+  e->syn_timer.time64 += local->synproxy->conf->timeouts.syn_retx*1000ULL*1000ULL;
+  worker_local_wrlock(local);
+  timer_linkheap_add(&local->timers, &e->syn_timer);
+  worker_local_wrunlock(local);
 }
 
 static void send_syn(
@@ -1289,7 +1351,24 @@ static void send_syn(
     local->synproxy->conf->timeouts.dl_syn_sent*1000ULL*1000ULL;
   timer_linkheap_modify(&local->timers, &entry->timer);
 
-  send_or_resend_syn(orig, local, port, st, entry);
+  worker_local_wrlock(local); // FIXME ?????? is this already taken?
+  entry->syn_timer.time64 = time64 + 
+    local->synproxy->conf->timeouts.syn_retx*1000ULL*1000ULL;
+  entry->syn_timer.fn = synproxy_resend_syn_fn;
+  entry->syn_timer.userdata = local;
+  timer_linkheap_add(&local->timers, &entry->syn_timer); // FIXME needs worker local lock???
+  worker_local_wrunlock(local);
+
+  // Update state_date packet info cache
+  memcpy(entry->state_data.downlink_syn_sent.syn_src_ether, ether_src(orig), 6);
+  memcpy(entry->state_data.downlink_syn_sent.syn_dst_ether, ether_dst(orig), 6);
+  memcpy(&entry->state_data.downlink_syn_sent.syn_src_ip, ip46_src(origip), (entry->version == 4) ? 4 : 16);
+  memcpy(&entry->state_data.downlink_syn_sent.syn_dst_ip, ip46_dst(origip), (entry->version == 4) ? 4 : 16);
+  entry->state_data.downlink_syn_sent.syn_src_port = tcp_src_port(origtcp);
+  entry->state_data.downlink_syn_sent.syn_dst_port = tcp_dst_port(origtcp);
+  entry->state_data.downlink_syn_sent.window = tcp_window(origtcp);
+
+  send_or_resend_syn(local, port, st, entry);
 }
 
 static void send_ack_only(
@@ -1595,6 +1674,10 @@ handle_downlink_rst(void *ip, void *ippay,
   worker_local_wrlock(local);
   entry->timer.time64 = time64 +
     synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
+  if (entry->flag_state == FLAG_STATE_DOWNLINK_SYN_SENT)
+  {
+    timer_linkheap_remove(&local->timers, &entry->syn_timer);
+  }
   timer_linkheap_modify(&local->timers, &entry->timer);
   worker_local_wrunlock(local);
   //port->portfunc(pkt, port->userdata);
@@ -1666,6 +1749,7 @@ handle_downlink_half_open(struct synproxy_hash_entry *entry,
     }
     local->half_open_connections--;
     worker_local_wrunlock(local);
+    // FIXME does send_syn require worker local lock?
     send_syn(
       ether, local, port, st,
       entry->state_data.downlink_half_open.mss,
@@ -1837,6 +1921,7 @@ handle_ack_cookie(void *ether, void *ip, void *ippay, // RFE const
     delete_closing_already_bucket_locked(synproxy, local, entry);
     entry = NULL;
   }
+  // FIXME does send_syn require worker local lock?
   send_syn(ether, local, port, st, mss, wscale, sack_permitted, NULL, time64, was_keepalive);
   return;
 }
@@ -2621,6 +2706,7 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
     entry->timer.time64 = time64 +
       synproxy->conf->timeouts.connected*1000ULL*1000ULL;
     timer_linkheap_modify(&local->timers, &entry->timer);
+    timer_linkheap_remove(&local->timers, &entry->syn_timer);
     worker_local_wrunlock(local);
     send_ack_and_window_update(ether, entry, port, st);
     synproxy_hash_unlock(local, &ctx);
@@ -2775,6 +2861,7 @@ handle_uplink_rst(void *ether, void *ip, void *ippay,
     entry->timer.time64 = time64 +
       synproxy->conf->timeouts.reseted*1000ULL*1000ULL;
     timer_linkheap_modify(&local->timers, &entry->timer);
+    timer_linkheap_remove(&local->timers, &entry->syn_timer);
     worker_local_wrunlock(local);
     //port->portfunc(pkt, port->userdata);
     return 0;

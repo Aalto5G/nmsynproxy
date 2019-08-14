@@ -32,6 +32,7 @@ dl_half_open return DL_HALF_OPEN;
 dl_syn_sent return DL_SYN_SENT;
 time_wait return TIME_WAIT;
 reseted return RESETED;
+syn_retx return SYN_RETX;
 
 
 synproxyconf return SYNPROXYCONF;

@@ -120,6 +120,10 @@ static void *rx_func(void *userdata)
   struct timeval tv1;
   struct periodic_userdata periodic = {};
   struct allocif intf = {.ops = &ll_allocif_ops_st, .userdata = &st};
+  struct timer_thread_data ttd;
+
+  ttd.port = &outport;
+  ttd.st = &st;
 
   gettimeofday(&tv1, NULL);
 
@@ -196,7 +200,7 @@ static void *rx_func(void *userdata)
         struct timer_link *timer = timer_linkheap_next_expiry_timer(&args->local->timers);
         timer_linkheap_remove(&args->local->timers, timer);
         worker_local_wrunlock(args->local);
-        timer->fn(timer, &args->local->timers, timer->userdata, NULL);
+        timer->fn(timer, &args->local->timers, timer->userdata, &ttd);
         worker_local_wrlock(args->local);
       }
       worker_local_wrunlock(args->local);
