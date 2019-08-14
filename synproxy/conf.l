@@ -34,6 +34,13 @@ time_wait return TIME_WAIT;
 reseted return RESETED;
 syn_retx return SYN_RETX;
 
+ldp return LDP;
+netmap_nr_rx_slots return NETMAP_NR_RX_SLOTS;
+netmap_nr_tx_slots return NETMAP_NR_TX_SLOTS;
+socket_num_bufs return SOCKET_NUM_BUFS;
+socket_rcvbuf return SOCKET_RCVBUF;
+socket_sndbuf return SOCKET_SNDBUF;
+
 
 synproxyconf return SYNPROXYCONF;
 \{           return OPENBRACE;

@@ -55,7 +55,7 @@ SYNPROXY: $(DIRSYNPROXY)/libsynproxy.a $(DIRSYNPROXY)/workeronlyperf $(DIRSYNPRO
 
 ifeq ($(WITH_NETMAP),yes)
 SYNPROXY: $(DIRSYNPROXY)/nmsynproxy $(DIRSYNPROXY)/netmapsend $(DIRSYNPROXY)/tcpsendrecv $(DIRSYNPROXY)/tcpsendrecv1
-CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR)
+CFLAGS_SYNPROXY += -I$(NETMAP_INCDIR) -Wno-sign-conversion
 endif
 ifeq ($(WITH_ODP),yes)
 SYNPROXY: $(DIRSYNPROXY)/odpsynproxy
