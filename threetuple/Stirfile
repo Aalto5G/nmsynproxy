@@ -1,0 +1,20 @@
+@subfile
+@strict
+
+# You can modify these
+$SRC_LIB = ["threetuple.c"]
+$SRC_PROG = ["threetupletest.c"]
+$LIB = "libthreetuple.a"
+# FIXME fix += operator
+$EXTRACFLAGS = ["-I../pptk/hashlist", "-I../pptk/misc", "-I../pptk/hashtable"]
+$CFLAGS = [@$CFLAGS, @$EXTRACFLAGS]
+$LIBS = ["../pptk/misc/libmisc.a", "../pptk/hashtable/libhashtable.a", \
+         "../pptk/log/liblog.a"]
+$UNITDEPS = []
+$UNITCMDS = []
+
+# You won't want to modify anything below this line
+@call $MODULE($LIB, $SRC_LIB, $SRC_PROG, $LIBS, $UNITDEPS, $UNITCMDS)
+
+@cdepincludes @autophony @autotarget @ignore \
+  @sufsuball([@$SRC_PROG, @$SRC_LIB], ".c", ".d")

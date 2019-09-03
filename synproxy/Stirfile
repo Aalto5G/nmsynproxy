@@ -1,0 +1,53 @@
+@subfile
+@strict
+
+# You can modify these
+$LEX_LIB = ["conf.l"]
+$SRC_LIB = ["synproxy.c", "yyutils.c", "secret.c", "ctrl.c", \
+            @@sufsuball($LEX_LIB, ".l", ".lex.c"), \
+            @@sufsuball($LEX_LIB, ".l", ".tab.c")]
+$SRC_PROG_NM = ["nmsynproxy.c", "netmapsend.c", \
+                "tcpsendrecv.c", "tcpsendrecv1.c"]
+$SRC_PROG_ODP = ["odpsynproxy.c"]
+$SRC_PROG = ["workeronlyperf.c", "secrettest.c", "conftest.c", \
+             "pcapngworkeronly.c", "unittest.c", "sizeof.c", "ctrlperf.c", \
+             "ldpsynproxy.c", "ldpsend.c"]
+@if($WITH_NETMAP)
+  $SRC_PROG = [@$SRC_PROG, @$SRC_PROG_NM]
+@endif
+@if($WITH_ODP)
+  $SRC_PROG = [@$SRC_PROG, @$SRC_PROG_ODP]
+@endif
+$LIB = "libsynproxy.a"
+# FIXME fix += operator
+# FIXME way to specify LDFLAGS
+# FIXME way to specify different CFLAGS for generated files
+$EXTRACFLAGS = ["-I../pptk/packet", "-I../pptk/linkedlist", "-I../pptk/iphdr", \
+                "-I../pptk/misc", "-I../pptk/log", "-I../pptk/hashtable", \
+                "-I../pptk/hashlist", "-I../pptk/ports", "-I../pptk/alloc", \
+                "-I../pptk/timerlinkheap", "-I../pptk/mypcap", \
+                "-I../pptk/dynarr", "-I../pptk/iphash", "-I../sackhash", \
+                "-I../threetuple", "-I../pptk/databuf", "-I../pptk/netmap", \
+                "-I../pptk/ldp", "-I../pptk/rbtree", \
+                "-Wno-sign-compare", "-Wno-missing-prototypes", \
+                "-Wno-sign-conversion", "-L../pptk/libpptk"]
+$CFLAGS = [@$CFLAGS, @$EXTRACFLAGS]
+$LIBS = ["../sackhash/libsackhash.a", "../threetuple/libthreetuple.a", \
+         "../pptk/libpptk/libpptk.a"]
+$UNITDEPS = ["workeronlyperf", "secrettest", "unittest"]
+$UNITCMDS = [["./workeronlyperf"], ["./secrettest"], ["./unittest"]]
+
+# You won't want to modify anything below this line
+@call $MODULE($LIB, $SRC_LIB, $SRC_PROG, $LIBS, $UNITDEPS, $UNITCMDS)
+
+'conf.lex.c' 'conf.lex.h': 'conf.l'
+@	["flex", "--outfile=conf.lex.c", '--header-file=conf.lex.h', $<]
+
+'conf.tab.c' 'conf.tab.h': 'conf.y'
+@	["bison", "--output=conf.tab.c", '--defines=conf.tab.h', $<]
+
+@deponly: 'conf.lex.d' 'conf.lex.o' 'conf.tab.d' 'conf.tab.o': \
+          'conf.tab.h' 'conf.lex.h'
+
+@cdepincludes @autophony @autotarget @ignore \
+  @sufsuball([@$SRC_PROG, @$SRC_LIB], ".c", ".d")
