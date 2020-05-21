@@ -48,7 +48,7 @@ struct timeouts {
 };
 
 struct conf {
-  enum learnmode sackmode;
+  enum sackmode sackmode;
   enum sackconflict sackconflict;
   enum learnmode mssmode;
   enum learnmode wscalemode;
