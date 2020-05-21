@@ -7,7 +7,7 @@ modifications to permit compilation on a certain platform.
 
 Copyright (c) 2017-2019 Aalto University
 
-Copyright (c) 2018 Juha-Matti Tilli
+Copyright (c) 2018, 2020 Juha-Matti Tilli
 
 Authors:
 - Juha-Matti Tilli (copyright to Aalto University transferred on 19.4.2018)
