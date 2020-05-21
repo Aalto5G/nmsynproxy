@@ -1599,7 +1599,7 @@ static inline void update_tcp_timeout(struct synproxy_hash_entry *entry,
   {
     next64 = time64 + local->synproxy->conf->timeouts.connected*1000ULL*1000ULL;
   }
-  if (abs(next64 - entry->timer.time64) >= 1000*1000)
+  if (llabs(((int64_t)next64) - ((int64_t)entry->timer.time64)) >= 1000*1000)
   {
     worker_local_wrlock(local);
     entry->timer.time64 = next64;
