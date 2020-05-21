@@ -55,6 +55,7 @@ ipport_hash(const struct ipport *ipport)
   return siphash_get(&ctx);
 }
 
+#if 0
 static inline uint64_t ip_port(uint32_t ip, uint16_t port)
 {
   return ip | (((uint64_t)port)<<32);
@@ -69,6 +70,7 @@ static inline uint32_t sack_ip_port_hash_value(uint32_t ip, uint16_t port)
 {
   return sack_ipport_hash_value(ip_port(ip, port));
 }
+#endif
 
 static inline uint32_t sack_ip_port_hash_fn(
   struct hash_list_node *node, void *ud)
