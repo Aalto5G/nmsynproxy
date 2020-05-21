@@ -22,10 +22,12 @@ static inline uint32_t sack_ipport_hash_value(uint64_t ipport)
   return siphash64(sack_hash_key, ipport);
 }
 
+#if 0
 static inline uint32_t sack_ip_port_hash_value(uint32_t ip, uint16_t port)
 {
   return sack_ipport_hash_value(ip_port(ip, port));
 }
+#endif
 
 static inline uint32_t sack_ip_port_hash_fn(
   struct hash_list_node *node, void *ud)
