@@ -272,7 +272,7 @@ static void *rx_func(void *userdata)
       else
       {
         //outpkts[j++] = pktstruct;
-        nm_my_inject(ulnmds[args->idx], pkt, hdr.len);
+        nm_my_inject(dlnmds[args->idx], pkt, hdr.len);
       }
       periodic.dlpkts++;
       periodic.dlbytes += hdr.len;
