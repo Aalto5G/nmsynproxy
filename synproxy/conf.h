@@ -8,12 +8,6 @@
 #include "log.h"
 #include "ldp.h"
 
-enum sackmode {
-  SACKMODE_ENABLE,
-  SACKMODE_DISABLE,
-  SACKMODE_HASHIP,
-  SACKMODE_HASHIPPORT,
-};
 enum learnmode {
   HASHMODE_DEFAULT,
   HASHMODE_HASHIP,
@@ -48,7 +42,7 @@ struct timeouts {
 };
 
 struct conf {
-  enum sackmode sackmode;
+  enum learnmode sackmode;
   enum sackconflict sackconflict;
   enum learnmode mssmode;
   enum learnmode wscalemode;
@@ -84,7 +78,7 @@ struct conf {
 };
 
 #define CONF_INITIALIZER { \
-  .sackmode = SACKMODE_HASHIP, \
+  .sackmode = HASHMODE_HASHIP, \
   .sackconflict = SACKCONFLICT_RETAIN, \
   .mssmode = HASHMODE_HASHIP, \
   .learnhashsize = 131072, \
