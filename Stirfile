@@ -4,8 +4,9 @@
 @fileinclude @ignore "opts.smk"
 
 # You can modify these for compilation
+$WITH_WERROR ?= @false
 $CC ?= "cc"
-$CFLAGS ?= ["-g", "-O2", "-Wall", "-Wextra", "-Wsign-conversion", "-Wno-missing-field-initializers", "-Wno-unused-parameter", "-Wshadow", "-Wstrict-prototypes", "-Wmissing-prototypes", "-Wpointer-arith", "-Werror", "-std=gnu11", "-fPIC"]
+$CFLAGS ?= ["-g", "-O2", "-Wall", "-Wextra", "-Wsign-conversion", "-Wno-missing-field-initializers", "-Wno-unused-parameter", "-Wshadow", "-Wstrict-prototypes", "-Wmissing-prototypes", "-Wpointer-arith", "-std=gnu11", "-fPIC"]
 $WITH_NETMAP ?= @false
 $NETMAP_INCDIR ?= ""
 $WITH_ODP ?= @false
@@ -16,6 +17,10 @@ $DPDK_INCDIR ?= ""
 $DPDK_LIBDIR ?= ""
 $LIBS_ODPDEP ?= ["/usr/lib/x86_64-linux-gnu/libssl.a", "/usr/lib/x86_64-linux-gnu/libcrypto.a"]
 $LDFLAGS ?= []
+
+@if($WITH_WERROR)
+  $CFLAGS = [@$CFLAGS, "-Werror"]
+@endif
 
 # You can modify these during development
 $MODS = ["sackhash", "synproxy", "threetuple"]
@@ -94,6 +99,7 @@ $MODS_UNIT = @sufsuball($MODS, "", "/unit")
   $DPDK_LIBDIR = @LP$DPDK_LIBDIR
   $LIBS_ODPDEP = @LP$LIBS_ODPDEP
   $LDFLAGS = @LP$LDFLAGS
+  $WITH_WERROR = @LP$WITH_WERROR
   @projdirinclude "pptk"
 @endscope
 
