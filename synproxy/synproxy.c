@@ -1495,7 +1495,12 @@ static void send_ack_and_window_update(
   tcp_set_ack_number(tcp, tcp_ack_number(origtcp));
   if (entry->wscalediff >= 0)
   {
-    tcp_set_window(tcp, tcp_window(origtcp)>>entry->wscalediff);
+    uint16_t win16 = tcp_window(origtcp) >> entry->wscalediff;
+    if (win16 == 0 && tcp_window(origtcp) != 0)
+    {
+      win16 = 1;
+    }
+    tcp_set_window(tcp, win16);
   }
   else
   {
@@ -3137,8 +3142,12 @@ int uplink(
   wscalediff = entry->wscalediff;
   if (wscalediff > 0)
   {
-    tcp_set_window_cksum_update(
-      ippay, tcp_len, tcp_window(ippay) >> entry->wscalediff);
+    uint16_t win16 = tcp_window(ippay) >> entry->wscalediff;
+    if (win16 == 0 && tcp_window(ippay) != 0)
+    {
+      win16 = 1;
+    }
+    tcp_set_window_cksum_update(ippay, tcp_len, win16);
   }
   else
   {
