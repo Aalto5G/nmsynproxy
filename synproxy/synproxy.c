@@ -821,7 +821,7 @@ static void send_synack(
       if (threetuplectx_find6(&synproxy->threetuplectx, ipv6_dst(origip), tcp_dst_port(origtcp), 6, &threetuplepayload) != 0)
       {
         threetuplepayload.sack_supported = synproxy->conf->own_sack;
-        threetuplepayload.mss = synproxy->conf->own_mss;
+        threetuplepayload.mss = synproxy->conf->own_mss - 20;
         threetuplepayload.wscaleshift = synproxy->conf->own_wscale;
       }
     }
@@ -842,7 +842,7 @@ static void send_synack(
       if (sack_ip_port_hash_get6(&synproxy->autolearn, ipv6_dst(origip), tcp_dst_port(origtcp), &ipportentry) == 0)
       {
         ipportentry.sack_supported = synproxy->conf->own_sack;
-        ipportentry.mss = synproxy->conf->own_mss;
+        ipportentry.mss = synproxy->conf->own_mss - 20;
       }
     }
   }
@@ -862,7 +862,7 @@ static void send_synack(
       if (sack_ip_port_hash_get6(&synproxy->autolearn, ipv6_dst(origip), 0, &ipentry) == 0)
       {
         ipentry.sack_supported = synproxy->conf->own_sack;
-        ipentry.mss = synproxy->conf->own_mss;
+        ipentry.mss = synproxy->conf->own_mss - 20;
       }
     }
   }
@@ -880,7 +880,7 @@ static void send_synack(
   }
   else
   {
-    own_mss = synproxy->conf->own_mss;
+    own_mss = synproxy->conf->own_mss - (version == 4 ? 0 : 20);
   }
   if (synproxy->conf->sackmode == HASHMODE_HASHIPPORT)
   {
@@ -2620,7 +2620,7 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
     tcp_parse_options(ippay, &tcpinfo);
     if (!tcpinfo.options_valid)
     {
-      tcpinfo.mss = synproxy->conf->own_mss;
+      tcpinfo.mss = synproxy->conf->own_mss - (version == 4 ? 0 : 20);
       tcpinfo.wscale = 0;
       tcpinfo.sack_permitted = 0;
     }
@@ -2628,7 +2628,7 @@ handle_uplink_syn(struct packet *pkt, void *ether, void *ip, void *ippay,
     sackdata.mss = tcpinfo.mss;
     if (sackdata.mss == 0)
     {
-      sackdata.mss = synproxy->conf->own_mss;
+      sackdata.mss = synproxy->conf->own_mss - (version == 4 ? 0 : 20);
     }
     if (   synproxy->conf->sackmode == HASHMODE_HASHIPPORT
         || synproxy->conf->mssmode == HASHMODE_HASHIPPORT)
